@@ -5,7 +5,7 @@ IndentWidth: 4
 ContinuationIndentWidth: 4
 PointerAlignment: Left
 AlignAfterOpenBracket: BlockIndent
-ColumnLimit: 128
+ColumnLimit: 100
 BinPackArguments: false
 BinPackParameters: false
 BreakBeforeBraces: Attach
@@ -28,4 +28,6 @@ AllowShortEnumsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
+InsertTrailingCommas: Wrapped
+AllowAllArgumentsOnNextLine: false
 ...

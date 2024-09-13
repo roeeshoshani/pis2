@@ -45,13 +45,22 @@ static err_t lift(lift_ctx_t* ctx) {
         SUCCESS_CLEANUP();
     }
 
-    CHECK_FAIL_TRACE_CODE(PIS_ERR_UNSUPPORTED_INSN, "unsupported first opcode byte: 0x%x", first_opcode_byte);
+    CHECK_FAIL_TRACE_CODE(
+        PIS_ERR_UNSUPPORTED_INSN,
+        "unsupported first opcode byte: 0x%x",
+        first_opcode_byte
+    );
 
 cleanup:
     return err;
 }
 
-err_t pis_x86_lift(const pis_x86_ctx_t* ctx, const u8* machine_code, size_t machine_code_len, pis_lift_result_t* result) {
+err_t pis_x86_lift(
+    const pis_x86_ctx_t* ctx,
+    const u8* machine_code,
+    size_t machine_code_len,
+    pis_lift_result_t* result
+) {
     err_t err = SUCCESS;
 
     CHECK_CODE(machine_code != NULL, PIS_ERR_NULL_ARG);

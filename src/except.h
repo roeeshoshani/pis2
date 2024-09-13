@@ -6,13 +6,13 @@
 
 #define SUCCESS (PIS_ERR_SUCCESS)
 
-#define CHECK_TRACE_CODE(EXPR, CODE, FMT, ...)                                                                                 \
-    do {                                                                                                                       \
-        if (!(EXPR)) {                                                                                                         \
-            err = CODE;                                                                                                        \
-            TRACE_WITH_INFO(FMT, ##__VA_ARGS__);                                                                               \
-            goto cleanup;                                                                                                      \
-        }                                                                                                                      \
+#define CHECK_TRACE_CODE(EXPR, CODE, FMT, ...)                                                     \
+    do {                                                                                           \
+        if (!(EXPR)) {                                                                             \
+            err = CODE;                                                                            \
+            TRACE_WITH_INFO(FMT, ##__VA_ARGS__);                                                   \
+            goto cleanup;                                                                          \
+        }                                                                                          \
     } while (0)
 
 #define CHECK_TRACE(EXPR, FMT, ...) CHECK_TRACE_CODE(EXPR, PIS_ERR_GENERIC, FMT, ##__VA_ARGS__)
@@ -24,14 +24,14 @@
 #define CHECK_FAIL_CODE(CODE) CHECK_CODE(false, CODE)
 #define CHECK_FAIL() CHECK(false)
 
-#define CHECK_RETHROW(EXPR)                                                                                                    \
-    do {                                                                                                                       \
-        err_t ___res = (EXPR);                                                                                                 \
-        CHECK_TRACE_CODE(___res == SUCCESS, ___res, "rethrow");                                                                \
+#define CHECK_RETHROW(EXPR)                                                                        \
+    do {                                                                                           \
+        err_t ___res = (EXPR);                                                                     \
+        CHECK_TRACE_CODE(___res == SUCCESS, ___res, "rethrow");                                    \
     } while (0)
 
-#define SUCCESS_CLEANUP()                                                                                                      \
-    do {                                                                                                                       \
-        err = SUCCESS;                                                                                                         \
-        goto cleanup;                                                                                                          \
+#define SUCCESS_CLEANUP()                                                                          \
+    do {                                                                                           \
+        err = SUCCESS;                                                                             \
+        goto cleanup;                                                                              \
     } while (0)
