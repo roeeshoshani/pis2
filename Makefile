@@ -5,6 +5,8 @@ DEPS := $(OBJS:%.o=%.d)
 
 BIN := build/main
 
+CC := clang
+
 CFLAGS ?=
 CFLAGS += -Isrc
 CFLAGS += -Wall -Wextra
