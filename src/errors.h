@@ -1,0 +1,12 @@
+#pragma once
+
+typedef enum {
+    PIS_ERR_SUCCESS = 0,
+    PIS_ERR_GENERIC,
+    PIS_ERR_UNSUPPORTED_INSN,
+    PIS_ERR_EARLY_EOF,
+    PIS_ERR_NULL_ARG,
+    PIS_ERR_TOO_MANY_INSNS,
+
+    PIS_ERR_X86_2_LEGACY_PREFIXES_OF_SAME_GROUP,
+} err_t;

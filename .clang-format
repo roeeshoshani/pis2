@@ -1,0 +1,31 @@
+---
+BasedOnStyle: LLVM
+DerivePointerAlignment: false
+IndentWidth: 4
+ContinuationIndentWidth: 4
+PointerAlignment: Left
+AlignAfterOpenBracket: BlockIndent
+ColumnLimit: 128
+BinPackArguments: false
+BinPackParameters: false
+BreakBeforeBraces: Attach
+Cpp11BracedListStyle: false
+DerivePointerAlignment: false
+IndentCaseLabels: false
+IndentPPDirectives: AfterHash
+IndentWrappedFunctionNames: true
+KeepEmptyLinesAtTheStartOfBlocks: false
+Language: Cpp
+MaxEmptyLinesToKeep: 2
+ReflowComments: true
+SpaceAfterCStyleCast: true
+SpaceBeforeCpp11BracedList: true
+SpaceBeforeParens: ControlStatements
+UseTab: false
+AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+...
