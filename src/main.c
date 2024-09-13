@@ -22,7 +22,7 @@ int main() {
         .stack_segment_default_size = PIS_X86_SEGMENT_DEFAULT_SIZE_32,
     };
 
-    const u8 code[] = {0xf2, 0x50};
+    const u8 code[] = { 0xf2, 0x50 };
 
     CHECK_RETHROW(pis_x86_lift(&ctx, code, sizeof(code), &result));
 

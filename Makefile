@@ -1,4 +1,5 @@
 SRCS := $(shell find src -type f -name "*.c")
+HDRS := $(shell find src -type f -name "*.h")
 OBJS := $(SRCS:src/%.c=build/%.o)
 DEPS := $(OBJS:%.o=%.d)
 
@@ -21,6 +22,10 @@ build/%.o: src/%.c
 
 $(BIN): $(OBJS)
 	$(CC) $(LDFLAGS) $(CFLAGS) $^ -o $@
+
+.phony: format
+format:
+	clang-format -i $(SRCS) $(HDRS)
 
 .phony: clean
 clean:

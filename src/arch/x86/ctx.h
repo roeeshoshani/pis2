@@ -23,7 +23,4 @@ typedef struct {
     pis_x86_segment_default_size_t stack_segment_default_size;
 } pis_x86_ctx_t;
 
-err_t pis_x86_lift(
-    const pis_x86_ctx_t* ctx, const u8* machine_code, size_t machine_code_len,
-    pis_lift_result_t* result
-);
+err_t pis_x86_lift(const pis_x86_ctx_t* ctx, const u8* machine_code, size_t machine_code_len, pis_lift_result_t* result);

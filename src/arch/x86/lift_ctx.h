@@ -4,11 +4,11 @@
 #include "except.h"
 #include "pis.h"
 
-#define LIFT_CTX_CUR(LIFT_CTX)                                                 \
-    ({                                                                         \
-        u8 ___cur = 0;                                                         \
-        CHECK_RETHROW(lift_ctx_cur(LIFT_CTX, &___cur));                        \
-        ___cur;                                                                \
+#define LIFT_CTX_CUR(LIFT_CTX)                                                                                                 \
+    ({                                                                                                                         \
+        u8 ___cur = 0;                                                                                                         \
+        CHECK_RETHROW(lift_ctx_cur(LIFT_CTX, &___cur));                                                                        \
+        ___cur;                                                                                                                \
     })
 
 #define LIFT_CTX_ADVANCE(LIFT_CTX) CHECK_RETHROW(lift_ctx_advance(LIFT_CTX))
