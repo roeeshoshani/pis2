@@ -11,7 +11,7 @@ void pis_addr_dump(const pis_addr_t* addr) {
 
 void pis_operand_dump(const pis_operand_t* operand) {
     pis_addr_dump(&operand->addr);
-    TRACE_NO_NEWLINE(":0x%lx", (unsigned long) operand->size);
+    TRACE_NO_NEWLINE(":0x%x", (unsigned) pis_operand_size_to_bytes(operand->size));
 }
 
 void pis_insn_dump(const pis_insn_t* insn) {
@@ -40,5 +40,22 @@ void pis_lift_result_dump(const pis_lift_result_t* result) {
 
         // add a newline after each instruction
         TRACE();
+    }
+}
+
+u32 pis_operand_size_to_bytes(pis_operand_size_t operand_size) {
+    return (u32) operand_size;
+}
+
+u32 pis_operand_size_to_bits(pis_operand_size_t operand_size) {
+    return pis_operand_size_to_bytes(operand_size) * 8;
+}
+
+u64 pis_const_negate(u64 const_value, pis_operand_size_t operand_size) {
+    u32 operand_size_bits = pis_operand_size_to_bits(operand_size);
+    if (operand_size_bits == 64) {
+        return -const_value;
+    } else {
+        return (1 << operand_size) - const_value;
     }
 }

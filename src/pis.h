@@ -19,11 +19,13 @@
 
 #define PIS_OPERAND_CONST(VALUE, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_CONST, VALUE), SIZE))
 
+#define PIS_OPERAND_CONST_NEG(ABS_VALUE, SIZE)                                                     \
+    (PIS_OPERAND(PIS_ADDR(PIS_SPACE_CONST, pis_const_negate(ABS_VALUE, SIZE)), SIZE))
+
 #define PIS_LIFT_RESULT_EMIT(LIFT_RESULT, INSN)                                                    \
     CHECK_RETHROW(pis_lift_result_emit((LIFT_RESULT), &(INSN)))
 
-#define DECLARE_REG_OPERAND(NAME)                                                     \
-    const pis_operand_t NAME;
+#define DECLARE_REG_OPERAND(NAME) extern const pis_operand_t NAME;
 
 #define DECLARE_REG_OPERANDS(...) MAP(DECLARE_REG_OPERAND, ##__VA_ARGS__)
 
@@ -39,17 +41,17 @@
     ...                                                                                            \
 )                                                                                                  \
     DEFINE_REG_OPERAND(FIRST_NAME, START_OFFSET, OPERAND_SIZE);                                    \
-    REC_MACRO_EVAL(_DEFINE_REG_OPERANDS_REC_0(                                                       \
+    REC_MACRO_EVAL(_DEFINE_REG_OPERANDS_REC_0(                                                     \
         START_OFFSET,                                                                              \
         OFFSET_STEP_SIZE,                                                                          \
         OPERAND_SIZE,                                                                              \
         SECOND_NAME,                                                                               \
         ##__VA_ARGS__,                                                                             \
-        REC_MACRO_END,                                                                      \
+        REC_MACRO_END,                                                                             \
         0                                                                                          \
     ))
 
-#define _DEFINE_REG_OPERANDS_REC_0(                                                                  \
+#define _DEFINE_REG_OPERANDS_REC_0(                                                                \
     PREV_OFFSET,                                                                                   \
     OFFSET_STEP_SIZE,                                                                              \
     OPERAND_SIZE,                                                                                  \
@@ -58,10 +60,10 @@
     ...                                                                                            \
 )                                                                                                  \
     DEFINE_REG_OPERAND(CUR_NAME, PREV_OFFSET + OFFSET_STEP_SIZE, OPERAND_SIZE);                    \
-    REC_MACRO_TEST(NEXT_NAME, _DEFINE_REG_OPERANDS_REC_1)                                            \
+    REC_MACRO_TEST(NEXT_NAME, _DEFINE_REG_OPERANDS_REC_1)                                          \
     (PREV_OFFSET + OFFSET_STEP_SIZE, OFFSET_STEP_SIZE, OPERAND_SIZE, NEXT_NAME, ##__VA_ARGS__)
 
-#define _DEFINE_REG_OPERANDS_REC_1(                                                                  \
+#define _DEFINE_REG_OPERANDS_REC_1(                                                                \
     PREV_OFFSET,                                                                                   \
     OFFSET_STEP_SIZE,                                                                              \
     OPERAND_SIZE,                                                                                  \
@@ -70,12 +72,13 @@
     ...                                                                                            \
 )                                                                                                  \
     DEFINE_REG_OPERAND(CUR_NAME, PREV_OFFSET + OFFSET_STEP_SIZE, OPERAND_SIZE);                    \
-    REC_MACRO_TEST(NEXT_NAME, _DEFINE_REG_OPERANDS_REC_0)                                            \
+    REC_MACRO_TEST(NEXT_NAME, _DEFINE_REG_OPERANDS_REC_0)                                          \
     (PREV_OFFSET + OFFSET_STEP_SIZE, OFFSET_STEP_SIZE, OPERAND_SIZE, NEXT_NAME, ##__VA_ARGS__)
 
 #define PIS_OPCODE(_)                                                                              \
     _(PIS_OPCODE_MOVE, )                                                                           \
-    _(PIS_OPCODE_ADD, )
+    _(PIS_OPCODE_ADD, )                                                                            \
+    _(PIS_OPCODE_STORE, )
 STR_ENUM(pis_opcode, PIS_OPCODE);
 
 #define PIS_SPACE(_)                                                                               \
@@ -84,6 +87,17 @@ STR_ENUM(pis_opcode, PIS_OPCODE);
     _(PIS_SPACE_RAM, )
 STR_ENUM(pis_space, PIS_SPACE);
 
+typedef enum {
+    /// 1 byte
+    PIS_OPERAND_SIZE_1 = 1,
+    /// 2 bytes
+    PIS_OPERAND_SIZE_2 = 2,
+    /// 4 bytes
+    PIS_OPERAND_SIZE_4 = 4,
+    /// 8 bytes
+    PIS_OPERAND_SIZE_8 = 8,
+} pis_operand_size_t;
+
 typedef struct {
     pis_space_t space;
     u64 offset;
@@ -91,7 +105,7 @@ typedef struct {
 
 typedef struct {
     pis_addr_t addr;
-    u32 size;
+    pis_operand_size_t size;
 } pis_operand_t;
 
 typedef struct {
@@ -113,3 +127,9 @@ void pis_insn_dump(const pis_insn_t* insn);
 err_t pis_lift_result_emit(pis_lift_result_t* result, const pis_insn_t* insn);
 
 void pis_lift_result_dump(const pis_lift_result_t* result);
+
+u32 pis_operand_size_to_bytes(pis_operand_size_t operand_size);
+
+u32 pis_operand_size_to_bits(pis_operand_size_t operand_size);
+
+u64 pis_const_negate(u64 const_value, u32 operand_size);
