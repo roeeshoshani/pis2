@@ -4,20 +4,8 @@
 #include "lift_ctx.h"
 #include "pis.h"
 #include "prefixes.h"
+#include "regs.h"
 #include "utils.h"
-
-typedef enum {
-    REG_RAX,
-    REG_RCX,
-    REG_RDX,
-    REG_RBX,
-    REG_RSP_OR_AH,
-    REG_RBP_OR_CH,
-    REG_RSI_OR_DH,
-    REG_RDI_OR_BH,
-    REG_AMOUNT,
-    REG_MAX = REG_AMOUNT - 1,
-} reg_t;
 
 static err_t lift_push_reg(lift_ctx_t* ctx, prefixes_t* prefixes, reg_t reg) {
     err_t err = SUCCESS;

@@ -23,7 +23,7 @@
 #define _REC_MACRO_DEFER(FN) FN _REC_MACRO_EMPTY()
 
 /// an argument used to mark the end of a recursive macro.
-#define REC_MACRO_END_MARKER ()
+#define REC_MACRO_END ()
 
 /// a function-like macro used to detect an end marker.
 /// it is able to detect the end marker because when it is concatenated with an
@@ -42,3 +42,8 @@
 /// nothing to terminate recursion.
 #define REC_MACRO_TEST(X, RESULT_FN)                                                               \
     _REC_MACRO_EVAL_AND_GET_2ND_ARG(_REC_MACRO_END_MARKER_DETECTOR X, RESULT_FN)
+
+/// invokes the given function-like macro for each one of the arguments.
+#define MAP(FN, ...) REC_MACRO_EVAL(_MAP_0(FN, ##__VA_ARGS__, REC_MACRO_END, 0))
+#define _MAP_0(FN, CUR, NEXT, ...) FN(CUR) REC_MACRO_TEST(NEXT, _MAP_1)(FN, NEXT, ##__VA_ARGS__)
+#define _MAP_1(FN, CUR, NEXT, ...) FN(CUR) REC_MACRO_TEST(NEXT, _MAP_0)(FN, NEXT, ##__VA_ARGS__)

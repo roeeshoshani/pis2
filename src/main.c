@@ -1,4 +1,5 @@
 #include "arch/x86/ctx.h"
+#include "arch/x86/regs.h"
 #include "except.h"
 #include "pis.h"
 #include <stdarg.h>
@@ -27,6 +28,7 @@ int main() {
     CHECK_RETHROW(pis_x86_lift(&ctx, code, sizeof(code), &result));
 
     pis_lift_result_dump(&result);
+    pis_operand_dump(&r8);
 
 cleanup:
     return err;

@@ -22,6 +22,57 @@
 #define PIS_LIFT_RESULT_EMIT(LIFT_RESULT, INSN)                                                    \
     CHECK_RETHROW(pis_lift_result_emit((LIFT_RESULT), &(INSN)))
 
+#define DECLARE_REG_OPERAND(NAME)                                                     \
+    const pis_operand_t NAME;
+
+#define DECLARE_REG_OPERANDS(...) MAP(DECLARE_REG_OPERAND, ##__VA_ARGS__)
+
+#define DEFINE_REG_OPERAND(NAME, OFFSET, SIZE)                                                     \
+    const pis_operand_t NAME = PIS_OPERAND_REG(OFFSET, SIZE)
+
+#define DEFINE_REG_OPERANDS(                                                                       \
+    START_OFFSET,                                                                                  \
+    OFFSET_STEP_SIZE,                                                                              \
+    OPERAND_SIZE,                                                                                  \
+    FIRST_NAME,                                                                                    \
+    SECOND_NAME,                                                                                   \
+    ...                                                                                            \
+)                                                                                                  \
+    DEFINE_REG_OPERAND(FIRST_NAME, START_OFFSET, OPERAND_SIZE);                                    \
+    REC_MACRO_EVAL(_DEFINE_REG_OPERANDS_REC_0(                                                       \
+        START_OFFSET,                                                                              \
+        OFFSET_STEP_SIZE,                                                                          \
+        OPERAND_SIZE,                                                                              \
+        SECOND_NAME,                                                                               \
+        ##__VA_ARGS__,                                                                             \
+        REC_MACRO_END,                                                                      \
+        0                                                                                          \
+    ))
+
+#define _DEFINE_REG_OPERANDS_REC_0(                                                                  \
+    PREV_OFFSET,                                                                                   \
+    OFFSET_STEP_SIZE,                                                                              \
+    OPERAND_SIZE,                                                                                  \
+    CUR_NAME,                                                                                      \
+    NEXT_NAME,                                                                                     \
+    ...                                                                                            \
+)                                                                                                  \
+    DEFINE_REG_OPERAND(CUR_NAME, PREV_OFFSET + OFFSET_STEP_SIZE, OPERAND_SIZE);                    \
+    REC_MACRO_TEST(NEXT_NAME, _DEFINE_REG_OPERANDS_REC_1)                                            \
+    (PREV_OFFSET + OFFSET_STEP_SIZE, OFFSET_STEP_SIZE, OPERAND_SIZE, NEXT_NAME, ##__VA_ARGS__)
+
+#define _DEFINE_REG_OPERANDS_REC_1(                                                                  \
+    PREV_OFFSET,                                                                                   \
+    OFFSET_STEP_SIZE,                                                                              \
+    OPERAND_SIZE,                                                                                  \
+    CUR_NAME,                                                                                      \
+    NEXT_NAME,                                                                                     \
+    ...                                                                                            \
+)                                                                                                  \
+    DEFINE_REG_OPERAND(CUR_NAME, PREV_OFFSET + OFFSET_STEP_SIZE, OPERAND_SIZE);                    \
+    REC_MACRO_TEST(NEXT_NAME, _DEFINE_REG_OPERANDS_REC_0)                                            \
+    (PREV_OFFSET + OFFSET_STEP_SIZE, OFFSET_STEP_SIZE, OPERAND_SIZE, NEXT_NAME, ##__VA_ARGS__)
+
 #define PIS_OPCODE(_)                                                                              \
     _(PIS_OPCODE_MOVE, )                                                                           \
     _(PIS_OPCODE_ADD, )
