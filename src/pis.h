@@ -9,11 +9,11 @@
 #define PIS_LIFT_MAX_INSNS_AMOUNT (64)
 
 #define PIS_INSN(OPCODE, OPERAND_1, OPERAND_2)                                                     \
-    ((pis_insn_t) { .opcode = (OPCODE), .operands = { (OPERAND_1), (OPERAND_2) } })
+    ((pis_insn_t) {.opcode = (OPCODE), .operands = {(OPERAND_1), (OPERAND_2)}})
 
-#define PIS_ADDR(SPACE, OFFSET) ((pis_addr_t) { .space = (SPACE), .offset = (OFFSET) })
+#define PIS_ADDR(SPACE, OFFSET) ((pis_addr_t) {.space = (SPACE), .offset = (OFFSET)})
 
-#define PIS_OPERAND(ADDR, SIZE) ((pis_operand_t) { .addr = (ADDR), .size = (SIZE) })
+#define PIS_OPERAND(ADDR, SIZE) ((pis_operand_t) {.addr = (ADDR), .size = (SIZE)})
 
 #define PIS_OPERAND_REG(OFFSET, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_REG, OFFSET), SIZE))
 
