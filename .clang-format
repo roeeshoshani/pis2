@@ -10,7 +10,6 @@ BinPackArguments: false
 BinPackParameters: false
 BreakBeforeBraces: Attach
 Cpp11BracedListStyle: true
-DerivePointerAlignment: false
 IndentCaseLabels: false
 IndentPPDirectives: AfterHash
 IndentWrappedFunctionNames: true
