@@ -11,7 +11,7 @@ static err_t lift_push_reg(lift_ctx_t* ctx, prefixes_t* prefixes, reg_t reg) {
     err_t err = SUCCESS;
 
     LIFT_CTX_EMIT(ctx, PIS_INSN(PIS_OPCODE_ADD, rsp, PIS_OPERAND_CONST_NEG(8, PIS_OPERAND_SIZE_8)));
-    LIFT_CTX_EMIT(ctx, PIS_INSN(PIS_OPCODE_STORE, rsp, reg));
+    // LIFT_CTX_EMIT(ctx, PIS_INSN(PIS_OPCODE_STORE, rsp, reg));
 
     UNUSED(prefixes);
     UNUSED(reg);
@@ -27,7 +27,7 @@ static err_t lift(lift_ctx_t* ctx) {
     CHECK_RETHROW(parse_prefixes(ctx, &prefixes));
     u8 first_opcode_byte = LIFT_CTX_CUR(ctx);
 
-    if (first_opcode_byte >= 0x50 && first_opcode_byte <= 0x50 + REG_MAX) {
+    if (first_opcode_byte >= 0x50 && first_opcode_byte <= 0x50 + 0b111) {
         reg_t reg = (reg_t) {.encoding = (first_opcode_byte - 0x50)};
         CHECK_RETHROW(lift_push_reg(ctx, &prefixes, reg));
         SUCCESS_CLEANUP();

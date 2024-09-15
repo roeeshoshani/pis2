@@ -6,4 +6,6 @@ DEFINE_REG_OPERANDS(
 
 const pis_operand_t* pis_reg_get_operand(reg_t reg) {
     // TODO: implement this
+    UNUSED(reg);
+    return NULL;
 }
