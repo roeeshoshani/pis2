@@ -3,6 +3,7 @@
 #include "except.h"
 #include "str_enum.h"
 #include "types.h"
+#include "recursive_macros.h"
 
 #define PIS_INSN_OPERANDS_AMOUNT (2)
 

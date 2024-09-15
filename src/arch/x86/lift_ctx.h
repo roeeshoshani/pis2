@@ -31,4 +31,3 @@ err_t lift_ctx_advance(lift_ctx_t* ctx);
 /// returns the current byte of the context.
 err_t lift_ctx_cur(lift_ctx_t* ctx, u8* cur_byte);
 
-pis_operand_size_t lift_ctx_get_operand_size(lift_ctx_t* ctx);

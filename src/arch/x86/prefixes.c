@@ -99,3 +99,12 @@ err_t parse_prefixes(lift_ctx_t* ctx, prefixes_t* prefixes) {
 cleanup:
     return err;
 }
+
+bool prefixes_contain_legacy_prefix(const prefixes_t* prefixes, legacy_prefix_t contains) {
+    for (size_t i = 0; i < LEGACY_PREFIX_GROUP_AMOUNT; i++) {
+        if (prefixes->legacy.by_group[i] == contains) {
+            return true;
+        }
+    }
+    return false;
+}

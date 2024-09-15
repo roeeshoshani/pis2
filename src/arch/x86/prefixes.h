@@ -55,3 +55,5 @@ typedef struct {
 } prefixes_t;
 
 err_t parse_prefixes(lift_ctx_t* ctx, prefixes_t* prefixes);
+
+bool prefixes_contain_legacy_prefix(const prefixes_t* prefixes, legacy_prefix_t contains);

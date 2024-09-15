@@ -1,4 +1,5 @@
 #include "ctx.h"
+#include "arch/x86/common.h"
 #include "errors.h"
 #include "except.h"
 #include "lift_ctx.h"
@@ -10,11 +11,13 @@
 static err_t lift_push_reg(lift_ctx_t* ctx, prefixes_t* prefixes, reg_t reg) {
     err_t err = SUCCESS;
 
-    LIFT_CTX_EMIT(ctx, PIS_INSN(PIS_OPCODE_ADD, rsp, PIS_OPERAND_CONST_NEG(8, PIS_OPERAND_SIZE_8)));
-    // LIFT_CTX_EMIT(ctx, PIS_INSN(PIS_OPCODE_STORE, rsp, reg));
+    pis_operand_size_t operand_size = cpumode_get_operand_size(ctx->pis_x86_ctx->cpumode);
 
-    UNUSED(prefixes);
-    UNUSED(reg);
+    LIFT_CTX_EMIT(ctx, PIS_INSN(PIS_OPCODE_ADD, rsp, PIS_OPERAND_CONST_NEG(8, PIS_OPERAND_SIZE_8)));
+    LIFT_CTX_EMIT(
+        ctx,
+        PIS_INSN(PIS_OPCODE_STORE, rsp, reg_get_operand(reg, operand_size, prefixes))
+    );
 
 cleanup:
     return err;
