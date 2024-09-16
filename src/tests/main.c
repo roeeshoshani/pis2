@@ -29,7 +29,7 @@ cleanup:
     return err;
 }
 
-static err_t generic_test_push_reg(u8 opcode, pis_operand_t pushed_reg) {
+static err_t generic_test_push_reg(const u8* code, size_t code_len, pis_operand_t pushed_reg) {
     err_t err = SUCCESS;
 
     pis_lift_result_t result = {};
@@ -40,9 +40,7 @@ static err_t generic_test_push_reg(u8 opcode, pis_operand_t pushed_reg) {
         .stack_segment_default_size = PIS_X86_SEGMENT_DEFAULT_SIZE_32,
     };
 
-    const u8 code[] = {opcode};
-
-    CHECK_RETHROW(pis_x86_lift(&ctx, code, sizeof(code), &result));
+    CHECK_RETHROW(pis_x86_lift(&ctx, code, code_len, &result));
 
     pis_insn_t expected[] = {
         PIS_INSN(PIS_OPCODE_ADD, rsp, PIS_OPERAND_CONST(-8, PIS_OPERAND_SIZE_8)),
@@ -56,8 +54,15 @@ cleanup:
 
 static err_t test_push_reg() {
     err_t err = SUCCESS;
-    CHECK_RETHROW(generic_test_push_reg(0x50, rax));
-    CHECK_RETHROW(generic_test_push_reg(0x51, rcx));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x50}, 1, rax));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x51}, 1, rcx));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x52}, 1, rdx));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x53}, 1, rbx));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x54}, 1, rsp));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x55}, 1, rbp));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x56}, 1, rsi));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x57}, 1, rdi));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x50}, 1, r8));
 cleanup:
     return err;
 }

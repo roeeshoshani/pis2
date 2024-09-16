@@ -1,2 +1,3 @@
 BITS 64
-push rax
+db 0x41
+db 0x50
