@@ -62,7 +62,18 @@ static err_t test_push_reg() {
     CHECK_RETHROW(generic_test_push_reg((u8[]) {0x55}, 1, rbp));
     CHECK_RETHROW(generic_test_push_reg((u8[]) {0x56}, 1, rsi));
     CHECK_RETHROW(generic_test_push_reg((u8[]) {0x57}, 1, rdi));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x50}, 1, r8));
+
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x50}, 2, r8));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x51}, 2, r9));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x52}, 2, r10));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x53}, 2, r11));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x54}, 2, r12));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x55}, 2, r13));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x56}, 2, r14));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x57}, 2, r15));
+
+    // TODO: add tests for push <reg> with operand size override prefix.
+    // TODO: add tests for push <reg> in 32 and 16 bit cpu modes.
 cleanup:
     return err;
 }
@@ -75,6 +86,8 @@ int main() {
     for (size_t i = 0; i < ARRAY_SIZE(test_funcs); i++) {
         CHECK_RETHROW(test_funcs[i]());
     }
+
+    TRACE(":)");
 
 cleanup:
     return err;
