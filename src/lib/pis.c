@@ -9,9 +9,17 @@ void pis_addr_dump(const pis_addr_t* addr) {
     TRACE_NO_NEWLINE("%s[0x%lx]", pis_space_to_str(addr->space), (unsigned long) addr->offset);
 }
 
+bool pis_addr_equals(const pis_addr_t* a, const pis_addr_t* b) {
+    return a->space == b->space && a->offset == b->offset;
+}
+
 void pis_operand_dump(const pis_operand_t* operand) {
     pis_addr_dump(&operand->addr);
     TRACE_NO_NEWLINE(":0x%x", (unsigned) pis_operand_size_to_bytes(operand->size));
+}
+
+bool pis_operand_equals(const pis_operand_t* a, const pis_operand_t* b) {
+    return a->size == b->size && pis_addr_equals(&a->addr, &b->addr);
 }
 
 void pis_insn_dump(const pis_insn_t* insn) {
@@ -20,6 +28,11 @@ void pis_insn_dump(const pis_insn_t* insn) {
     TRACE_NO_NEWLINE(", ");
     pis_operand_dump(&insn->operands[1]);
     TRACE_NO_NEWLINE(")");
+}
+
+bool pis_insn_equals(const pis_insn_t* a, const pis_insn_t* b) {
+    return a->opcode == b->opcode && pis_operand_equals(&a->operands[0], &b->operands[0]) &&
+           pis_operand_equals(&a->operands[1], &b->operands[1]);
 }
 
 err_t pis_lift_result_emit(pis_lift_result_t* result, const pis_insn_t* insn) {

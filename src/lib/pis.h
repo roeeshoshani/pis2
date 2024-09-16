@@ -120,10 +120,13 @@ typedef struct {
 } pis_lift_result_t;
 
 void pis_addr_dump(const pis_addr_t* addr);
+bool pis_addr_equals(const pis_addr_t* a, const pis_addr_t* b);
 
 void pis_operand_dump(const pis_operand_t* operand);
+bool pis_operand_equals(const pis_operand_t* a, const pis_operand_t* b);
 
 void pis_insn_dump(const pis_insn_t* insn);
+bool pis_insn_equals(const pis_insn_t* a, const pis_insn_t* b);
 
 err_t pis_lift_result_emit(pis_lift_result_t* result, const pis_insn_t* insn);
 
