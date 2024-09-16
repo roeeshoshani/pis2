@@ -56,6 +56,6 @@ u64 pis_const_negate(u64 const_value, pis_operand_size_t operand_size) {
     if (operand_size_bits == 64) {
         return -const_value;
     } else {
-        return (1 << operand_size) - const_value;
+        return (1UL << operand_size_bits) - const_value;
     }
 }
