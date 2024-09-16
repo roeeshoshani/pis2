@@ -54,6 +54,11 @@ typedef struct {
     rex_prefix_t rex;
 } prefixes_t;
 
+typedef struct {
+    lift_ctx_t* lift_ctx;
+    const prefixes_t* prefixes;
+} post_prefixes_ctx_t;
+
 err_t parse_prefixes(lift_ctx_t* ctx, prefixes_t* prefixes);
 
 bool prefixes_contain_legacy_prefix(const prefixes_t* prefixes, legacy_prefix_t contains);

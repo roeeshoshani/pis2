@@ -6,17 +6,45 @@
 #include "pis.h"
 #include "prefixes.h"
 #include "regs.h"
-#include "utils.h"
 
-static err_t lift_push_reg(lift_ctx_t* ctx, prefixes_t* prefixes, reg_t reg) {
+static err_t lift_push_reg(const post_prefixes_ctx_t* ctx, reg_t reg) {
     err_t err = SUCCESS;
 
-    pis_operand_size_t operand_size = cpumode_get_operand_size(ctx->pis_x86_ctx->cpumode);
+    pis_operand_size_t operand_size = cpumode_get_operand_size(ctx->lift_ctx->pis_x86_ctx->cpumode);
 
-    LIFT_CTX_EMIT(ctx, PIS_INSN(PIS_OPCODE_ADD, rsp, PIS_OPERAND_CONST_NEG(8, PIS_OPERAND_SIZE_8)));
     LIFT_CTX_EMIT(
-        ctx,
-        PIS_INSN(PIS_OPCODE_STORE, rsp, reg_get_operand(reg, operand_size, prefixes))
+        ctx->lift_ctx,
+        PIS_INSN(PIS_OPCODE_ADD, rsp, PIS_OPERAND_CONST_NEG(8, PIS_OPERAND_SIZE_8))
+    );
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN(PIS_OPCODE_STORE, rsp, reg_get_operand(reg, operand_size, ctx->prefixes))
+    );
+
+cleanup:
+    return err;
+}
+
+static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    u8 first_opcode_byte = LIFT_CTX_CUR(ctx->lift_ctx);
+
+    if ((first_opcode_byte & (~0b111)) == 0x50) {
+        u8 reg_encoding = first_opcode_byte & 0b111;
+        if (ctx->prefixes->rex.is_present) {
+            // the REX.B bit is an extensions to the register
+            reg_encoding |= ctx->prefixes->rex.b << 3;
+        }
+        reg_t reg = (reg_t) {.encoding = reg_encoding};
+        CHECK_RETHROW(lift_push_reg(ctx, reg));
+        SUCCESS_CLEANUP();
+    }
+
+    CHECK_FAIL_TRACE_CODE(
+        PIS_ERR_UNSUPPORTED_INSN,
+        "unsupported first opcode byte: 0x%x",
+        first_opcode_byte
     );
 
 cleanup:
@@ -28,24 +56,11 @@ static err_t lift(lift_ctx_t* ctx) {
     prefixes_t prefixes = {};
 
     CHECK_RETHROW(parse_prefixes(ctx, &prefixes));
-    u8 first_opcode_byte = LIFT_CTX_CUR(ctx);
 
-    if ((first_opcode_byte & (~0b111)) == 0x50) {
-        u8 reg_encoding = first_opcode_byte & 0b111;
-        if (prefixes.rex.is_present) {
-            // the REX.B bit is an extensions to the register
-            reg_encoding |= prefixes.rex.b << 3;
-        }
-        reg_t reg = (reg_t) {.encoding = reg_encoding};
-        CHECK_RETHROW(lift_push_reg(ctx, &prefixes, reg));
-        SUCCESS_CLEANUP();
-    }
-
-    CHECK_FAIL_TRACE_CODE(
-        PIS_ERR_UNSUPPORTED_INSN,
-        "unsupported first opcode byte: 0x%x",
-        first_opcode_byte
-    );
+    CHECK_RETHROW(post_prefixes_lift(&(post_prefixes_ctx_t) {
+        .lift_ctx = ctx,
+        .prefixes = &prefixes,
+    }));
 
 cleanup:
     return err;
