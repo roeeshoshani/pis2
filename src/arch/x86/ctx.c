@@ -30,8 +30,13 @@ static err_t lift(lift_ctx_t* ctx) {
     CHECK_RETHROW(parse_prefixes(ctx, &prefixes));
     u8 first_opcode_byte = LIFT_CTX_CUR(ctx);
 
-    if (first_opcode_byte >= 0x50 && first_opcode_byte <= 0x50 + 0b111) {
-        reg_t reg = (reg_t) {.encoding = (first_opcode_byte - 0x50)};
+    if ((first_opcode_byte & (~0b111)) == 0x50) {
+        u8 reg_encoding = first_opcode_byte & 0b111;
+        if (prefixes.rex.is_present) {
+            // the REX.B bit is an extensions to the register
+            reg_encoding |= prefixes.rex.b << 3;
+        }
+        reg_t reg = (reg_t) {.encoding = reg_encoding};
         CHECK_RETHROW(lift_push_reg(ctx, &prefixes, reg));
         SUCCESS_CLEANUP();
     }
