@@ -18,7 +18,8 @@ pis_operand_size_t cpumode_get_operand_size(pis_x86_cpumode_t cpumode) {
     }
 }
 
-pis_operand_size_t get_effective_operand_size(const post_prefixes_ctx_t* ctx) {
+pis_operand_size_t
+    get_effective_operand_size(const post_prefixes_ctx_t* ctx, bool default_to_64_bit) {
     bool has_size_override =
         prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_OPERAND_SIZE_OVERRIDE);
 
@@ -31,7 +32,11 @@ pis_operand_size_t get_effective_operand_size(const post_prefixes_ctx_t* ctx) {
         if (ctx->prefixes->rex.is_present && ctx->prefixes->rex.w) {
             return PIS_OPERAND_SIZE_8;
         } else {
-            return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
+            if (default_to_64_bit) {
+                return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_8;
+            } else {
+                return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
+            }
         }
     default:
         // unreachable

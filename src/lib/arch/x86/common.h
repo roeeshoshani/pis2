@@ -8,13 +8,10 @@
 
 pis_operand_size_t cpumode_get_operand_size(pis_x86_cpumode_t cpumode);
 
-pis_operand_size_t get_effective_operand_size(
-    const post_prefixes_ctx_t* ctx
-);
+pis_operand_size_t
+    get_effective_operand_size(const post_prefixes_ctx_t* ctx, bool default_to_64_bit);
 
-pis_operand_size_t get_effective_addr_size(
-    const post_prefixes_ctx_t* ctx
-);
+pis_operand_size_t get_effective_addr_size(const post_prefixes_ctx_t* ctx);
 
 pis_operand_size_t get_effective_stack_addr_size(const post_prefixes_ctx_t* ctx);
 

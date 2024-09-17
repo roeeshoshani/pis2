@@ -117,6 +117,31 @@ static err_t test_push_reg() {
         generic_test_push_reg_mode_64((u8[]) {0x66, 0x41, 0x57}, 3, r15w, 0xfffffffffffffffe)
     );
 
+    CHECK_RETHROW(
+        generic_test_push_reg_mode_64((u8[]) {0x66, 0x48, 0x50}, 3, rax, 0xfffffffffffffff8)
+    );
+    CHECK_RETHROW(
+        generic_test_push_reg_mode_64((u8[]) {0x66, 0x48, 0x51}, 3, rcx, 0xfffffffffffffff8)
+    );
+    CHECK_RETHROW(
+        generic_test_push_reg_mode_64((u8[]) {0x66, 0x48, 0x52}, 3, rdx, 0xfffffffffffffff8)
+    );
+    CHECK_RETHROW(
+        generic_test_push_reg_mode_64((u8[]) {0x66, 0x48, 0x53}, 3, rbx, 0xfffffffffffffff8)
+    );
+    CHECK_RETHROW(
+        generic_test_push_reg_mode_64((u8[]) {0x66, 0x48, 0x54}, 3, rsp, 0xfffffffffffffff8)
+    );
+    CHECK_RETHROW(
+        generic_test_push_reg_mode_64((u8[]) {0x66, 0x48, 0x55}, 3, rbp, 0xfffffffffffffff8)
+    );
+    CHECK_RETHROW(
+        generic_test_push_reg_mode_64((u8[]) {0x66, 0x48, 0x56}, 3, rsi, 0xfffffffffffffff8)
+    );
+    CHECK_RETHROW(
+        generic_test_push_reg_mode_64((u8[]) {0x66, 0x48, 0x57}, 3, rdi, 0xfffffffffffffff8)
+    );
+
     // TODO: add tests for push <reg> in 32 and 16 bit cpu modes.
 cleanup:
     return err;
