@@ -83,6 +83,13 @@ static err_t test_push_reg() {
     CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x57}, 2, r15, 0xfffffffffffffff8));
 
     CHECK_RETHROW(generic_test_push_reg((u8[]) {0x66, 0x50}, 2, ax, 0xfffffffffffffffe));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x66, 0x51}, 2, cx, 0xfffffffffffffffe));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x66, 0x52}, 2, dx, 0xfffffffffffffffe));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x66, 0x53}, 2, bx, 0xfffffffffffffffe));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x66, 0x54}, 2, sp, 0xfffffffffffffffe));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x66, 0x55}, 2, bp, 0xfffffffffffffffe));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x66, 0x56}, 2, si, 0xfffffffffffffffe));
+    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x66, 0x57}, 2, di, 0xfffffffffffffffe));
 
     // TODO: add tests for push <reg> with operand size override prefix.
     // TODO: add tests for push <reg> in 32 and 16 bit cpu modes.
