@@ -1,2 +1,2 @@
 BITS 16
-push ax
+mov bp, sp
