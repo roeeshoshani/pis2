@@ -36,8 +36,6 @@ static err_t generic_test_push_reg(const u8* code, size_t code_len, pis_operand_
 
     pis_x86_ctx_t ctx = {
         .cpumode = PIS_X86_CPUMODE_64_BIT,
-        .code_segment_default_size = PIS_X86_SEGMENT_DEFAULT_SIZE_32,
-        .stack_segment_default_size = PIS_X86_SEGMENT_DEFAULT_SIZE_32,
     };
 
     CHECK_RETHROW(pis_x86_lift(&ctx, code, code_len, &result));

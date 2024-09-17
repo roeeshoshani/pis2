@@ -19,8 +19,6 @@ int main() {
 
     pis_x86_ctx_t ctx = {
         .cpumode = PIS_X86_CPUMODE_64_BIT,
-        .code_segment_default_size = PIS_X86_SEGMENT_DEFAULT_SIZE_32,
-        .stack_segment_default_size = PIS_X86_SEGMENT_DEFAULT_SIZE_32,
     };
 
     const u8 code[] = {0x50};

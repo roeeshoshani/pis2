@@ -26,15 +26,7 @@ pis_operand_size_t get_effective_operand_size(const post_prefixes_ctx_t* ctx) {
     case PIS_X86_CPUMODE_16_BIT:
         return has_size_override ? PIS_OPERAND_SIZE_4 : PIS_OPERAND_SIZE_2;
     case PIS_X86_CPUMODE_32_BIT:
-        switch (ctx->lift_ctx->pis_x86_ctx->code_segment_default_size) {
-        case PIS_X86_SEGMENT_DEFAULT_SIZE_32:
-            return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
-        case PIS_X86_SEGMENT_DEFAULT_SIZE_16:
-            return has_size_override ? PIS_OPERAND_SIZE_4 : PIS_OPERAND_SIZE_2;
-        default:
-            // unreachable
-            return PIS_OPERAND_SIZE_1;
-        }
+        return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
     case PIS_X86_CPUMODE_64_BIT:
         if (ctx->prefixes->rex.is_present && ctx->prefixes->rex.w) {
             return PIS_OPERAND_SIZE_8;
@@ -55,15 +47,7 @@ pis_operand_size_t get_effective_addr_size(const post_prefixes_ctx_t* ctx) {
     case PIS_X86_CPUMODE_16_BIT:
         return has_size_override ? PIS_OPERAND_SIZE_4 : PIS_OPERAND_SIZE_2;
     case PIS_X86_CPUMODE_32_BIT:
-        switch (ctx->lift_ctx->pis_x86_ctx->code_segment_default_size) {
-        case PIS_X86_SEGMENT_DEFAULT_SIZE_32:
-            return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
-        case PIS_X86_SEGMENT_DEFAULT_SIZE_16:
-            return has_size_override ? PIS_OPERAND_SIZE_4 : PIS_OPERAND_SIZE_2;
-        default:
-            // unreachable
-            return PIS_OPERAND_SIZE_1;
-        }
+        return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
     case PIS_X86_CPUMODE_64_BIT:
         return has_size_override ? PIS_OPERAND_SIZE_4 : PIS_OPERAND_SIZE_8;
     default:
@@ -73,18 +57,7 @@ pis_operand_size_t get_effective_addr_size(const post_prefixes_ctx_t* ctx) {
 }
 
 pis_operand_size_t get_effective_stack_addr_size(const post_prefixes_ctx_t* ctx) {
-    if (ctx->lift_ctx->pis_x86_ctx->cpumode == PIS_X86_CPUMODE_64_BIT) {
-        return PIS_OPERAND_SIZE_8;
-    } else {
-        switch (ctx->lift_ctx->pis_x86_ctx->stack_segment_default_size) {
-        case PIS_X86_SEGMENT_DEFAULT_SIZE_32:
-            return PIS_OPERAND_SIZE_4;
-        case PIS_X86_SEGMENT_DEFAULT_SIZE_16:
-            return PIS_OPERAND_SIZE_2;
-        default:
-            return PIS_OPERAND_SIZE_1;
-        }
-    }
+    return cpumode_get_operand_size(ctx->lift_ctx->pis_x86_ctx->cpumode);
 }
 
 pis_operand_t get_sp_operand(const post_prefixes_ctx_t* ctx) {
