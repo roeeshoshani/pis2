@@ -7,13 +7,34 @@
 #include "prefixes.h"
 #include "regs.h"
 
+static pis_operand_size_t get_operand_size_for_push(const post_prefixes_ctx_t* ctx) {
+    bool has_size_override =
+        prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_OPERAND_SIZE_OVERRIDE);
+
+    switch (ctx->lift_ctx->pis_x86_ctx->cpumode) {
+    case PIS_X86_CPUMODE_16_BIT:
+        return has_size_override ? PIS_OPERAND_SIZE_4 : PIS_OPERAND_SIZE_2;
+    case PIS_X86_CPUMODE_32_BIT:
+        return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
+    case PIS_X86_CPUMODE_64_BIT:
+        return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_8;
+    default:
+        // unreachable
+        return PIS_OPERAND_SIZE_1;
+    }
+}
+
 static err_t lift_push_reg(const post_prefixes_ctx_t* ctx, reg_t reg) {
     err_t err = SUCCESS;
 
-    pis_operand_size_t operand_size = cpumode_get_operand_size(ctx->lift_ctx->pis_x86_ctx->cpumode);
+    pis_operand_size_t operand_size = get_operand_size_for_push(ctx);
     pis_operand_t sp = get_sp_operand(ctx);
+    u64 operand_size_bytes = pis_operand_size_to_bytes(operand_size);
 
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_ADD, sp, PIS_OPERAND_CONST_NEG(8, sp.size)));
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN(PIS_OPCODE_ADD, sp, PIS_OPERAND_CONST_NEG(operand_size_bytes, sp.size))
+    );
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
         PIS_INSN(PIS_OPCODE_STORE, sp, reg_get_operand(reg, operand_size, ctx->prefixes))

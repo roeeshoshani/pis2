@@ -1,0 +1,10 @@
+define hook-stop
+x/4i $rip
+end
+
+set disassembly-flavor intel
+set pagination off
+
+b main
+
+r
