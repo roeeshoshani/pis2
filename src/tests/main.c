@@ -39,7 +39,7 @@ cleanup:
     return err;
 }
 
-static err_t generic_test_push_reg(
+static err_t generic_test_push_reg_mode_64(
     const u8* code, size_t code_len, pis_operand_t pushed_reg, u64 rsp_add_amount
 ) {
     err_t err = SUCCESS;
@@ -64,34 +64,59 @@ cleanup:
 
 static err_t test_push_reg() {
     err_t err = SUCCESS;
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x50}, 1, rax, 0xfffffffffffffff8));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x51}, 1, rcx, 0xfffffffffffffff8));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x52}, 1, rdx, 0xfffffffffffffff8));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x53}, 1, rbx, 0xfffffffffffffff8));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x54}, 1, rsp, 0xfffffffffffffff8));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x55}, 1, rbp, 0xfffffffffffffff8));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x56}, 1, rsi, 0xfffffffffffffff8));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x57}, 1, rdi, 0xfffffffffffffff8));
 
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x50}, 2, r8, 0xfffffffffffffff8));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x51}, 2, r9, 0xfffffffffffffff8));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x52}, 2, r10, 0xfffffffffffffff8));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x53}, 2, r11, 0xfffffffffffffff8));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x54}, 2, r12, 0xfffffffffffffff8));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x55}, 2, r13, 0xfffffffffffffff8));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x56}, 2, r14, 0xfffffffffffffff8));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x41, 0x57}, 2, r15, 0xfffffffffffffff8));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x50}, 1, rax, 0xfffffffffffffff8));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x51}, 1, rcx, 0xfffffffffffffff8));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x52}, 1, rdx, 0xfffffffffffffff8));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x53}, 1, rbx, 0xfffffffffffffff8));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x54}, 1, rsp, 0xfffffffffffffff8));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x55}, 1, rbp, 0xfffffffffffffff8));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x56}, 1, rsi, 0xfffffffffffffff8));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x57}, 1, rdi, 0xfffffffffffffff8));
 
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x66, 0x50}, 2, ax, 0xfffffffffffffffe));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x66, 0x51}, 2, cx, 0xfffffffffffffffe));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x66, 0x52}, 2, dx, 0xfffffffffffffffe));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x66, 0x53}, 2, bx, 0xfffffffffffffffe));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x66, 0x54}, 2, sp, 0xfffffffffffffffe));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x66, 0x55}, 2, bp, 0xfffffffffffffffe));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x66, 0x56}, 2, si, 0xfffffffffffffffe));
-    CHECK_RETHROW(generic_test_push_reg((u8[]) {0x66, 0x57}, 2, di, 0xfffffffffffffffe));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x41, 0x50}, 2, r8, 0xfffffffffffffff8));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x41, 0x51}, 2, r9, 0xfffffffffffffff8));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x41, 0x52}, 2, r10, 0xfffffffffffffff8));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x41, 0x53}, 2, r11, 0xfffffffffffffff8));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x41, 0x54}, 2, r12, 0xfffffffffffffff8));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x41, 0x55}, 2, r13, 0xfffffffffffffff8));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x41, 0x56}, 2, r14, 0xfffffffffffffff8));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x41, 0x57}, 2, r15, 0xfffffffffffffff8));
 
-    // TODO: add tests for push <reg> with operand size override prefix.
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x66, 0x50}, 2, ax, 0xfffffffffffffffe));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x66, 0x51}, 2, cx, 0xfffffffffffffffe));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x66, 0x52}, 2, dx, 0xfffffffffffffffe));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x66, 0x53}, 2, bx, 0xfffffffffffffffe));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x66, 0x54}, 2, sp, 0xfffffffffffffffe));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x66, 0x55}, 2, bp, 0xfffffffffffffffe));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x66, 0x56}, 2, si, 0xfffffffffffffffe));
+    CHECK_RETHROW(generic_test_push_reg_mode_64((u8[]) {0x66, 0x57}, 2, di, 0xfffffffffffffffe));
+
+    CHECK_RETHROW(
+        generic_test_push_reg_mode_64((u8[]) {0x66, 0x41, 0x50}, 3, r8w, 0xfffffffffffffffe)
+    );
+    CHECK_RETHROW(
+        generic_test_push_reg_mode_64((u8[]) {0x66, 0x41, 0x51}, 3, r9w, 0xfffffffffffffffe)
+    );
+    CHECK_RETHROW(
+        generic_test_push_reg_mode_64((u8[]) {0x66, 0x41, 0x52}, 3, r10w, 0xfffffffffffffffe)
+    );
+    CHECK_RETHROW(
+        generic_test_push_reg_mode_64((u8[]) {0x66, 0x41, 0x53}, 3, r11w, 0xfffffffffffffffe)
+    );
+    CHECK_RETHROW(
+        generic_test_push_reg_mode_64((u8[]) {0x66, 0x41, 0x54}, 3, r12w, 0xfffffffffffffffe)
+    );
+    CHECK_RETHROW(
+        generic_test_push_reg_mode_64((u8[]) {0x66, 0x41, 0x55}, 3, r13w, 0xfffffffffffffffe)
+    );
+    CHECK_RETHROW(
+        generic_test_push_reg_mode_64((u8[]) {0x66, 0x41, 0x56}, 3, r14w, 0xfffffffffffffffe)
+    );
+    CHECK_RETHROW(
+        generic_test_push_reg_mode_64((u8[]) {0x66, 0x41, 0x57}, 3, r15w, 0xfffffffffffffffe)
+    );
+
     // TODO: add tests for push <reg> in 32 and 16 bit cpu modes.
 cleanup:
     return err;
