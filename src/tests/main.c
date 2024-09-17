@@ -227,6 +227,12 @@ cleanup:
 DEFINE_TEST(test_mov_rm_r_64) {
     err_t err = SUCCESS;
 
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x89, 0xe5),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(PIS_INSN(PIS_OPCODE_MOVE, ebp, esp))
+    ));
+
     goto cleanup;
 cleanup:
     return err;

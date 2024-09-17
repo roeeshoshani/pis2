@@ -1,5 +1,4 @@
 #include "arch/x86/ctx.h"
-#include "arch/x86/regs.h"
 #include "except.h"
 #include "pis.h"
 #include <stdarg.h>
@@ -21,7 +20,7 @@ int main() {
         .cpumode = PIS_X86_CPUMODE_64_BIT,
     };
 
-    const u8 code[] = {0x50};
+    const u8 code[] = {0x89, 0xe5};
 
     CHECK_RETHROW(pis_x86_lift(&ctx, code, sizeof(code), &result));
 

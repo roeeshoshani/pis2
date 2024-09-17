@@ -25,6 +25,10 @@ CFLAGS += -Werror
 .phony: all
 all: $(EXAMPLE_BIN) $(TESTS_BIN) $(OBJS)
 
+.phony: example
+example: $(EXAMPLE_BIN)
+	$(EXAMPLE_BIN)
+
 .phony: test
 test: $(TESTS_BIN)
 	$(TESTS_BIN)
