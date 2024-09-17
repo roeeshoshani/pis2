@@ -33,7 +33,7 @@
 #define CHECK_RETHROW_VERBOSE(EXPR)                                                                \
     do {                                                                                           \
         err_t ___res = (EXPR);                                                                     \
-        CHECK_TRACE_CODE(___res == SUCCESS, ___res, "rethrow from (" #EXPR ")");         \
+        CHECK_TRACE_CODE(___res == SUCCESS, ___res, "rethrow from (" #EXPR ")");                   \
     } while (0)
 
 #define SUCCESS_CLEANUP()                                                                          \
