@@ -39,22 +39,27 @@ cleanup:
     return err;
 }
 
-static err_t generic_test_push_reg_mode_64(
-    const u8* code, size_t code_len, pis_operand_t pushed_reg, u64 rsp_add_amount
+static err_t generic_test_push_reg(
+    const u8* code,
+    size_t code_len,
+    pis_operand_t pushed_reg,
+    u64 sp_add_amount,
+    pis_x86_cpumode_t cpumode,
+    pis_operand_t sp
 ) {
     err_t err = SUCCESS;
 
     pis_lift_result_t result = {};
 
     pis_x86_ctx_t ctx = {
-        .cpumode = PIS_X86_CPUMODE_64_BIT,
+        .cpumode = cpumode,
     };
 
     CHECK_RETHROW_VERBOSE(pis_x86_lift(&ctx, code, code_len, &result));
 
     pis_insn_t expected[] = {
-        PIS_INSN(PIS_OPCODE_ADD, rsp, PIS_OPERAND_CONST(rsp_add_amount, PIS_OPERAND_SIZE_8)),
-        PIS_INSN(PIS_OPCODE_STORE, rsp, pushed_reg),
+        PIS_INSN(PIS_OPCODE_ADD, sp, PIS_OPERAND_CONST(sp_add_amount, sp.size)),
+        PIS_INSN(PIS_OPCODE_STORE, sp, pushed_reg),
     };
     CHECK_RETHROW_VERBOSE(assert_pis_lift_result_equals(&result, expected, ARRAY_SIZE(expected)));
 
@@ -62,7 +67,39 @@ cleanup:
     return err;
 }
 
-static err_t test_push_reg() {
+static err_t generic_test_push_reg_mode_64(
+    const u8* code, size_t code_len, pis_operand_t pushed_reg, u64 rsp_add_amount
+) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW_VERBOSE(generic_test_push_reg(
+        code,
+        code_len,
+        pushed_reg,
+        rsp_add_amount,
+        PIS_X86_CPUMODE_64_BIT,
+        rsp
+    ));
+cleanup:
+    return err;
+}
+
+static err_t generic_test_push_reg_mode_32(
+    const u8* code, size_t code_len, pis_operand_t pushed_reg, u32 esp_add_amount
+) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW_VERBOSE(generic_test_push_reg(
+        code,
+        code_len,
+        pushed_reg,
+        esp_add_amount,
+        PIS_X86_CPUMODE_32_BIT,
+        esp
+    ));
+cleanup:
+    return err;
+}
+
+static err_t test_push_reg_64_bit_mode() {
     err_t err = SUCCESS;
 
     // regular 64 bit push
@@ -109,12 +146,29 @@ static err_t test_push_reg() {
         generic_test_push_reg_mode_64((u8[]) {0x66, 0x49, 0x55}, 3, r13, 0xfffffffffffffff8)
     );
 
-    // TODO: add tests for push <reg> in 32 and 16 bit cpu modes.
 cleanup:
     return err;
 }
 
-const test_func_t test_funcs[] = {test_push_reg};
+static err_t test_push_reg_32_bit_mode() {
+    err_t err = SUCCESS;
+
+    // regular 32 bit push
+    CHECK_RETHROW_VERBOSE(generic_test_push_reg_mode_32((u8[]) {0x50}, 1, eax, 0xfffffffc));
+    CHECK_RETHROW_VERBOSE(generic_test_push_reg_mode_32((u8[]) {0x55}, 1, ebp, 0xfffffffc));
+
+    // operand size override 32 bit push
+    CHECK_RETHROW_VERBOSE(generic_test_push_reg_mode_32((u8[]) {0x66, 0x50}, 2, ax, 0xfffffffe));
+    CHECK_RETHROW_VERBOSE(generic_test_push_reg_mode_32((u8[]) {0x66, 0x55}, 2, bp, 0xfffffffe));
+
+cleanup:
+    return err;
+}
+
+const test_func_t test_funcs[] = {
+    test_push_reg_64_bit_mode,
+    test_push_reg_32_bit_mode,
+};
 
 int main() {
     err_t err = SUCCESS;
