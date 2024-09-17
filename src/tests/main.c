@@ -7,7 +7,23 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-typedef err_t (*test_func_t)();
+typedef err_t (*test_fn_t)();
+
+typedef struct {
+    test_fn_t fn;
+    const char* name;
+} test_entry_t;
+
+extern test_entry_t __start_test_entries[];
+extern test_entry_t __stop_test_entries[];
+
+#define DEFINE_TEST(NAME)                                                                          \
+    static err_t NAME();                                                                           \
+    static test_entry_t __attribute__((used, section("test_entries"))) NAME##_test_entry = {       \
+        .fn = NAME,                                                                                \
+        .name = STRINGIFY(NAME),                                                                   \
+    };                                                                                             \
+    static err_t NAME()
 
 // define an example trace function
 void trace(const char* format, ...) {
@@ -110,7 +126,7 @@ cleanup:
     return err;
 }
 
-static err_t test_push_reg_64_bit_mode() {
+DEFINE_TEST(test_push_reg_64_bit_mode) {
     err_t err = SUCCESS;
 
     // regular 64 bit push
@@ -161,7 +177,7 @@ cleanup:
     return err;
 }
 
-static err_t test_push_reg_32_bit_mode() {
+DEFINE_TEST(test_push_reg_32_bit_mode) {
     err_t err = SUCCESS;
 
     // regular 32 bit push
@@ -177,7 +193,7 @@ cleanup:
 }
 
 
-static err_t test_push_reg_16_bit_mode() {
+DEFINE_TEST(test_push_reg_16_bit_mode) {
     err_t err = SUCCESS;
 
     // regular 16 bit push
@@ -192,17 +208,12 @@ cleanup:
     return err;
 }
 
-const test_func_t test_funcs[] = {
-    test_push_reg_64_bit_mode,
-    test_push_reg_32_bit_mode,
-    test_push_reg_16_bit_mode,
-};
-
 int main() {
     err_t err = SUCCESS;
 
-    for (size_t i = 0; i < ARRAY_SIZE(test_funcs); i++) {
-        CHECK_RETHROW_VERBOSE(test_funcs[i]());
+    for (test_entry_t* cur = __start_test_entries; cur < __stop_test_entries; cur++) {
+        TRACE("[*] %s", cur->name);
+        CHECK_RETHROW_TRACE(cur->fn(), "[!] %s", cur->name);
     }
 
     TRACE(":)");

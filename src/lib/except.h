@@ -36,6 +36,12 @@
         CHECK_TRACE_CODE(___res == SUCCESS, ___res, "rethrow from (" #EXPR ")");                   \
     } while (0)
 
+#define CHECK_RETHROW_TRACE(EXPR, FMT, ...)                                                        \
+    do {                                                                                           \
+        err_t ___res = (EXPR);                                                                     \
+        CHECK_TRACE_CODE(___res == SUCCESS, ___res, FMT, ##__VA_ARGS__);                           \
+    } while (0)
+
 #define SUCCESS_CLEANUP()                                                                          \
     do {                                                                                           \
         err = SUCCESS;                                                                             \
