@@ -199,21 +199,20 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
         // move r/m, r instruction
         modrm_t modrm = decode_modrm_byte(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx));
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+
+        reg_t src_reg = {.encoding = modrm.reg};
+        pis_operand_t src = reg_get_operand(src_reg, operand_size, ctx->prefixes);
+
         if (modrm.mod == 0b11) {
             reg_t dst_reg = {.encoding = modrm.rm};
             pis_operand_t dst = reg_get_operand(dst_reg, operand_size, ctx->prefixes);
-
-            reg_t src_reg = {.encoding = modrm.reg};
-            pis_operand_t src = reg_get_operand(src_reg, operand_size, ctx->prefixes);
 
             LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_MOVE, dst, src));
         } else {
             pis_operand_t rm_addr_tmp = PIS_OPERAND_TMP(0, ctx->addr_size);
             CHECK_RETHROW(build_modrm_rm_addr_into(ctx, &modrm, &rm_addr_tmp));
-            // CHECK_FAIL_TRACE_CODE(
-            //     PIS_ERR_UNSUPPORTED_INSN,
-            //     "memory access with modrm not supported"
-            // );
+
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_STORE, rm_addr_tmp, src));
         }
     } else {
         CHECK_FAIL_TRACE_CODE(
