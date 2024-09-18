@@ -95,7 +95,7 @@ static err_t build_modrm_rm_addr_32_into(
     if (modrm->rm == 0b100) {
         // SIB
         CHECK_FAIL_TRACE_CODE(PIS_ERR_UNSUPPORTED_INSN, "SIB bytes are not supported yet");
-    } else if (modrm->rm == 0b100 && modrm->mod == 0b00) {
+    } else if (modrm->rm == 0b101 && modrm->mod == 0b00) {
         // 32-bit displacement only
         u32 disp = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
         LIFT_CTX_EMIT(
