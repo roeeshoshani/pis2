@@ -169,6 +169,36 @@ cleanup:
     return err;
 }
 
+static err_t
+    decode_modrm_and_get_operands(const post_prefixes_ctx_t* ctx, modrm_operands_t* operands) {
+    err_t err = SUCCESS;
+
+    modrm_t modrm = decode_modrm_byte(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx));
+    pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+
+    reg_t reg = {.encoding = modrm.reg};
+    pis_operand_t reg_operand = reg_get_operand(reg, operand_size, ctx->prefixes);
+
+    if (modrm.mod == 0b11) {
+        reg_t rm_reg = {.encoding = modrm.rm};
+        pis_operand_t rm_operand = reg_get_operand(rm_reg, operand_size, ctx->prefixes);
+
+        operands->reg_operand = reg_operand;
+        operands->rm_operand = rm_operand;
+        operands->is_rm_operand_memory = false;
+    } else {
+        pis_operand_t rm_addr_tmp = PIS_OPERAND_TMP(0, ctx->addr_size);
+        CHECK_RETHROW(build_modrm_rm_addr_into(ctx, &modrm, &rm_addr_tmp));
+
+        operands->reg_operand = reg_operand;
+        operands->rm_operand = rm_addr_tmp;
+        operands->is_rm_operand_memory = true;
+    }
+
+cleanup:
+    return err;
+}
+
 static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
     err_t err = SUCCESS;
 
@@ -197,23 +227,14 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
         );
     } else if (first_opcode_byte == 0x89) {
         // move r/m, r instruction
-        modrm_t modrm = decode_modrm_byte(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx));
-        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
-
-        reg_t src_reg = {.encoding = modrm.reg};
-        pis_operand_t src = reg_get_operand(src_reg, operand_size, ctx->prefixes);
-
-        if (modrm.mod == 0b11) {
-            reg_t dst_reg = {.encoding = modrm.rm};
-            pis_operand_t dst = reg_get_operand(dst_reg, operand_size, ctx->prefixes);
-
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_MOVE, dst, src));
-        } else {
-            pis_operand_t rm_addr_tmp = PIS_OPERAND_TMP(0, ctx->addr_size);
-            CHECK_RETHROW(build_modrm_rm_addr_into(ctx, &modrm, &rm_addr_tmp));
-
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_STORE, rm_addr_tmp, src));
-        }
+        modrm_operands_t modrm_operands = {};
+        CHECK_RETHROW(decode_modrm_and_get_operands(ctx, &modrm_operands));
+        pis_opcode_t opcode =
+            modrm_operands.is_rm_operand_memory ? PIS_OPCODE_STORE : PIS_OPCODE_MOVE;
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN(opcode, modrm_operands.rm_operand, modrm_operands.reg_operand)
+        );
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
