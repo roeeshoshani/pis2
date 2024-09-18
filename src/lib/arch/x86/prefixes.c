@@ -35,7 +35,7 @@ static err_t parse_legacy_prefixes(lift_ctx_t* ctx, legacy_prefixes_t* parsed_pr
     legacy_prefixes_t prefixes = {};
 
     while (!lift_ctx_eof(ctx)) {
-        legacy_prefix_t cur_prefix = (legacy_prefix_t) LIFT_CTX_CUR(ctx);
+        legacy_prefix_t cur_prefix = (legacy_prefix_t) LIFT_CTX_CUR1(ctx);
 
         legacy_prefix_group_t group = legacy_prefix_get_group(cur_prefix);
         if (group == LEGACY_PREFIX_GROUP_INVALID) {
@@ -55,7 +55,7 @@ static err_t parse_legacy_prefixes(lift_ctx_t* ctx, legacy_prefixes_t* parsed_pr
         );
 
         prefixes.by_group[group] = cur_prefix;
-        LIFT_CTX_ADVANCE(ctx);
+        LIFT_CTX_ADVANCE1(ctx);
     }
 
     *parsed_prefixes = prefixes;
@@ -72,7 +72,7 @@ static err_t parse_rex_prefix(lift_ctx_t* ctx, rex_prefix_t* rex_prefix) {
         SUCCESS_CLEANUP();
     }
 
-    u8 cur_byte = LIFT_CTX_CUR(ctx);
+    u8 cur_byte = LIFT_CTX_CUR1(ctx);
     if ((cur_byte & 0xf0) == 0x40) {
         // the byte is a REX prefix
         *rex_prefix = (rex_prefix_t) {
@@ -82,7 +82,7 @@ static err_t parse_rex_prefix(lift_ctx_t* ctx, rex_prefix_t* rex_prefix) {
             .x = GET_BIT_VALUE(cur_byte, 1),
             .b = GET_BIT_VALUE(cur_byte, 0),
         };
-        LIFT_CTX_ADVANCE(ctx);
+        LIFT_CTX_ADVANCE1(ctx);
     }
 
 cleanup:

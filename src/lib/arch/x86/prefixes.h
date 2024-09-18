@@ -2,6 +2,7 @@
 
 #include "except.h"
 #include "lift_ctx.h"
+#include "pis.h"
 #include "types.h"
 
 typedef enum {
@@ -55,8 +56,17 @@ typedef struct {
 } prefixes_t;
 
 typedef struct {
+    /// the operand size for instructions that default to using 64 bit operands
+    pis_operand_size_t insn_default_64_bit;
+    /// the operand size for instructions that don't default to using 64 bit operands
+    pis_operand_size_t insn_default_not_64_bit;
+} effective_operand_sizes_t;
+
+typedef struct {
     lift_ctx_t* lift_ctx;
     const prefixes_t* prefixes;
+    pis_operand_size_t addr_size;
+    effective_operand_sizes_t operand_sizes;
 } post_prefixes_ctx_t;
 
 err_t parse_prefixes(lift_ctx_t* ctx, prefixes_t* prefixes);

@@ -1,5 +1,2 @@
 BITS 32
-push eax
-push ebp
-push ax
-push bp
+mov [eax + 3], ebp

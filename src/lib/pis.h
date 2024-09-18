@@ -18,6 +18,8 @@
 
 #define PIS_OPERAND_REG(OFFSET, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_REG, OFFSET), SIZE))
 
+#define PIS_OPERAND_TMP(OFFSET, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_TMP, OFFSET), SIZE))
+
 #define PIS_OPERAND_CONST(VALUE, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_CONST, VALUE), SIZE))
 
 #define PIS_OPERAND_CONST_NEG(ABS_VALUE, SIZE)                                                     \
@@ -85,7 +87,8 @@ STR_ENUM(pis_opcode, PIS_OPCODE);
 #define PIS_SPACE(_)                                                                               \
     _(PIS_SPACE_CONST, )                                                                           \
     _(PIS_SPACE_REG, )                                                                             \
-    _(PIS_SPACE_RAM, )
+    _(PIS_SPACE_RAM, )                                                                             \
+    _(PIS_SPACE_TMP, )
 STR_ENUM(pis_space, PIS_SPACE);
 
 typedef enum {
