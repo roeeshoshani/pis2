@@ -14,7 +14,7 @@ dump: $(OBJ64) $(OBJ32) $(OBJ16)
 
 .phony: dump16
 dump16: $(OBJ16)
-	objdump -Mintel -d $(OBJ16)
+	objdump -Mintel -mi8086 -d $(OBJ16)
 
 .phony: dump32
 dump32: $(OBJ32)
