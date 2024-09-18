@@ -38,11 +38,13 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
         // move r/m, r instruction
         modrm_operands_t modrm_operands = {};
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-        pis_opcode_t opcode =
-            modrm_operands.is_rm_operand_memory ? PIS_OPCODE_STORE : PIS_OPCODE_MOVE;
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN(opcode, modrm_operands.rm_operand, modrm_operands.reg_operand)
+            PIS_INSN(
+                modrm_operands.rm_operand.is_memory ? PIS_OPCODE_STORE : PIS_OPCODE_MOVE,
+                modrm_operands.rm_operand.addr_or_reg,
+                modrm_operands.reg_operand
+            )
         );
     } else {
         CHECK_FAIL_TRACE_CODE(

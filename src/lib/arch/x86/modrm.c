@@ -185,15 +185,15 @@ err_t modrm_fetch_and_process(const post_prefixes_ctx_t* ctx, modrm_operands_t* 
         pis_operand_t rm_operand = reg_get_operand(rm_reg, operand_size, ctx->prefixes);
 
         operands->reg_operand = reg_operand;
-        operands->rm_operand = rm_operand;
-        operands->is_rm_operand_memory = false;
+        operands->rm_operand.addr_or_reg = rm_operand;
+        operands->rm_operand.is_memory = false;
     } else {
         pis_operand_t rm_addr_tmp = PIS_OPERAND_TMP(0, ctx->addr_size);
         CHECK_RETHROW(build_modrm_rm_addr_into(ctx, &modrm, &rm_addr_tmp));
 
         operands->reg_operand = reg_operand;
-        operands->rm_operand = rm_addr_tmp;
-        operands->is_rm_operand_memory = true;
+        operands->rm_operand.addr_or_reg = rm_addr_tmp;
+        operands->rm_operand.is_memory = true;
     }
 
 cleanup:
