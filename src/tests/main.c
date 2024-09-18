@@ -300,6 +300,26 @@ DEFINE_TEST(test_mov_32_bit_mode) {
         )
     ));
 
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x89, 0xa8, 0x44, 0x33, 0x22, 0x11),
+        PIS_X86_CPUMODE_32_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, eax),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x11223344, 4)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, ebp)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x89, 0x9d, 0xbc, 0xbc, 0xbd, 0xbe),
+        PIS_X86_CPUMODE_32_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, ebp),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST_NEG(0x41424344, 4)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, ebx)
+        )
+    ));
+
     goto cleanup;
 cleanup:
     return err;
