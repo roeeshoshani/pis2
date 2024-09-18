@@ -268,6 +268,12 @@ DEFINE_TEST(test_mov_16_bit_mode) {
         EXPECTED_INSNS(PIS_INSN(PIS_OPCODE_MOVE, bp, sp))
     ));
 
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x89, 0xce),
+        PIS_X86_CPUMODE_16_BIT,
+        EXPECTED_INSNS(PIS_INSN(PIS_OPCODE_MOVE, si, cx))
+    ));
+
     pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, 2);
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x89, 0x0f),
@@ -293,6 +299,58 @@ DEFINE_TEST(test_mov_16_bit_mode) {
         EXPECTED_INSNS(
             PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, PIS_OPERAND_CONST(0x1234, 2)),
             PIS_INSN(PIS_OPCODE_STORE, addr_tmp, di)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x89, 0x44, 0x05),
+        PIS_X86_CPUMODE_16_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, si),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x5, 2)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, ax)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x89, 0x59, 0xff),
+        PIS_X86_CPUMODE_16_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, bx),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, di),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0xffff, 2)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, bx)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x89, 0x76, 0x7f),
+        PIS_X86_CPUMODE_16_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, bp),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x7f, 2)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, si)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x89, 0x88, 0x34, 0x12),
+        PIS_X86_CPUMODE_16_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, bx),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, si),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x1234, 2)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, cx)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x89, 0x96, 0xcc, 0xed),
+        PIS_X86_CPUMODE_16_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, bp),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST_NEG(0x1234, 2)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, dx)
         )
     ));
 
