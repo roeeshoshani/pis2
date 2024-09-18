@@ -268,6 +268,34 @@ DEFINE_TEST(test_mov_16_bit_mode) {
         EXPECTED_INSNS(PIS_INSN(PIS_OPCODE_MOVE, bp, sp))
     ));
 
+    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, 2);
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x89, 0x0f),
+        PIS_X86_CPUMODE_16_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, bx),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, cx)
+        )
+    ));
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x89, 0x12),
+        PIS_X86_CPUMODE_16_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, bp),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, si),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, dx)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x89, 0x3e, 0x34, 0x12),
+        PIS_X86_CPUMODE_16_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, PIS_OPERAND_CONST(0x1234, 2)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, di)
+        )
+    ));
+
     goto cleanup;
 cleanup:
     return err;

@@ -1,3 +1,4 @@
 BITS 16
-mov bp, sp
-db 0x89, 0x68, 0xff
+mov [bx], cx
+mov [bp+si], dx
+mov [0x1234], di
