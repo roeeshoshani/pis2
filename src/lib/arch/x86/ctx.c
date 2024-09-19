@@ -20,7 +20,6 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
             // the REX.B bit is an extensions to the register
             reg_encoding |= ctx->prefixes->rex.b << 3;
         }
-        reg_t reg = (reg_t) {.encoding = reg_encoding};
 
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_64_bit;
         pis_operand_t sp = ctx->lift_ctx->sp;
@@ -32,7 +31,11 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
         );
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN(PIS_OPCODE_STORE, sp, reg_get_operand(reg, operand_size, ctx->prefixes))
+            PIS_INSN(
+                PIS_OPCODE_STORE,
+                sp,
+                reg_get_operand(reg_encoding, operand_size, ctx->prefixes)
+            )
         );
     } else if (first_opcode_byte == 0x89) {
         // move r/m, r instruction

@@ -14,18 +14,18 @@ DEFINE_REG_OPERANDS(
 );
 
 pis_operand_t
-    reg_get_operand(reg_t reg, pis_operand_size_t operand_size, const prefixes_t* prefixes) {
-    if (operand_size == PIS_OPERAND_SIZE_1 && !prefixes->rex.is_present && reg.encoding >= 4 &&
-        reg.encoding <= 7) {
+    reg_get_operand(u8 reg_encoding, pis_operand_size_t operand_size, const prefixes_t* prefixes) {
+    if (operand_size == PIS_OPERAND_SIZE_1 && !prefixes->rex.is_present && reg_encoding >= 4 &&
+        reg_encoding <= 7) {
         // this is an access to the high part of a gpr, for example `AH`.
 
         // find the encoding of the base register which is accessed, for example for `AH` this will
         // be `RAX`.
-        u8 base_reg_encoding = reg.encoding - 4;
+        u8 base_reg_encoding = reg_encoding - 4;
 
         // go to the start of the base register, and add 1 to get the higher byte
         return PIS_OPERAND_REG(base_reg_encoding * 8 + 1, operand_size);
     }
     // regular register access
-    return PIS_OPERAND_REG(reg.encoding * 8, operand_size);
+    return PIS_OPERAND_REG(reg_encoding * 8, operand_size);
 }
