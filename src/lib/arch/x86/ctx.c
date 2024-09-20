@@ -7,6 +7,28 @@
 #include "prefixes.h"
 #include "regs.h"
 
+static pis_operand_size_t cpumode_get_operand_size(pis_x86_cpumode_t cpumode) {
+    switch (cpumode) {
+    case PIS_X86_CPUMODE_64_BIT:
+        return PIS_OPERAND_SIZE_8;
+    case PIS_X86_CPUMODE_32_BIT:
+        return PIS_OPERAND_SIZE_4;
+    case PIS_X86_CPUMODE_16_BIT:
+        return PIS_OPERAND_SIZE_2;
+    default:
+        // unreachable
+        return PIS_OPERAND_SIZE_1;
+    }
+}
+
+static pis_operand_size_t get_effective_stack_addr_size(pis_x86_cpumode_t cpumode) {
+    return cpumode_get_operand_size(cpumode);
+}
+
+static pis_operand_t get_sp_operand(pis_x86_cpumode_t cpumode) {
+    return PIS_OPERAND_REG(0b100 * 8, get_effective_stack_addr_size(cpumode));
+}
+
 static pis_operand_size_t get_effective_operand_size(
     pis_x86_cpumode_t cpumode, const prefixes_t* prefixes, bool default_to_64_bit
 ) {
@@ -126,28 +148,6 @@ static err_t lift(lift_ctx_t* ctx) {
 
 cleanup:
     return err;
-}
-
-static pis_operand_size_t cpumode_get_operand_size(pis_x86_cpumode_t cpumode) {
-    switch (cpumode) {
-    case PIS_X86_CPUMODE_64_BIT:
-        return PIS_OPERAND_SIZE_8;
-    case PIS_X86_CPUMODE_32_BIT:
-        return PIS_OPERAND_SIZE_4;
-    case PIS_X86_CPUMODE_16_BIT:
-        return PIS_OPERAND_SIZE_2;
-    default:
-        // unreachable
-        return PIS_OPERAND_SIZE_1;
-    }
-}
-
-static pis_operand_size_t get_effective_stack_addr_size(pis_x86_cpumode_t cpumode) {
-    return cpumode_get_operand_size(cpumode);
-}
-
-static pis_operand_t get_sp_operand(pis_x86_cpumode_t cpumode) {
-    return PIS_OPERAND_REG(0b100 * 8, get_effective_stack_addr_size(cpumode));
 }
 
 err_t pis_x86_lift(
