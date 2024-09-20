@@ -10,6 +10,12 @@ typedef struct {
     u8 rm;
 } modrm_t;
 
+typedef struct {
+    u8 scale;
+    u8 index;
+    u8 base;
+} sib_t;
+
 /// an operand representing the modrm r/m field.
 typedef struct {
     /// is the r/m field a memory operand or a register operand.
@@ -26,5 +32,7 @@ typedef struct {
 } modrm_operands_t;
 
 modrm_t modrm_decode_byte(u8 modrm_byte);
+
+sib_t sib_decode_byte(u8 sib_byte);
 
 err_t modrm_fetch_and_process(const post_prefixes_ctx_t* ctx, modrm_operands_t* operands);
