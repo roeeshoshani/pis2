@@ -26,7 +26,7 @@
         ___cur;                                                                                    \
     })
 
-#define LIFT_CTX_CUR2_ADVANCE(LIFT_CTX)                                                                    \
+#define LIFT_CTX_CUR2_ADVANCE(LIFT_CTX)                                                            \
     ({                                                                                             \
         u16 ___cur = 0;                                                                            \
         CHECK_RETHROW(lift_ctx_cur2(LIFT_CTX, &___cur));                                           \
@@ -41,7 +41,7 @@
         ___cur;                                                                                    \
     })
 
-#define LIFT_CTX_CUR4_ADVANCE(LIFT_CTX)                                                                    \
+#define LIFT_CTX_CUR4_ADVANCE(LIFT_CTX)                                                            \
     ({                                                                                             \
         u32 ___cur = 0;                                                                            \
         CHECK_RETHROW(lift_ctx_cur4(LIFT_CTX, &___cur));                                           \
