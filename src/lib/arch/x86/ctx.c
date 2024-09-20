@@ -74,6 +74,14 @@ static pis_operand_size_t
     }
 }
 
+static u8 apply_rex_b_bit_to_reg_encoding(u8 reg_encoding, const prefixes_t* prefixes) {
+    if (prefixes->rex.is_present) {
+        // the REX.B bit is an extensions to the register
+        reg_encoding |= prefixes->rex.b << 3;
+    }
+    return reg_encoding;
+}
+
 static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
     err_t err = SUCCESS;
 
@@ -81,11 +89,7 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
 
     if ((first_opcode_byte & (~0b111)) == 0x50) {
         // push <reg> instruction
-        u8 reg_encoding = first_opcode_byte & 0b111;
-        if (ctx->prefixes->rex.is_present) {
-            // the REX.B bit is an extensions to the register
-            reg_encoding |= ctx->prefixes->rex.b << 3;
-        }
+        u8 reg_encoding = apply_rex_b_bit_to_reg_encoding(first_opcode_byte & 0b111, ctx->prefixes);
 
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_64_bit;
         pis_operand_t sp = ctx->lift_ctx->sp;
