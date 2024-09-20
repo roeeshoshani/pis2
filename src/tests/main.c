@@ -226,6 +226,7 @@ cleanup:
 
 DEFINE_TEST(test_mov_64_bit_mode) {
     err_t err = SUCCESS;
+    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_8);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x89, 0xe5),
@@ -263,6 +264,73 @@ DEFINE_TEST(test_mov_64_bit_mode) {
         EXPECTED_INSNS(PIS_INSN(PIS_OPCODE_MOVE, ESI, R15D))
     ));
 
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x4c, 0x89, 0x26),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, RSI),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, R12)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x49, 0x89, 0x6d, 0x07),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, R13),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x7, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, RBP)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x48, 0x89, 0x48, 0x02),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, RAX),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x2, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, RCX)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x4d, 0x89, 0x48, 0xfa),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, R8),
+            PIS_INSN(
+                PIS_OPCODE_ADD,
+                addr_tmp,
+                PIS_OPERAND_CONST(0xfffffffffffffffa, PIS_OPERAND_SIZE_8)
+            ),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, R9)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x49, 0x89, 0x9a, 0x44, 0x33, 0x22, 0x11),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, R10),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x11223344, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, RBX)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x4c, 0x89, 0x9a, 0xbc, 0xbc, 0xbd, 0xbe),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, RDX),
+            PIS_INSN(
+                PIS_OPCODE_ADD,
+                addr_tmp,
+                PIS_OPERAND_CONST_NEG(0x41424344, PIS_OPERAND_SIZE_8)
+            ),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, R11)
+        )
+    ));
+
     goto cleanup;
 cleanup:
     return err;
@@ -270,7 +338,7 @@ cleanup:
 
 DEFINE_TEST(test_mov_32_bit_mode) {
     err_t err = SUCCESS;
-    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, 4);
+    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_4);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x89, 0xe5),
@@ -288,7 +356,7 @@ DEFINE_TEST(test_mov_32_bit_mode) {
         CODE(0x89, 0x35, 0x78, 0x56, 0x34, 0x12),
         PIS_X86_CPUMODE_32_BIT,
         EXPECTED_INSNS(
-            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, PIS_OPERAND_CONST(0x12345678, 4)),
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, PIS_OPERAND_CONST(0x12345678, PIS_OPERAND_SIZE_4)),
             PIS_INSN(PIS_OPCODE_STORE, addr_tmp, ESI)
         )
     ));
@@ -298,7 +366,7 @@ DEFINE_TEST(test_mov_32_bit_mode) {
         PIS_X86_CPUMODE_32_BIT,
         EXPECTED_INSNS(
             PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, EBX),
-            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x3, 4)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x3, PIS_OPERAND_SIZE_4)),
             PIS_INSN(PIS_OPCODE_STORE, addr_tmp, EAX)
         )
     ));
@@ -308,7 +376,7 @@ DEFINE_TEST(test_mov_32_bit_mode) {
         PIS_X86_CPUMODE_32_BIT,
         EXPECTED_INSNS(
             PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, EDI),
-            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0xfffffffe, 4)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0xfffffffe, PIS_OPERAND_SIZE_4)),
             PIS_INSN(PIS_OPCODE_STORE, addr_tmp, ESP)
         )
     ));
@@ -318,7 +386,7 @@ DEFINE_TEST(test_mov_32_bit_mode) {
         PIS_X86_CPUMODE_32_BIT,
         EXPECTED_INSNS(
             PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, EBP),
-            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x7f, 4)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x7f, PIS_OPERAND_SIZE_4)),
             PIS_INSN(PIS_OPCODE_STORE, addr_tmp, EDX)
         )
     ));
@@ -328,7 +396,7 @@ DEFINE_TEST(test_mov_32_bit_mode) {
         PIS_X86_CPUMODE_32_BIT,
         EXPECTED_INSNS(
             PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, EAX),
-            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x11223344, 4)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x11223344, PIS_OPERAND_SIZE_4)),
             PIS_INSN(PIS_OPCODE_STORE, addr_tmp, EBP)
         )
     ));
@@ -338,10 +406,16 @@ DEFINE_TEST(test_mov_32_bit_mode) {
         PIS_X86_CPUMODE_32_BIT,
         EXPECTED_INSNS(
             PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, EBP),
-            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST_NEG(0x41424344, 4)),
+            PIS_INSN(
+                PIS_OPCODE_ADD,
+                addr_tmp,
+                PIS_OPERAND_CONST_NEG(0x41424344, PIS_OPERAND_SIZE_4)
+            ),
             PIS_INSN(PIS_OPCODE_STORE, addr_tmp, EBX)
         )
     ));
+
+    // TODO: add tests with address size override prefix
 
     goto cleanup;
 cleanup:
@@ -350,7 +424,7 @@ cleanup:
 
 DEFINE_TEST(test_mov_16_bit_mode) {
     err_t err = SUCCESS;
-    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, 2);
+    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_2);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x89, 0xe5),
@@ -386,7 +460,7 @@ DEFINE_TEST(test_mov_16_bit_mode) {
         CODE(0x89, 0x3e, 0x34, 0x12),
         PIS_X86_CPUMODE_16_BIT,
         EXPECTED_INSNS(
-            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, PIS_OPERAND_CONST(0x1234, 2)),
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, PIS_OPERAND_CONST(0x1234, PIS_OPERAND_SIZE_2)),
             PIS_INSN(PIS_OPCODE_STORE, addr_tmp, DI)
         )
     ));
@@ -396,7 +470,7 @@ DEFINE_TEST(test_mov_16_bit_mode) {
         PIS_X86_CPUMODE_16_BIT,
         EXPECTED_INSNS(
             PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, SI),
-            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x5, 2)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x5, PIS_OPERAND_SIZE_2)),
             PIS_INSN(PIS_OPCODE_STORE, addr_tmp, AX)
         )
     ));
@@ -407,7 +481,7 @@ DEFINE_TEST(test_mov_16_bit_mode) {
         EXPECTED_INSNS(
             PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, BX),
             PIS_INSN(PIS_OPCODE_ADD, addr_tmp, DI),
-            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0xffff, 2)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0xffff, PIS_OPERAND_SIZE_2)),
             PIS_INSN(PIS_OPCODE_STORE, addr_tmp, BX)
         )
     ));
@@ -417,7 +491,7 @@ DEFINE_TEST(test_mov_16_bit_mode) {
         PIS_X86_CPUMODE_16_BIT,
         EXPECTED_INSNS(
             PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, BP),
-            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x7f, 2)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x7f, PIS_OPERAND_SIZE_2)),
             PIS_INSN(PIS_OPCODE_STORE, addr_tmp, SI)
         )
     ));
@@ -428,7 +502,7 @@ DEFINE_TEST(test_mov_16_bit_mode) {
         EXPECTED_INSNS(
             PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, BX),
             PIS_INSN(PIS_OPCODE_ADD, addr_tmp, SI),
-            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x1234, 2)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x1234, PIS_OPERAND_SIZE_2)),
             PIS_INSN(PIS_OPCODE_STORE, addr_tmp, CX)
         )
     ));
@@ -438,10 +512,12 @@ DEFINE_TEST(test_mov_16_bit_mode) {
         PIS_X86_CPUMODE_16_BIT,
         EXPECTED_INSNS(
             PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, BP),
-            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST_NEG(0x1234, 2)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST_NEG(0x1234, PIS_OPERAND_SIZE_2)),
             PIS_INSN(PIS_OPCODE_STORE, addr_tmp, DX)
         )
     ));
+
+    // TODO: add tests with address size override prefix
 
 cleanup:
     return err;
