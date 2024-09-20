@@ -199,10 +199,7 @@ static err_t build_modrm_rm_addr_64_into(
 ) {
     err_t err = SUCCESS;
 
-    if (modrm->rm == 0b100) {
-        // SIB
-        CHECK_FAIL_TRACE_CODE(PIS_ERR_UNSUPPORTED_INSN, "SIB bytes are not supported yet");
-    } else if (modrm->rm == 0b101 && modrm->mod == 0b00) {
+    if (modrm->rm == 0b101 && modrm->mod == 0b00) {
         // rip relative with 32-bit displacement
         i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
         // sign extend it to 64 bits
@@ -210,13 +207,60 @@ static err_t build_modrm_rm_addr_64_into(
         UNUSED(disp64);
         CHECK_FAIL_TRACE("rip-relative not supported yet");
     } else {
-        // base register encoded in rm
-        pis_operand_t base_reg_operand = reg_get_operand(
-            apply_rex_bit_to_reg_encoding(modrm->rm, ctx->prefixes->rex.b),
-            ctx->addr_size,
-            ctx->prefixes
-        );
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_MOVE, *into, base_reg_operand));
+        if (modrm->rm == 0b100) {
+            // SIB
+            sib_t sib = sib_decode_byte(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx));
+
+            // handle the sib base
+            if (sib.base == 0b101 && modrm->mod == 0b00) {
+                // the base is a disp32
+                u32 disp = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+                LIFT_CTX_EMIT(
+                    ctx->lift_ctx,
+                    PIS_INSN(PIS_OPCODE_MOVE, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
+                );
+            } else {
+                pis_operand_t base_reg_operand = reg_get_operand(
+                    apply_rex_bit_to_reg_encoding(sib.base, ctx->prefixes->rex.b),
+                    ctx->addr_size,
+                    ctx->prefixes
+                );
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_MOVE, *into, base_reg_operand));
+            }
+
+            // handle the scaled index
+            if (sib.index == 0b100) {
+                // no index
+            } else {
+                // build the scaled index into a tmp
+                pis_operand_t sib_tmp = PIS_OPERAND(g_sib_index_tmp_addr, ctx->addr_size);
+                pis_operand_t index_reg_operand = reg_get_operand(
+                    apply_rex_bit_to_reg_encoding(sib.index, ctx->prefixes->rex.x),
+                    ctx->addr_size,
+                    ctx->prefixes
+                );
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_MOVE, sib_tmp, index_reg_operand));
+                LIFT_CTX_EMIT(
+                    ctx->lift_ctx,
+                    PIS_INSN(
+                        PIS_OPCODE_MUL,
+                        sib_tmp,
+                        PIS_OPERAND_CONST(1 << sib.scale, ctx->addr_size)
+                    )
+                );
+
+                // add the scaled index to the address
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_ADD, *into, sib_tmp));
+            }
+        } else {
+            // base register encoded in rm
+            pis_operand_t base_reg_operand = reg_get_operand(
+                apply_rex_bit_to_reg_encoding(modrm->rm, ctx->prefixes->rex.b),
+                ctx->addr_size,
+                ctx->prefixes
+            );
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_MOVE, *into, base_reg_operand));
+        }
 
         // handle displacement
         switch (modrm->mod) {
