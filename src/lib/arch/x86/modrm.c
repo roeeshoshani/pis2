@@ -174,17 +174,20 @@ err_t modrm_fetch_and_process(const post_prefixes_ctx_t* ctx, modrm_operands_t* 
     err_t err = SUCCESS;
 
     modrm_t modrm = modrm_decode_byte(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx));
+
     pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
 
     pis_operand_t reg_operand = reg_get_operand(modrm.reg, operand_size, ctx->prefixes);
 
     if (modrm.mod == 0b11) {
+        // in this case, the r/m field is a register and not a memory operand
         pis_operand_t rm_operand = reg_get_operand(modrm.rm, operand_size, ctx->prefixes);
 
         operands->reg_operand = reg_operand;
         operands->rm_operand.addr_or_reg = rm_operand;
         operands->rm_operand.is_memory = false;
     } else {
+        // in this case, the r/m field is a memory operand
         pis_operand_t rm_addr_tmp = PIS_OPERAND_TMP(0, ctx->addr_size);
         CHECK_RETHROW(build_modrm_rm_addr_into(ctx, &modrm, &rm_addr_tmp));
 
