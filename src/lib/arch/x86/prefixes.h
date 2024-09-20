@@ -73,4 +73,6 @@ err_t parse_prefixes(lift_ctx_t* ctx, prefixes_t* prefixes);
 
 bool prefixes_contain_legacy_prefix(const prefixes_t* prefixes, legacy_prefix_t contains);
 
-u8 apply_rex_b_bit_to_reg_encoding(u8 reg_encoding, const prefixes_t* prefixes);
+u8 apply_rex_bit_to_reg_encoding(u8 reg_encoding, u8 rex_bit);
+
+u8 apply_rex_to_opcode_reg_encoding(u8 reg_encoding, const prefixes_t* prefixes);

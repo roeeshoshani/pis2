@@ -233,12 +233,18 @@ DEFINE_TEST(test_mov_64_bit_mode) {
         EXPECTED_INSNS(PIS_INSN(PIS_OPCODE_MOVE, EBP, ESP))
     ));
 
-    // mov with REX.W should use 64 bit operands
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x48, 0x89, 0xe5),
         PIS_X86_CPUMODE_64_BIT,
         EXPECTED_INSNS(PIS_INSN(PIS_OPCODE_MOVE, RBP, RSP))
     ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x4d, 0x89, 0xc8),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(PIS_INSN(PIS_OPCODE_MOVE, R8, R9))
+    ));
+
 
     goto cleanup;
 cleanup:

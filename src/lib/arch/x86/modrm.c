@@ -162,9 +162,8 @@ static err_t build_modrm_rm_addr_64_into(
         CHECK_FAIL_TRACE("rip-relative not supported yet");
     } else {
         // base register encoded in rm
-
         pis_operand_t base_reg_operand = reg_get_operand(
-            apply_rex_b_bit_to_reg_encoding(modrm->rm, ctx->prefixes),
+            apply_rex_bit_to_reg_encoding(modrm->rm, ctx->prefixes->rex.b),
             ctx->addr_size,
             ctx->prefixes
         );
@@ -240,11 +239,19 @@ err_t modrm_fetch_and_process(const post_prefixes_ctx_t* ctx, modrm_operands_t* 
 
     pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
 
-    pis_operand_t reg_operand = reg_get_operand(modrm.reg, operand_size, ctx->prefixes);
+    pis_operand_t reg_operand = reg_get_operand(
+        apply_rex_bit_to_reg_encoding(modrm.reg, ctx->prefixes->rex.r),
+        operand_size,
+        ctx->prefixes
+    );
 
     if (modrm.mod == 0b11) {
         // in this case, the r/m field is a register and not a memory operand
-        pis_operand_t rm_operand = reg_get_operand(modrm.rm, operand_size, ctx->prefixes);
+        pis_operand_t rm_operand = reg_get_operand(
+            apply_rex_bit_to_reg_encoding(modrm.rm, ctx->prefixes->rex.b),
+            operand_size,
+            ctx->prefixes
+        );
 
         operands->reg_operand = reg_operand;
         operands->rm_operand.addr_or_reg = rm_operand;

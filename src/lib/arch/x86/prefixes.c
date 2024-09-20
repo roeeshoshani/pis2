@@ -111,7 +111,11 @@ bool prefixes_contain_legacy_prefix(const prefixes_t* prefixes, legacy_prefix_t 
     return false;
 }
 
-u8 apply_rex_b_bit_to_reg_encoding(u8 reg_encoding, const prefixes_t* prefixes) {
-    // the REX.B bit is an extensions to the register
-    return reg_encoding | (prefixes->rex.b << 3);
+u8 apply_rex_bit_to_reg_encoding(u8 reg_encoding, u8 rex_bit) {
+    return reg_encoding | (rex_bit << 3);
+}
+
+u8 apply_rex_to_opcode_reg_encoding(u8 reg_encoding, const prefixes_t* prefixes) {
+    // the REX.B bit is an extension to the register encoded in an opcode
+    return apply_rex_bit_to_reg_encoding(reg_encoding, prefixes->rex.b);
 }

@@ -81,7 +81,8 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
 
     if ((first_opcode_byte & (~0b111)) == 0x50) {
         // push <reg> instruction
-        u8 reg_encoding = apply_rex_b_bit_to_reg_encoding(first_opcode_byte & 0b111, ctx->prefixes);
+        u8 reg_encoding =
+            apply_rex_bit_to_reg_encoding(first_opcode_byte & 0b111, ctx->prefixes->rex.b);
 
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_64_bit;
         pis_operand_t sp = ctx->lift_ctx->sp;
