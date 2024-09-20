@@ -133,7 +133,7 @@ static err_t lift(lift_ctx_t* ctx) {
 
     CHECK_RETHROW(parse_prefixes(ctx, &prefixes));
 
-    CHECK_RETHROW(post_prefixes_lift(&(post_prefixes_ctx_t) {
+    post_prefixes_ctx_t post_prefixes_ctx = {
         .lift_ctx = ctx,
         .prefixes = &prefixes,
         .addr_size = get_effective_addr_size(ctx->pis_x86_ctx->cpumode, &prefixes),
@@ -144,7 +144,8 @@ static err_t lift(lift_ctx_t* ctx) {
                 .insn_default_not_64_bit =
                     get_effective_operand_size(ctx->pis_x86_ctx->cpumode, &prefixes, false),
             },
-    }));
+    };
+    CHECK_RETHROW(post_prefixes_lift(&post_prefixes_ctx));
 
 cleanup:
     return err;
