@@ -1,5 +1,5 @@
 #include "prefixes.h"
-#include "arch/x86/ctx.h"
+#include "ctx.h"
 #include "errors.h"
 #include "except.h"
 #include "lift_ctx.h"
@@ -83,6 +83,8 @@ static err_t parse_rex_prefix(lift_ctx_t* ctx, rex_prefix_t* rex_prefix) {
             .b = GET_BIT_VALUE(cur_byte, 0),
         };
         LIFT_CTX_ADVANCE1(ctx);
+    } else {
+        *rex_prefix = (rex_prefix_t) {};
     }
 
 cleanup:
@@ -107,4 +109,9 @@ bool prefixes_contain_legacy_prefix(const prefixes_t* prefixes, legacy_prefix_t 
         }
     }
     return false;
+}
+
+u8 apply_rex_b_bit_to_reg_encoding(u8 reg_encoding, const prefixes_t* prefixes) {
+    // the REX.B bit is an extensions to the register
+    return reg_encoding | (prefixes->rex.b << 3);
 }

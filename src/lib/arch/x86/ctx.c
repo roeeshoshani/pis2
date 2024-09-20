@@ -1,8 +1,8 @@
 #include "ctx.h"
-#include "arch/x86/modrm.h"
 #include "errors.h"
 #include "except.h"
 #include "lift_ctx.h"
+#include "modrm.h"
 #include "pis.h"
 #include "prefixes.h"
 #include "regs.h"
@@ -41,7 +41,7 @@ static pis_operand_size_t get_effective_operand_size(
     case PIS_X86_CPUMODE_32_BIT:
         return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
     case PIS_X86_CPUMODE_64_BIT:
-        if (prefixes->rex.is_present && prefixes->rex.w) {
+        if (prefixes->rex.w) {
             return PIS_OPERAND_SIZE_8;
         } else {
             if (default_to_64_bit) {
@@ -72,14 +72,6 @@ static pis_operand_size_t
         // unreachable
         return PIS_OPERAND_SIZE_1;
     }
-}
-
-static u8 apply_rex_b_bit_to_reg_encoding(u8 reg_encoding, const prefixes_t* prefixes) {
-    if (prefixes->rex.is_present) {
-        // the REX.B bit is an extensions to the register
-        reg_encoding |= prefixes->rex.b << 3;
-    }
-    return reg_encoding;
 }
 
 static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {

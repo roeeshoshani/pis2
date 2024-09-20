@@ -1,4 +1,5 @@
 #include "modrm.h"
+#include "prefixes.h"
 #include "regs.h"
 
 modrm_t modrm_decode_byte(u8 modrm_byte) {
@@ -144,6 +145,68 @@ cleanup:
     return err;
 }
 
+static err_t build_modrm_rm_addr_64_into(
+    const post_prefixes_ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into
+) {
+    err_t err = SUCCESS;
+
+    if (modrm->rm == 0b100) {
+        // SIB
+        CHECK_FAIL_TRACE_CODE(PIS_ERR_UNSUPPORTED_INSN, "SIB bytes are not supported yet");
+    } else if (modrm->rm == 0b101 && modrm->mod == 0b00) {
+        // rip relative with 32-bit displacement
+        i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+        // sign extend it to 64 bits
+        u64 disp64 = (i64) disp32;
+        UNUSED(disp64);
+        CHECK_FAIL_TRACE("rip-relative not supported yet");
+    } else {
+        // base register encoded in rm
+
+        pis_operand_t base_reg_operand = reg_get_operand(
+            apply_rex_b_bit_to_reg_encoding(modrm->rm, ctx->prefixes),
+            ctx->addr_size,
+            ctx->prefixes
+        );
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_MOVE, *into, base_reg_operand));
+
+        // handle displacement
+        switch (modrm->mod) {
+        case 0b00:
+            // no displacement
+            break;
+        case 0b01: {
+            // 8 bit displacement
+            i8 disp8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+            // sign extend it to 64 bits
+            u64 disp64 = (i64) disp8;
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN(PIS_OPCODE_ADD, *into, PIS_OPERAND_CONST(disp64, ctx->addr_size))
+            );
+            break;
+        }
+        case 0b10: {
+            // 32 bit displacement
+            i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+            // sign extend it to 64 bits
+            u64 disp64 = (i64) disp32;
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN(PIS_OPCODE_ADD, *into, PIS_OPERAND_CONST(disp64, ctx->addr_size))
+            );
+            break;
+        }
+        case 0b11:
+            // unreachable
+            CHECK_FAIL();
+        }
+    }
+
+cleanup:
+    return err;
+}
+
 static err_t build_modrm_rm_addr_into(
     const post_prefixes_ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into
 ) {
@@ -154,7 +217,7 @@ static err_t build_modrm_rm_addr_into(
 
     switch (ctx->addr_size) {
     case PIS_OPERAND_SIZE_8:
-        CHECK_FAIL();
+        CHECK_RETHROW(build_modrm_rm_addr_64_into(ctx, modrm, into));
         break;
     case PIS_OPERAND_SIZE_4:
         CHECK_RETHROW(build_modrm_rm_addr_32_into(ctx, modrm, into));

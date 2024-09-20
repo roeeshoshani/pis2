@@ -1,8 +1,8 @@
 #include "lift_ctx.h"
-#include "arch/x86/prefixes.h"
 #include "ctx.h"
 #include "except.h"
 #include "pis.h"
+#include "prefixes.h"
 
 bool lift_ctx_eof(lift_ctx_t* ctx) {
     return ctx->cur >= ctx->end;
