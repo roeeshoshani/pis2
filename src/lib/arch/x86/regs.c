@@ -2,15 +2,15 @@
 #include "pis.h"
 
 DEFINE_REG_OPERANDS(
-    0, 8, 8, rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15
+    0, 8, 8, RAX, RCX, RDX, RBX, RSP, RBP, RSI, RDI, R8, R9, R10, R11, R12, R13, R14, R15
 );
 
 DEFINE_REG_OPERANDS(
-    0, 8, 4, eax, ecx, edx, ebx, esp, ebp, esi, edi, r8d, r9d, r10d, r11d, r12d, r13d, r14d, r15d
+    0, 8, 4, EAX, ECX, EDX, EBX, ESP, EBP, ESI, EDI, R8D, R9D, R10D, R11D, R12D, R13D, R14D, R15D
 );
 
 DEFINE_REG_OPERANDS(
-    0, 8, 2, ax, cx, dx, bx, sp, bp, si, di, r8w, r9w, r10w, r11w, r12w, r13w, r14w, r15w
+    0, 8, 2, AX, CX, DX, BX, SP, BP, SI, DI, R8W, R9W, R10W, R11W, R12W, R13W, R14W, R15W
 );
 
 pis_operand_t
