@@ -245,6 +245,23 @@ DEFINE_TEST(test_mov_64_bit_mode) {
         EXPECTED_INSNS(PIS_INSN(PIS_OPCODE_MOVE, R8, R9))
     ));
 
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x45, 0x89, 0xf4),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(PIS_INSN(PIS_OPCODE_MOVE, R12D, R14D))
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x66, 0x41, 0x89, 0xe5),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(PIS_INSN(PIS_OPCODE_MOVE, R13W, SP))
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x44, 0x89, 0xfe),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(PIS_INSN(PIS_OPCODE_MOVE, ESI, R15D))
+    ));
 
     goto cleanup;
 cleanup:
