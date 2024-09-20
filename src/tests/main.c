@@ -64,7 +64,20 @@ void trace(const char* format, ...) {
 static err_t
     assert_pis_lift_result_equals(const pis_lift_result_t* result, expected_insns_t expected) {
     err_t err = SUCCESS;
-    CHECK(result->insns_amount == expected.amount);
+    if (result->insns_amount != expected.amount) {
+        TRACE("expected %lu insns, got %lu insns", expected.amount, result->insns_amount);
+
+        TRACE("expected insns:");
+        for (size_t i = 0; i < expected.amount; i++) {
+            pis_insn_dump(&expected.insns[i]);
+            TRACE();
+        }
+
+        TRACE("intead got:");
+        pis_lift_result_dump(result);
+
+        CHECK_FAIL();
+    }
     for (size_t i = 0; i < expected.amount; i++) {
         if (!pis_insn_equals(&result->insns[i], &expected.insns[i])) {
             TRACE("expected insn:");
@@ -228,6 +241,7 @@ cleanup:
 DEFINE_TEST(test_mov_64_bit_mode) {
     err_t err = SUCCESS;
     pis_operand_t addr_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_8);
+    pis_operand_t sib_tmp = PIS_OPERAND(g_sib_index_tmp_addr, PIS_OPERAND_SIZE_8);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x89, 0xe5),
@@ -332,6 +346,116 @@ DEFINE_TEST(test_mov_64_bit_mode) {
         )
     ));
 
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x4C, 0x89, 0x94, 0x42, 0x78, 0x56, 0x34, 0x12),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, RDX),
+            PIS_INSN(PIS_OPCODE_MOVE, sib_tmp, RAX),
+            PIS_INSN(PIS_OPCODE_MUL, sib_tmp, PIS_OPERAND_CONST(2, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, sib_tmp),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x12345678, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, R10)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x4c, 0x89, 0x5c, 0x9d, 0x05),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, RBP),
+            PIS_INSN(PIS_OPCODE_MOVE, sib_tmp, RBX),
+            PIS_INSN(PIS_OPCODE_MUL, sib_tmp, PIS_OPERAND_CONST(4, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, sib_tmp),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x05, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, R11)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x4c, 0x89, 0x1c, 0xf7),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, RDI),
+            PIS_INSN(PIS_OPCODE_MOVE, sib_tmp, RSI),
+            PIS_INSN(PIS_OPCODE_MUL, sib_tmp, PIS_OPERAND_CONST(8, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, sib_tmp),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, R11)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x4c, 0x89, 0x1c, 0x04),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, RSP),
+            PIS_INSN(PIS_OPCODE_MOVE, sib_tmp, RAX),
+            PIS_INSN(PIS_OPCODE_MUL, sib_tmp, PIS_OPERAND_CONST(1, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, sib_tmp),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, R11)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x4c, 0x89, 0x1c, 0x25, 0x78, 0x56, 0x34, 0x12),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, PIS_OPERAND_CONST(0x12345678, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, R11)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x4c, 0x89, 0x8c, 0x4d, 0x88, 0x77, 0x66, 0xff),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, RBP),
+            PIS_INSN(PIS_OPCODE_MOVE, sib_tmp, RCX),
+            PIS_INSN(PIS_OPCODE_MUL, sib_tmp, PIS_OPERAND_CONST(2, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, sib_tmp),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST_NEG(0x998878, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, R9)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x4c, 0x89, 0x8c, 0x4d, 0x88, 0x77, 0x66, 0xff),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, RBP),
+            PIS_INSN(PIS_OPCODE_MOVE, sib_tmp, RCX),
+            PIS_INSN(PIS_OPCODE_MUL, sib_tmp, PIS_OPERAND_CONST(2, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, sib_tmp),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST_NEG(0x998878, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, R9)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x4c, 0x89, 0x5c, 0xb5, 0xf8),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, RBP),
+            PIS_INSN(PIS_OPCODE_MOVE, sib_tmp, RSI),
+            PIS_INSN(PIS_OPCODE_MUL, sib_tmp, PIS_OPERAND_CONST(4, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, sib_tmp),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST_NEG(0x08, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, R11)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x4c, 0x89, 0x5c, 0xd5, 0x00),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, RBP),
+            PIS_INSN(PIS_OPCODE_MOVE, sib_tmp, RDX),
+            PIS_INSN(PIS_OPCODE_MUL, sib_tmp, PIS_OPERAND_CONST(8, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, sib_tmp),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, R11)
+        )
+    ));
     goto cleanup;
 cleanup:
     return err;

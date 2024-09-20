@@ -12,3 +12,8 @@ mov [r8-6], r9
 mov [rax + 2], rcx
 mov [r10+0x11223344], rbx
 mov [rdx - 0x41424344], r11
+
+
+MOV [RBP + 4*RBX + 0x05], R11
+MOV [RBP + 4*RSI - 0x08], R11
+MOV [RBP + 8*RDX], R11
