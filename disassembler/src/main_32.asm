@@ -23,3 +23,11 @@ mov [ebp + 2*edx - 0x41424344], esp
 mov [ecx + esi*8 + 1], edi
 mov [eax + ebx*2 - 3], ebp
 mov [esp + 4*ecx + 0x11223344], esp
+
+nop
+nop
+nop
+
+mov [bp + si + 0x1234], eax
+mov [eax + ebx*2 - 3], ax
+mov [bx + si + 0x1234], cx
