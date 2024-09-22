@@ -670,6 +670,8 @@ cleanup:
 DEFINE_TEST(test_mov_16_bit_mode) {
     err_t err = SUCCESS;
     pis_operand_t addr_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_2);
+    pis_operand_t addr32_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_4);
+    pis_operand_t sib_tmp = PIS_OPERAND(g_sib_index_tmp_addr, PIS_OPERAND_SIZE_4);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x89, 0xe5),
@@ -762,7 +764,42 @@ DEFINE_TEST(test_mov_16_bit_mode) {
         )
     ));
 
-    // TODO: add tests with address size override prefix
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x66, 0x89, 0x82, 0x34, 0x12),
+        PIS_X86_CPUMODE_16_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, BP),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, SI),
+            PIS_INSN(PIS_OPCODE_ADD, addr_tmp, PIS_OPERAND_CONST(0x1234, PIS_OPERAND_SIZE_2)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, EAX)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x67, 0x89, 0x44, 0x58, 0xfd),
+        PIS_X86_CPUMODE_16_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr32_tmp, EAX),
+            PIS_INSN(PIS_OPCODE_MOVE, sib_tmp, EBX),
+            PIS_INSN(PIS_OPCODE_MUL, sib_tmp, PIS_OPERAND_CONST(2, PIS_OPERAND_SIZE_4)),
+            PIS_INSN(PIS_OPCODE_ADD, addr32_tmp, sib_tmp),
+            PIS_INSN(PIS_OPCODE_ADD, addr32_tmp, PIS_OPERAND_CONST(0xfffffffd, PIS_OPERAND_SIZE_4)),
+            PIS_INSN(PIS_OPCODE_STORE, addr32_tmp, AX)
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x66, 0x67, 0x89, 0x64, 0x58, 0xfd),
+        PIS_X86_CPUMODE_16_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr32_tmp, EAX),
+            PIS_INSN(PIS_OPCODE_MOVE, sib_tmp, EBX),
+            PIS_INSN(PIS_OPCODE_MUL, sib_tmp, PIS_OPERAND_CONST(2, PIS_OPERAND_SIZE_4)),
+            PIS_INSN(PIS_OPCODE_ADD, addr32_tmp, sib_tmp),
+            PIS_INSN(PIS_OPCODE_ADD, addr32_tmp, PIS_OPERAND_CONST_NEG(3, PIS_OPERAND_SIZE_4)),
+            PIS_INSN(PIS_OPCODE_STORE, addr32_tmp, ESP)
+        )
+    ));
 
 cleanup:
     return err;
