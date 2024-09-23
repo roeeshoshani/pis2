@@ -144,6 +144,32 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
                 )
             );
         }
+    } else if (first_opcode_byte == 0x03) {
+        // add r, r/m
+        modrm_operands_t modrm_operands = {};
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+        pis_operand_t tmp = PIS_OPERAND(g_read_modify_write_tmp_addr, operand_size);
+
+        if (modrm_operands.rm_operand.is_memory) {
+            // load the value into a tmp
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN(PIS_OPCODE_LOAD, tmp, modrm_operands.rm_operand.addr_or_reg)
+            );
+            // add the value to the dst operand
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_ADD, modrm_operands.reg_operand, tmp));
+        } else {
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN(
+                    PIS_OPCODE_ADD,
+                    modrm_operands.reg_operand,
+                    modrm_operands.rm_operand.addr_or_reg
+                )
+            );
+        }
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
