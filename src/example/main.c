@@ -17,10 +17,10 @@ int main() {
     pis_lift_result_t result = {};
 
     pis_x86_ctx_t ctx = {
-        .cpumode = PIS_X86_CPUMODE_16_BIT,
+        .cpumode = PIS_X86_CPUMODE_64_BIT,
     };
 
-    const u8 code[] = {0x89, 0x68, 0x0f};
+    const u8 code[] = {0x48, 0x01, 0x1c, 0x44};
 
     CHECK_RETHROW(pis_x86_lift(&ctx, code, sizeof(code), &result));
 

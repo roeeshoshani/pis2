@@ -1,4 +1,5 @@
 #include "ctx.h"
+#include "arch/x86/tmps.h"
 #include "errors.h"
 #include "except.h"
 #include "lift_ctx.h"
@@ -80,7 +81,7 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
     u8 first_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
 
     if ((first_opcode_byte & (~0b111)) == 0x50) {
-        // push <reg> instruction
+        // push <reg>
         u8 reg_encoding =
             apply_rex_bit_to_reg_encoding(first_opcode_byte & 0b111, ctx->prefixes->rex.b);
 
@@ -101,7 +102,7 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
             )
         );
     } else if (first_opcode_byte == 0x89) {
-        // move r/m, r instruction
+        // move r/m, r
         modrm_operands_t modrm_operands = {};
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         LIFT_CTX_EMIT(
@@ -112,6 +113,37 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
                 modrm_operands.reg_operand
             )
         );
+    } else if (first_opcode_byte == 0x01) {
+        // add r/m, r
+        modrm_operands_t modrm_operands = {};
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+        pis_operand_t tmp = PIS_OPERAND(g_read_modify_write_tmp_addr, operand_size);
+
+        if (modrm_operands.rm_operand.is_memory) {
+            // load the value into a tmp
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN(PIS_OPCODE_LOAD, tmp, modrm_operands.rm_operand.addr_or_reg)
+            );
+            // add the src operand to the tmp
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_ADD, tmp, modrm_operands.reg_operand));
+            // write it back
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN(PIS_OPCODE_STORE, modrm_operands.rm_operand.addr_or_reg, tmp)
+            );
+        } else {
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN(
+                    PIS_OPCODE_ADD,
+                    modrm_operands.rm_operand.addr_or_reg,
+                    modrm_operands.reg_operand
+                )
+            );
+        }
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,

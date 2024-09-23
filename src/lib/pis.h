@@ -82,6 +82,7 @@
     _(PIS_OPCODE_MOVE, )                                                                           \
     _(PIS_OPCODE_ADD, )                                                                            \
     _(PIS_OPCODE_STORE, )                                                                          \
+    _(PIS_OPCODE_LOAD, )                                                                           \
     _(PIS_OPCODE_MUL, )
 STR_ENUM(pis_opcode, PIS_OPCODE);
 
