@@ -238,7 +238,7 @@ cleanup:
     return err;
 }
 
-DEFINE_TEST(test_mov_64_bit_mode) {
+DEFINE_TEST(test_modrm_64_bit_mode) {
     err_t err = SUCCESS;
     pis_operand_t addr_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_8);
     pis_operand_t addr32_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_4);
@@ -501,7 +501,7 @@ cleanup:
     return err;
 }
 
-DEFINE_TEST(test_mov_32_bit_mode) {
+DEFINE_TEST(test_modrm_32_bit_mode) {
     err_t err = SUCCESS;
     pis_operand_t addr_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_4);
     pis_operand_t addr16_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_2);
@@ -758,7 +758,7 @@ cleanup:
     return err;
 }
 
-DEFINE_TEST(test_mov_16_bit_mode) {
+DEFINE_TEST(test_modrm_16_bit_mode) {
     err_t err = SUCCESS;
     pis_operand_t addr_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_2);
     pis_operand_t addr32_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_4);
