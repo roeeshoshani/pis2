@@ -17,3 +17,5 @@ mov [bp + si + 0x1234], eax
 
 mov [eax + ebx*2 - 3], ax
 mov [eax + ebx*2 - 3], esp
+
+add [bp + si - 1], cx

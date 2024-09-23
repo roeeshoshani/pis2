@@ -31,3 +31,5 @@ nop
 mov [bp + si + 0x1234], eax
 mov [eax + ebx*2 - 3], ax
 mov [bx + si + 0x1234], cx
+
+add [ecx + 8*esi + 5], ebp
