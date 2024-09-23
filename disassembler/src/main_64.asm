@@ -36,3 +36,13 @@ mov [r10 +8*r15 - 3], r12
 
 ; sign extension of 32-bit displacement
 mov [rsi + 1*r8 - 0x12341234], r12
+
+nop
+nop
+nop
+
+mov [ebp + 2*edx - 0x41424344], esp
+mov [r9d + 8*r15d + 5], r8
+mov [rsp+4*r13 - 1], ax
+
+mov [ebp + 2*r12d], si
