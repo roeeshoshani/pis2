@@ -56,11 +56,11 @@ static err_t build_sib_addr_into(
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, sib_tmp, index_reg_operand));
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_MUL, sib_tmp, PIS_OPERAND_CONST(1 << sib.scale, ctx->addr_size))
+            PIS_INSN_MUL2(sib_tmp, PIS_OPERAND_CONST(1 << sib.scale, ctx->addr_size))
         );
 
         // add the scaled index to the address
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ADD, *into, sib_tmp));
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN_ADD2(*into, sib_tmp));
     }
 cleanup:
     return err;
@@ -83,19 +83,19 @@ static err_t build_modrm_rm_addr_16_into(
         switch (modrm->rm) {
         case 0b000:
             LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, BX));
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ADD, *into, SI));
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN_ADD2(*into, SI));
             break;
         case 0b001:
             LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, BX));
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ADD, *into, DI));
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN_ADD2(*into, DI));
             break;
         case 0b010:
             LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, BP));
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ADD, *into, SI));
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN_ADD2(*into, SI));
             break;
         case 0b011:
             LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, BP));
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ADD, *into, DI));
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN_ADD2(*into, DI));
             break;
         case 0b100:
             LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, SI));
@@ -123,7 +123,7 @@ static err_t build_modrm_rm_addr_16_into(
             u16 disp16 = (i16) disp8;
             LIFT_CTX_EMIT(
                 ctx->lift_ctx,
-                PIS_INSN2(PIS_OPCODE_ADD, *into, PIS_OPERAND_CONST(disp16, ctx->addr_size))
+                PIS_INSN_ADD2(*into, PIS_OPERAND_CONST(disp16, ctx->addr_size))
             );
             break;
         }
@@ -132,7 +132,7 @@ static err_t build_modrm_rm_addr_16_into(
             u16 disp = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
             LIFT_CTX_EMIT(
                 ctx->lift_ctx,
-                PIS_INSN2(PIS_OPCODE_ADD, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
+                PIS_INSN_ADD2(*into, PIS_OPERAND_CONST(disp, ctx->addr_size))
             );
             break;
         }
@@ -179,7 +179,7 @@ static err_t build_modrm_rm_addr_32_into(
             u32 disp32 = (i32) disp8;
             LIFT_CTX_EMIT(
                 ctx->lift_ctx,
-                PIS_INSN2(PIS_OPCODE_ADD, *into, PIS_OPERAND_CONST(disp32, ctx->addr_size))
+                PIS_INSN_ADD2(*into, PIS_OPERAND_CONST(disp32, ctx->addr_size))
             );
             break;
         }
@@ -188,7 +188,7 @@ static err_t build_modrm_rm_addr_32_into(
             u32 disp = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
             LIFT_CTX_EMIT(
                 ctx->lift_ctx,
-                PIS_INSN2(PIS_OPCODE_ADD, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
+                PIS_INSN_ADD2(*into, PIS_OPERAND_CONST(disp, ctx->addr_size))
             );
             break;
         }
@@ -245,7 +245,7 @@ static err_t build_modrm_rm_addr_64_into(
             u64 disp64 = (i64) disp8;
             LIFT_CTX_EMIT(
                 ctx->lift_ctx,
-                PIS_INSN2(PIS_OPCODE_ADD, *into, PIS_OPERAND_CONST(disp64, ctx->addr_size))
+                PIS_INSN_ADD2(*into, PIS_OPERAND_CONST(disp64, ctx->addr_size))
             );
             break;
         }
@@ -256,7 +256,7 @@ static err_t build_modrm_rm_addr_64_into(
             u64 disp64 = (i64) disp32;
             LIFT_CTX_EMIT(
                 ctx->lift_ctx,
-                PIS_INSN2(PIS_OPCODE_ADD, *into, PIS_OPERAND_CONST(disp64, ctx->addr_size))
+                PIS_INSN_ADD2(*into, PIS_OPERAND_CONST(disp64, ctx->addr_size))
             );
             break;
         }

@@ -9,8 +9,23 @@
 
 #define PIS_LIFT_MAX_INSNS_AMOUNT (64)
 
-#define PIS_INSN2(OPCODE, OPERAND_1, OPERAND_2)                                                     \
-    ((pis_insn_t) {.opcode = (OPCODE), .operands = {(OPERAND_1), (OPERAND_2)}, .operands_amount = 2})
+#define PIS_INSN2(OPCODE, OPERAND_1, OPERAND_2)                                                    \
+    ((pis_insn_t) {                                                                                \
+        .opcode = (OPCODE),                                                                        \
+        .operands = {(OPERAND_1), (OPERAND_2)},                                                    \
+        .operands_amount = 2,                                                                      \
+    })
+
+#define PIS_INSN3(OPCODE, OPERAND_1, OPERAND_2, OPERAND_3)                                         \
+    ((pis_insn_t) {                                                                                \
+        .opcode = (OPCODE),                                                                        \
+        .operands = {(OPERAND_1), (OPERAND_2), (OPERAND_3)},                                       \
+        .operands_amount = 3,                                                                      \
+    })
+
+#define PIS_INSN_ADD2(OPERAND_1, OPERAND_2) PIS_INSN3(PIS_OPCODE_ADD, OPERAND_1, OPERAND_1, OPERAND_2)
+
+#define PIS_INSN_MUL2(OPERAND_1, OPERAND_2) PIS_INSN3(PIS_OPCODE_MUL, OPERAND_1, OPERAND_1, OPERAND_2)
 
 #define PIS_ADDR(SPACE, OFFSET) ((pis_addr_t) {.space = (SPACE), .offset = (OFFSET)})
 
@@ -81,8 +96,10 @@
 #define PIS_OPCODE(_)                                                                              \
     _(PIS_OPCODE_MOVE, )                                                                           \
     _(PIS_OPCODE_ADD, )                                                                            \
+    _(PIS_OPCODE_AND, )                                                                            \
     _(PIS_OPCODE_STORE, )                                                                          \
     _(PIS_OPCODE_LOAD, )                                                                           \
+    _(PIS_OPCODE_UNSIGNED_CARRY, )                                                                           \
     _(PIS_OPCODE_MUL, )
 STR_ENUM(pis_opcode, PIS_OPCODE);
 

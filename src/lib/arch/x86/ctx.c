@@ -91,7 +91,7 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
 
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_ADD, sp, PIS_OPERAND_CONST_NEG(operand_size_bytes, sp.size))
+            PIS_INSN_ADD2(sp, PIS_OPERAND_CONST_NEG(operand_size_bytes, sp.size))
         );
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
@@ -117,7 +117,7 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
         // load the value into a tmp
         CHECK_RETHROW(modrm_rm_read(ctx, &tmp, &modrm_operands.rm_operand));
         // add the src operand to the tmp
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ADD, tmp, modrm_operands.reg_operand));
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN_ADD2(tmp, modrm_operands.reg_operand));
         // write it back
         CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand, &tmp));
     } else if (first_opcode_byte == 0x03) {
@@ -131,7 +131,7 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
         // load the value into a tmp
         CHECK_RETHROW(modrm_rm_read(ctx, &tmp, &modrm_operands.rm_operand));
         // add the value to the dst operand
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ADD, modrm_operands.reg_operand, tmp));
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN_ADD2(modrm_operands.reg_operand, tmp));
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
