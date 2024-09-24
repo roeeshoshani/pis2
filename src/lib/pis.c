@@ -24,15 +24,31 @@ bool pis_operand_equals(const pis_operand_t* a, const pis_operand_t* b) {
 
 void pis_insn_dump(const pis_insn_t* insn) {
     TRACE_NO_NEWLINE("%s (", pis_opcode_to_str(insn->opcode));
-    pis_operand_dump(&insn->operands[0]);
-    TRACE_NO_NEWLINE(", ");
-    pis_operand_dump(&insn->operands[1]);
+    size_t operands_amount = MIN(insn->operands_amount, PIS_INSN_MAX_OPERANDS_AMOUNT);
+    for (size_t i = 0; i < operands_amount; i++) {
+        pis_operand_dump(&insn->operands[i]);
+        if (i + 1 < operands_amount) {
+            // not the last operand, add a comma
+            TRACE_NO_NEWLINE(", ");
+        }
+    }
     TRACE_NO_NEWLINE(")");
 }
 
 bool pis_insn_equals(const pis_insn_t* a, const pis_insn_t* b) {
-    return a->opcode == b->opcode && pis_operand_equals(&a->operands[0], &b->operands[0]) &&
-           pis_operand_equals(&a->operands[1], &b->operands[1]);
+    if (a->opcode != b->opcode) {
+        return false;
+    }
+    if (a->operands_amount != b->operands_amount) {
+        return false;
+    }
+    size_t operands_amount = MIN(a->operands_amount, PIS_INSN_MAX_OPERANDS_AMOUNT);
+    for (size_t i = 0; i < operands_amount; i++) {
+        if (!pis_operand_equals(&a->operands[i], &b->operands[i])) {
+            return false;
+        }
+    }
+    return true;
 }
 
 err_t pis_lift_result_emit(pis_lift_result_t* result, const pis_insn_t* insn) {

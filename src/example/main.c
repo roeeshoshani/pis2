@@ -22,7 +22,7 @@ int main() {
 
     const u8 code[] = {0x48, 0x01, 0x1c, 0x44};
 
-    CHECK_RETHROW(pis_x86_lift(&ctx, code, sizeof(code), &result));
+    CHECK_RETHROW(pis_x86_lift(&ctx, code, sizeof(code), 0, &result));
 
     pis_lift_result_dump(&result);
 

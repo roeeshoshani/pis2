@@ -5,12 +5,12 @@
 #include "str_enum.h"
 #include "types.h"
 
-#define PIS_INSN_OPERANDS_AMOUNT (2)
+#define PIS_INSN_MAX_OPERANDS_AMOUNT (3)
 
 #define PIS_LIFT_MAX_INSNS_AMOUNT (64)
 
-#define PIS_INSN(OPCODE, OPERAND_1, OPERAND_2)                                                     \
-    ((pis_insn_t) {.opcode = (OPCODE), .operands = {(OPERAND_1), (OPERAND_2)}})
+#define PIS_INSN2(OPCODE, OPERAND_1, OPERAND_2)                                                     \
+    ((pis_insn_t) {.opcode = (OPCODE), .operands = {(OPERAND_1), (OPERAND_2)}, .operands_amount = 2})
 
 #define PIS_ADDR(SPACE, OFFSET) ((pis_addr_t) {.space = (SPACE), .offset = (OFFSET)})
 
@@ -116,7 +116,8 @@ typedef struct {
 
 typedef struct {
     pis_opcode_t opcode;
-    pis_operand_t operands[PIS_INSN_OPERANDS_AMOUNT];
+    pis_operand_t operands[PIS_INSN_MAX_OPERANDS_AMOUNT];
+    size_t operands_amount;
 } pis_insn_t;
 
 typedef struct {
