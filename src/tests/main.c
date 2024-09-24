@@ -95,7 +95,9 @@ cleanup:
     return err;
 }
 
-static err_t generic_test_lift(code_t code, pis_x86_cpumode_t cpumode, expected_insns_t expected) {
+static err_t generic_test_lift_at_addr(
+    code_t code, pis_x86_cpumode_t cpumode, expected_insns_t expected, u64 addr
+) {
     err_t err = SUCCESS;
 
     pis_lift_result_t result = {};
@@ -104,9 +106,18 @@ static err_t generic_test_lift(code_t code, pis_x86_cpumode_t cpumode, expected_
         .cpumode = cpumode,
     };
 
-    CHECK_RETHROW_VERBOSE(pis_x86_lift(&ctx, code.code, code.len, &result));
+    CHECK_RETHROW_VERBOSE(pis_x86_lift(&ctx, code.code, code.len, addr, &result));
 
     CHECK_RETHROW_VERBOSE(assert_pis_lift_result_equals(&result, expected));
+
+cleanup:
+    return err;
+}
+
+static err_t generic_test_lift(code_t code, pis_x86_cpumode_t cpumode, expected_insns_t expected) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift_at_addr(code, cpumode, expected, 0));
 
 cleanup:
     return err;
@@ -495,6 +506,36 @@ DEFINE_TEST(test_modrm_64_bit_mode) {
             PIS_INSN(PIS_OPCODE_ADD, addr32_tmp, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_4)),
             PIS_INSN(PIS_OPCODE_STORE, addr32_tmp, SI)
         )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift_at_addr(
+        CODE(0x89, 0x05, 0x01, 0x00, 0x00, 0x00),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, PIS_OPERAND_CONST(7, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, EAX)
+        ),
+        0
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift_at_addr(
+        CODE(0x89, 0x05, 0x01, 0x00, 0x00, 0x00),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, PIS_OPERAND_CONST(8, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, EAX)
+        ),
+        1
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift_at_addr(
+        CODE(0x89, 0x05, 0xf6, 0xff, 0xff, 0xff),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(
+            PIS_INSN(PIS_OPCODE_MOVE, addr_tmp, PIS_OPERAND_CONST(2, PIS_OPERAND_SIZE_8)),
+            PIS_INSN(PIS_OPCODE_STORE, addr_tmp, EAX)
+        ),
+        6
     ));
 
 cleanup:

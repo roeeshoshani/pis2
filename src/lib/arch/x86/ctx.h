@@ -18,5 +18,6 @@ err_t pis_x86_lift(
     const pis_x86_ctx_t* ctx,
     const u8* machine_code,
     size_t machine_code_len,
+    u64 machine_code_addr,
     pis_lift_result_t* result
 );

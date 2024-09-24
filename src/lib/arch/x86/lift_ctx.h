@@ -60,7 +60,7 @@ typedef struct {
     const u8* start;
     const u8* cur;
     const u8* end;
-    uintptr_t cur_insn_addr;
+    u64 cur_insn_addr;
     pis_lift_result_t* result;
     pis_operand_size_t stack_addr_size;
     pis_operand_t sp;
