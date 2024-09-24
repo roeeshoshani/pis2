@@ -237,6 +237,38 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
             ctx->lift_ctx,
             PIS_INSN2(PIS_OPCODE_MOVE, modrm_operands.reg_operand, addition_result)
         );
+    } else if (first_opcode_byte == 0x29) {
+        // sub r/m, r
+        modrm_operands_t modrm_operands = {};
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+        pis_operand_t tmp = PIS_OPERAND(g_read_modify_write_tmp_addr, operand_size);
+
+        CHECK_RETHROW(modrm_rm_read(ctx, &tmp, &modrm_operands.rm_operand));
+
+        // carry flag
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(PIS_OPCODE_UNSIGNED_LESS_THAN, FLAGS_CF, tmp, modrm_operands.reg_operand)
+        );
+
+        // overflow flag
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(PIS_OPCODE_SIGNED_LESS_THAN, FLAGS_OF, tmp, modrm_operands.reg_operand)
+        );
+
+        // perform the actual subtraction
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(PIS_OPCODE_SUB, tmp, tmp, modrm_operands.reg_operand)
+        );
+
+        CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &tmp));
+
+        // write the result
+        CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand, &tmp));
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,

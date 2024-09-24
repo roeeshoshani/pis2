@@ -98,15 +98,18 @@
 #define PIS_OPCODE(_)                                                                              \
     _(PIS_OPCODE_MOVE, )                                                                           \
     _(PIS_OPCODE_ADD, )                                                                            \
+    _(PIS_OPCODE_SUB, )                                                                            \
     _(PIS_OPCODE_AND, )                                                                            \
     _(PIS_OPCODE_STORE, )                                                                          \
     _(PIS_OPCODE_LOAD, )                                                                           \
     _(PIS_OPCODE_UNSIGNED_CARRY, )                                                                 \
-    _(PIS_OPCODE_SIGNED_CARRY, )                                                                 \
+    _(PIS_OPCODE_SIGNED_CARRY, )                                                                   \
     _(PIS_OPCODE_GET_LOW_BITS, )                                                                   \
     _(PIS_OPCODE_PARITY, )                                                                         \
     _(PIS_OPCODE_EQUALS, )                                                                         \
     _(PIS_OPCODE_SHIFT_RIGHT, )                                                                    \
+    _(PIS_OPCODE_UNSIGNED_LESS_THAN, )                                                             \
+    _(PIS_OPCODE_SIGNED_LESS_THAN, )                                                               \
     _(PIS_OPCODE_MUL, )
 STR_ENUM(pis_opcode, PIS_OPCODE);
 

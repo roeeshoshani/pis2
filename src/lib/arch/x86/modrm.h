@@ -48,4 +48,3 @@ err_t modrm_rm_read(
     const pis_operand_t* read_into,
     const modrm_rm_operand_t* rm_operand
 );
-
