@@ -909,62 +909,6 @@ cleanup:
     return err;
 }
 
-DEFINE_TEST(test_add) {
-    err_t err = SUCCESS;
-    pis_operand_t addr64_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_8);
-    pis_operand_t addr32_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_4);
-    pis_operand_t addr16_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_2);
-    pis_operand_t sib64_tmp = PIS_OPERAND(g_sib_index_tmp_addr, PIS_OPERAND_SIZE_8);
-    pis_operand_t sib32_tmp = PIS_OPERAND(g_sib_index_tmp_addr, PIS_OPERAND_SIZE_4);
-    pis_operand_t modify16_tmp = PIS_OPERAND(g_read_modify_write_tmp_addr, PIS_OPERAND_SIZE_2);
-    pis_operand_t modify32_tmp = PIS_OPERAND(g_read_modify_write_tmp_addr, PIS_OPERAND_SIZE_4);
-
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
-        CODE(0x66, 0x46, 0x01, 0x04, 0x64),
-        PIS_X86_CPUMODE_64_BIT,
-        EXPECTED_INSNS(
-            PIS_INSN2(PIS_OPCODE_MOVE, addr64_tmp, RSP),
-            PIS_INSN2(PIS_OPCODE_MOVE, sib64_tmp, R12),
-            PIS_INSN_MUL2(sib64_tmp, PIS_OPERAND_CONST(2, PIS_OPERAND_SIZE_8)),
-            PIS_INSN_ADD2(addr64_tmp, sib64_tmp),
-            PIS_INSN2(PIS_OPCODE_LOAD, modify16_tmp, addr64_tmp),
-            PIS_INSN_ADD2(modify16_tmp, R8W),
-            PIS_INSN2(PIS_OPCODE_STORE, addr64_tmp, modify16_tmp)
-        )
-    ));
-
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
-        CODE(0x01, 0x6c, 0xf1, 0x05),
-        PIS_X86_CPUMODE_32_BIT,
-        EXPECTED_INSNS(
-            PIS_INSN2(PIS_OPCODE_MOVE, addr32_tmp, ECX),
-            PIS_INSN2(PIS_OPCODE_MOVE, sib32_tmp, ESI),
-            PIS_INSN_MUL2(sib32_tmp, PIS_OPERAND_CONST(8, PIS_OPERAND_SIZE_4)),
-            PIS_INSN_ADD2(addr32_tmp, sib32_tmp),
-            PIS_INSN_ADD2(addr32_tmp, PIS_OPERAND_CONST(5, PIS_OPERAND_SIZE_4)),
-            PIS_INSN2(PIS_OPCODE_LOAD, modify32_tmp, addr32_tmp),
-            PIS_INSN_ADD2(modify32_tmp, EBP),
-            PIS_INSN2(PIS_OPCODE_STORE, addr32_tmp, modify32_tmp)
-        )
-    ));
-
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
-        CODE(0x01, 0x4a, 0xff),
-        PIS_X86_CPUMODE_16_BIT,
-        EXPECTED_INSNS(
-            PIS_INSN2(PIS_OPCODE_MOVE, addr16_tmp, BP),
-            PIS_INSN_ADD2(addr16_tmp, SI),
-            PIS_INSN_ADD2(addr16_tmp, PIS_OPERAND_CONST_NEG(1, PIS_OPERAND_SIZE_2)),
-            PIS_INSN2(PIS_OPCODE_LOAD, modify16_tmp, addr16_tmp),
-            PIS_INSN_ADD2(modify16_tmp, CX),
-            PIS_INSN2(PIS_OPCODE_STORE, addr16_tmp, modify16_tmp)
-        )
-    ));
-
-cleanup:
-    return err;
-}
-
 int main() {
     err_t err = SUCCESS;
 

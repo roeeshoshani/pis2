@@ -9,6 +9,7 @@ const pis_addr_t g_sib_index_tmp_addr = TMP(TMP_ID_SIB_INDEX);
 
 const pis_addr_t g_read_modify_write_tmp_addr = TMP(TMP_ID_READ_MODIFY_WRITE);
 
-const pis_addr_t g_parity_flag_tmp_addr = TMP(TMP_ID_PARITY_FLAG);
+const pis_addr_t g_parity_flag_low_byte_tmp_addr = TMP(TMP_ID_PARITY_FLAG_LOW_BYTE);
 
-const pis_operand_t g_parity_flag_tmp = PIS_OPERAND(TMP(TMP_ID_PARITY_FLAG), PIS_OPERAND_SIZE_1);
+const pis_operand_t g_parity_flag_low_byte_tmp =
+    PIS_OPERAND(TMP(TMP_ID_PARITY_FLAG_LOW_BYTE), PIS_OPERAND_SIZE_1);
