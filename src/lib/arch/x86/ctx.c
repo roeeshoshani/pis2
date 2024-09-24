@@ -330,6 +330,8 @@ err_t pis_x86_lift(
     };
     CHECK_RETHROW(lift(&lift_ctx));
 
+    result->machine_insn_len = lift_ctx_index(&lift_ctx);
+
 cleanup:
     return err;
 }

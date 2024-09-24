@@ -150,6 +150,7 @@ typedef struct {
 typedef struct {
     pis_insn_t insns[PIS_LIFT_MAX_INSNS_AMOUNT];
     size_t insns_amount;
+    size_t machine_insn_len;
 } pis_lift_result_t;
 
 void pis_addr_dump(const pis_addr_t* addr);
