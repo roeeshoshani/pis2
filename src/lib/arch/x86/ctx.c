@@ -197,10 +197,7 @@ static err_t do_sub_modrm(
     );
 
     // overflow flag
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_SIGNED_LESS_THAN, FLAGS_OF, dst_tmp, src_tmp)
-    );
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SIGNED_BORROW, FLAGS_OF, dst_tmp, src_tmp));
 
     // perform the actual subtraction
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SUB, res_tmp, dst_tmp, src_tmp));
