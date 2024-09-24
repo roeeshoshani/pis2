@@ -39,3 +39,7 @@ err_t lift_ctx_cur4(lift_ctx_t* ctx, u32* cur_dword) {
 cleanup:
     return err;
 }
+
+size_t lift_ctx_index(const lift_ctx_t* ctx) {
+    return ctx->cur - ctx->start;
+}

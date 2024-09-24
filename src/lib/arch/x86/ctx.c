@@ -210,6 +210,7 @@ err_t pis_x86_lift(
     const pis_x86_ctx_t* ctx,
     const u8* machine_code,
     size_t machine_code_len,
+    uintptr_t machine_code_addr,
     pis_lift_result_t* result
 ) {
     err_t err = SUCCESS;
@@ -219,8 +220,10 @@ err_t pis_x86_lift(
 
     lift_ctx_t lift_ctx = {
         .pis_x86_ctx = ctx,
+        .start = machine_code,
         .cur = machine_code,
         .end = machine_code + machine_code_len,
+        .cur_insn_addr = machine_code_addr,
         .result = result,
         .stack_addr_size = get_effective_stack_addr_size(ctx->cpumode),
         .sp = get_sp_operand(ctx->cpumode),

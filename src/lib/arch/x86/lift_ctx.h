@@ -57,8 +57,10 @@
 
 typedef struct {
     const pis_x86_ctx_t* pis_x86_ctx;
+    const u8* start;
     const u8* cur;
     const u8* end;
+    uintptr_t cur_insn_addr;
     pis_lift_result_t* result;
     pis_operand_size_t stack_addr_size;
     pis_operand_t sp;
@@ -78,3 +80,6 @@ err_t lift_ctx_cur2(lift_ctx_t* ctx, u16* cur_word);
 
 /// returns the current double word of the context.
 err_t lift_ctx_cur4(lift_ctx_t* ctx, u32* cur_dword);
+
+/// returns the current index of the context.
+size_t lift_ctx_index(const lift_ctx_t* ctx);

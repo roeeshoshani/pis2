@@ -212,8 +212,14 @@ static err_t build_modrm_rm_addr_64_into(
         i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
         // sign extend it to 64 bits
         u64 disp64 = (i64) disp32;
-        UNUSED(disp64);
-        CHECK_FAIL_TRACE("rip-relative not supported yet");
+
+        u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
+        u64 mem_addr = cur_insn_end_addr + disp64;
+
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN(PIS_OPCODE_MOVE, *into, PIS_OPERAND_CONST(mem_addr, ctx->addr_size))
+        );
     } else {
         if (modrm->rm == 0b100) {
             CHECK_RETHROW(build_sib_addr_into(ctx, modrm, into));
