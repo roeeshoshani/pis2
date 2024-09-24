@@ -333,3 +333,43 @@ err_t modrm_fetch_and_process(const post_prefixes_ctx_t* ctx, modrm_operands_t* 
 cleanup:
     return err;
 }
+
+err_t modrm_rm_write(
+    const post_prefixes_ctx_t* ctx,
+    const modrm_rm_operand_t* rm_operand,
+    const pis_operand_t* to_write
+) {
+    err_t err = SUCCESS;
+
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN(
+            rm_operand->is_memory ? PIS_OPCODE_STORE : PIS_OPCODE_MOVE,
+            rm_operand->addr_or_reg,
+            *to_write
+        )
+    );
+
+cleanup:
+    return err;
+}
+
+err_t modrm_rm_read(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* read_into,
+    const modrm_rm_operand_t* rm_operand
+) {
+    err_t err = SUCCESS;
+
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN(
+            rm_operand->is_memory ? PIS_OPCODE_LOAD : PIS_OPCODE_MOVE,
+            *read_into,
+            rm_operand->addr_or_reg
+        )
+    );
+
+cleanup:
+    return err;
+}

@@ -105,14 +105,7 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
         // move r/m, r
         modrm_operands_t modrm_operands = {};
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN(
-                modrm_operands.rm_operand.is_memory ? PIS_OPCODE_STORE : PIS_OPCODE_MOVE,
-                modrm_operands.rm_operand.addr_or_reg,
-                modrm_operands.reg_operand
-            )
-        );
+        CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand, &modrm_operands.reg_operand));
     } else if (first_opcode_byte == 0x01) {
         // add r/m, r
         modrm_operands_t modrm_operands = {};
@@ -121,29 +114,12 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
         pis_operand_t tmp = PIS_OPERAND(g_read_modify_write_tmp_addr, operand_size);
 
-        if (modrm_operands.rm_operand.is_memory) {
-            // load the value into a tmp
-            LIFT_CTX_EMIT(
-                ctx->lift_ctx,
-                PIS_INSN(PIS_OPCODE_LOAD, tmp, modrm_operands.rm_operand.addr_or_reg)
-            );
-            // add the src operand to the tmp
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_ADD, tmp, modrm_operands.reg_operand));
-            // write it back
-            LIFT_CTX_EMIT(
-                ctx->lift_ctx,
-                PIS_INSN(PIS_OPCODE_STORE, modrm_operands.rm_operand.addr_or_reg, tmp)
-            );
-        } else {
-            LIFT_CTX_EMIT(
-                ctx->lift_ctx,
-                PIS_INSN(
-                    PIS_OPCODE_ADD,
-                    modrm_operands.rm_operand.addr_or_reg,
-                    modrm_operands.reg_operand
-                )
-            );
-        }
+        // load the value into a tmp
+        CHECK_RETHROW(modrm_rm_read(ctx, &tmp, &modrm_operands.rm_operand));
+        // add the src operand to the tmp
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_ADD, tmp, modrm_operands.reg_operand));
+        // write it back
+        CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand, &tmp));
     } else if (first_opcode_byte == 0x03) {
         // add r, r/m
         modrm_operands_t modrm_operands = {};
@@ -152,24 +128,10 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
         pis_operand_t tmp = PIS_OPERAND(g_read_modify_write_tmp_addr, operand_size);
 
-        if (modrm_operands.rm_operand.is_memory) {
-            // load the value into a tmp
-            LIFT_CTX_EMIT(
-                ctx->lift_ctx,
-                PIS_INSN(PIS_OPCODE_LOAD, tmp, modrm_operands.rm_operand.addr_or_reg)
-            );
-            // add the value to the dst operand
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_ADD, modrm_operands.reg_operand, tmp));
-        } else {
-            LIFT_CTX_EMIT(
-                ctx->lift_ctx,
-                PIS_INSN(
-                    PIS_OPCODE_ADD,
-                    modrm_operands.reg_operand,
-                    modrm_operands.rm_operand.addr_or_reg
-                )
-            );
-        }
+        // load the value into a tmp
+        CHECK_RETHROW(modrm_rm_read(ctx, &tmp, &modrm_operands.rm_operand));
+        // add the value to the dst operand
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN(PIS_OPCODE_ADD, modrm_operands.reg_operand, tmp));
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,

@@ -36,3 +36,16 @@ modrm_t modrm_decode_byte(u8 modrm_byte);
 sib_t sib_decode_byte(u8 sib_byte);
 
 err_t modrm_fetch_and_process(const post_prefixes_ctx_t* ctx, modrm_operands_t* operands);
+
+err_t modrm_rm_write(
+    const post_prefixes_ctx_t* ctx,
+    const modrm_rm_operand_t* rm_operand,
+    const pis_operand_t* to_write
+);
+
+err_t modrm_rm_read(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* read_into,
+    const modrm_rm_operand_t* rm_operand
+);
+
