@@ -26,9 +26,22 @@ typedef struct {
     pis_operand_t addr_or_reg;
 } modrm_rm_operand_t;
 
+typedef enum {
+    MODRM_OPERAND_TYPE_REG,
+    MODRM_OPERAND_TYPE_RM,
+} modrm_operand_type_t;
+
 typedef struct {
-    modrm_rm_operand_t rm_operand;
-    pis_operand_t reg_operand;
+    modrm_operand_type_t type;
+    union {
+        modrm_rm_operand_t rm;
+        pis_operand_t reg;
+    };
+} modrm_operand_t;
+
+typedef struct {
+    modrm_operand_t rm_operand;
+    modrm_operand_t reg_operand;
 } modrm_operands_t;
 
 modrm_t modrm_decode_byte(u8 modrm_byte);
@@ -47,4 +60,16 @@ err_t modrm_rm_read(
     const post_prefixes_ctx_t* ctx,
     const pis_operand_t* read_into,
     const modrm_rm_operand_t* rm_operand
+);
+
+err_t modrm_operand_read(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* read_into,
+    const modrm_operand_t* operand
+);
+
+err_t modrm_operand_write(
+    const post_prefixes_ctx_t* ctx,
+    const modrm_operand_t* operand,
+    const pis_operand_t* to_write
 );

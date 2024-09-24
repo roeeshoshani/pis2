@@ -7,7 +7,10 @@
 typedef enum {
     TMP_ID_MODRM_RM_ADDR,
     TMP_ID_SIB_INDEX,
-    TMP_ID_READ_MODIFY_WRITE,
+    TMP_ID_SRC_OP_1,
+    TMP_ID_SRC_OP_2,
+    TMP_ID_SRC_OP_3,
+    TMP_ID_CALC_RES,
     TMP_ID_PARITY_FLAG_LOW_BYTE,
 } tmp_id_t;
 
@@ -15,7 +18,13 @@ extern const pis_addr_t g_modrm_rm_tmp_addr;
 
 extern const pis_addr_t g_sib_index_tmp_addr;
 
-extern const pis_addr_t g_read_modify_write_tmp_addr;
+extern const pis_addr_t g_src_op_1_tmp_addr;
+
+extern const pis_addr_t g_src_op_2_tmp_addr;
+
+extern const pis_addr_t g_src_op_3_tmp_addr;
+
+extern const pis_addr_t g_calc_res_tmp_addr;
 
 extern const pis_addr_t g_parity_flag_low_byte_tmp_addr;
 

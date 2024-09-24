@@ -148,35 +148,66 @@ cleanup:
 }
 
 static err_t do_add_modrm(
-    const post_prefixes_ctx_t* ctx,
-    const modrm_operands_t* modrm_operands,
-    pis_operand_t* addition_result
+    const post_prefixes_ctx_t* ctx, const modrm_operand_t* dst, const modrm_operand_t* src
 ) {
     err_t err = SUCCESS;
 
     pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
-    pis_operand_t tmp = PIS_OPERAND(g_read_modify_write_tmp_addr, operand_size);
+    pis_operand_t dst_tmp = PIS_OPERAND(g_src_op_1_tmp_addr, operand_size);
+    pis_operand_t src_tmp = PIS_OPERAND(g_src_op_2_tmp_addr, operand_size);
+    pis_operand_t res_tmp = PIS_OPERAND(g_calc_res_tmp_addr, operand_size);
 
-    CHECK_RETHROW(modrm_rm_read(ctx, &tmp, &modrm_operands->rm_operand));
+    CHECK_RETHROW(modrm_operand_read(ctx, &dst_tmp, dst));
+    CHECK_RETHROW(modrm_operand_read(ctx, &src_tmp, src));
+
+    // carry flag
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_UNSIGNED_CARRY, FLAGS_CF, dst_tmp, src_tmp));
+
+    // overflow flag
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SIGNED_CARRY, FLAGS_OF, dst_tmp, src_tmp));
+
+    // perform the actual addition
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, res_tmp, dst_tmp, src_tmp));
+
+    CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &res_tmp));
+
+    CHECK_RETHROW(modrm_operand_write(ctx, dst, &res_tmp));
+
+cleanup:
+    return err;
+}
+
+static err_t do_sub_modrm(
+    const post_prefixes_ctx_t* ctx, const modrm_operand_t* dst, const modrm_operand_t* src
+) {
+    err_t err = SUCCESS;
+
+    pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+    pis_operand_t dst_tmp = PIS_OPERAND(g_src_op_1_tmp_addr, operand_size);
+    pis_operand_t src_tmp = PIS_OPERAND(g_src_op_2_tmp_addr, operand_size);
+    pis_operand_t res_tmp = PIS_OPERAND(g_calc_res_tmp_addr, operand_size);
+
+    CHECK_RETHROW(modrm_operand_read(ctx, &dst_tmp, dst));
+    CHECK_RETHROW(modrm_operand_read(ctx, &src_tmp, src));
 
     // carry flag
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_UNSIGNED_CARRY, FLAGS_CF, tmp, modrm_operands->reg_operand)
+        PIS_INSN3(PIS_OPCODE_UNSIGNED_LESS_THAN, FLAGS_CF, dst_tmp, src_tmp)
     );
 
     // overflow flag
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_SIGNED_CARRY, FLAGS_OF, tmp, modrm_operands->reg_operand)
+        PIS_INSN3(PIS_OPCODE_SIGNED_LESS_THAN, FLAGS_OF, dst_tmp, src_tmp)
     );
 
-    // perform the actual addition
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN_ADD2(tmp, modrm_operands->reg_operand));
+    // perform the actual subtraction
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SUB, res_tmp, dst_tmp, src_tmp));
 
-    CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &tmp));
+    CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &res_tmp));
 
-    *addition_result = tmp;
+    CHECK_RETHROW(modrm_operand_write(ctx, dst, &res_tmp));
 
 cleanup:
     return err;
@@ -212,63 +243,29 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
         // move r/m, r
         modrm_operands_t modrm_operands = {};
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-        CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand, &modrm_operands.reg_operand));
+        CHECK_RETHROW(
+            modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &modrm_operands.reg_operand.reg)
+        );
     } else if (first_opcode_byte == 0x01) {
         // add r/m, r
-
         modrm_operands_t modrm_operands = {};
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-
-        pis_operand_t addition_result = {};
-        CHECK_RETHROW(do_add_modrm(ctx, &modrm_operands, &addition_result));
-
-        // write the result
-        CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand, &addition_result));
+        CHECK_RETHROW(do_add_modrm(ctx, &modrm_operands.rm_operand, &modrm_operands.reg_operand));
     } else if (first_opcode_byte == 0x03) {
         // add r, r/m
         modrm_operands_t modrm_operands = {};
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-
-        pis_operand_t addition_result = {};
-        CHECK_RETHROW(do_add_modrm(ctx, &modrm_operands, &addition_result));
-
-        // write the result
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_MOVE, modrm_operands.reg_operand, addition_result)
-        );
+        CHECK_RETHROW(do_add_modrm(ctx, &modrm_operands.reg_operand, &modrm_operands.rm_operand));
     } else if (first_opcode_byte == 0x29) {
         // sub r/m, r
         modrm_operands_t modrm_operands = {};
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-
-        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
-        pis_operand_t tmp = PIS_OPERAND(g_read_modify_write_tmp_addr, operand_size);
-
-        CHECK_RETHROW(modrm_rm_read(ctx, &tmp, &modrm_operands.rm_operand));
-
-        // carry flag
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN3(PIS_OPCODE_UNSIGNED_LESS_THAN, FLAGS_CF, tmp, modrm_operands.reg_operand)
-        );
-
-        // overflow flag
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN3(PIS_OPCODE_SIGNED_LESS_THAN, FLAGS_OF, tmp, modrm_operands.reg_operand)
-        );
-
-        // perform the actual subtraction
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN3(PIS_OPCODE_SUB, tmp, tmp, modrm_operands.reg_operand)
-        );
-
-        CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &tmp));
-
-        // write the result
-        CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand, &tmp));
+        CHECK_RETHROW(do_sub_modrm(ctx, &modrm_operands.rm_operand, &modrm_operands.reg_operand));
+    } else if (first_opcode_byte == 0x2b) {
+        // sub r, r/m
+        modrm_operands_t modrm_operands = {};
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+        CHECK_RETHROW(do_sub_modrm(ctx, &modrm_operands.reg_operand, &modrm_operands.rm_operand));
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,

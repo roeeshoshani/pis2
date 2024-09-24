@@ -309,26 +309,44 @@ err_t modrm_fetch_and_process(const post_prefixes_ctx_t* ctx, modrm_operands_t* 
         ctx->prefixes
     );
 
+    modrm_rm_operand_t rm_operand = {};
+
     if (modrm.mod == 0b11) {
         // in this case, the r/m field is a register and not a memory operand
-        pis_operand_t rm_operand = reg_get_operand(
+        pis_operand_t rm_reg_operand = reg_get_operand(
             apply_rex_bit_to_reg_encoding(modrm.rm, ctx->prefixes->rex.b),
             operand_size,
             ctx->prefixes
         );
 
-        operands->reg_operand = reg_operand;
-        operands->rm_operand.addr_or_reg = rm_operand;
-        operands->rm_operand.is_memory = false;
+        rm_operand = (modrm_rm_operand_t) {
+            .is_memory = false,
+            .addr_or_reg = rm_reg_operand,
+        };
     } else {
         // in this case, the r/m field is a memory operand
         pis_operand_t rm_addr_tmp = PIS_OPERAND_TMP(0, ctx->addr_size);
         CHECK_RETHROW(build_modrm_rm_addr_into(ctx, &modrm, &rm_addr_tmp));
 
-        operands->reg_operand = reg_operand;
-        operands->rm_operand.addr_or_reg = rm_addr_tmp;
-        operands->rm_operand.is_memory = true;
+        rm_operand = (modrm_rm_operand_t) {
+            .is_memory = true,
+            .addr_or_reg = rm_addr_tmp,
+        };
     }
+
+    *operands = (modrm_operands_t) {
+        .reg_operand =
+            {
+                .type = MODRM_OPERAND_TYPE_REG,
+                .reg = reg_operand,
+            },
+        .rm_operand =
+            {
+                .type = MODRM_OPERAND_TYPE_RM,
+                .rm = rm_operand,
+            },
+
+    };
 
 cleanup:
     return err;
@@ -369,6 +387,48 @@ err_t modrm_rm_read(
             rm_operand->addr_or_reg
         )
     );
+
+cleanup:
+    return err;
+}
+
+err_t modrm_operand_read(
+    const post_prefixes_ctx_t* ctx, const pis_operand_t* read_into, const modrm_operand_t* operand
+) {
+    err_t err = SUCCESS;
+
+    switch (operand->type) {
+    case MODRM_OPERAND_TYPE_REG:
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *read_into, operand->reg));
+        break;
+    case MODRM_OPERAND_TYPE_RM:
+        CHECK_RETHROW(modrm_rm_read(ctx, read_into, &operand->rm));
+        break;
+    default:
+        // unreachable
+        CHECK_FAIL();
+    }
+
+cleanup:
+    return err;
+}
+
+err_t modrm_operand_write(
+    const post_prefixes_ctx_t* ctx, const modrm_operand_t* operand, const pis_operand_t* to_write
+) {
+    err_t err = SUCCESS;
+
+    switch (operand->type) {
+    case MODRM_OPERAND_TYPE_REG:
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, operand->reg, *to_write));
+        break;
+    case MODRM_OPERAND_TYPE_RM:
+        CHECK_RETHROW(modrm_rm_write(ctx, &operand->rm, to_write));
+        break;
+    default:
+        // unreachable
+        CHECK_FAIL();
+    }
 
 cleanup:
     return err;
