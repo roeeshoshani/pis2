@@ -243,6 +243,13 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
         CHECK_RETHROW(
             modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &modrm_operands.reg_operand.reg)
         );
+    } else if (first_opcode_byte == 0x8b) {
+        // move r, r/m
+        modrm_operands_t modrm_operands = {};
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+        CHECK_RETHROW(
+            modrm_rm_read(ctx, &modrm_operands.reg_operand.reg, &modrm_operands.rm_operand.rm)
+        );
     } else if (first_opcode_byte == 0x01) {
         // add r/m, r
         modrm_operands_t modrm_operands = {};
