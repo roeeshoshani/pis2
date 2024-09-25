@@ -171,3 +171,5 @@ u32 pis_operand_size_to_bytes(pis_operand_size_t operand_size);
 u32 pis_operand_size_to_bits(pis_operand_size_t operand_size);
 
 u64 pis_const_negate(u64 const_value, u32 operand_size);
+
+u64 pis_sign_extend_byte(i8 byte, pis_operand_size_t desired_size);

@@ -88,3 +88,19 @@ u64 pis_const_negate(u64 const_value, pis_operand_size_t operand_size) {
         return (1UL << operand_size_bits) - const_value;
     }
 }
+
+u64 pis_sign_extend_byte(i8 byte, pis_operand_size_t desired_size) {
+    switch (desired_size) {
+    case PIS_OPERAND_SIZE_1:
+        return (u8) byte;
+    case PIS_OPERAND_SIZE_2:
+        return (i16) byte;
+    case PIS_OPERAND_SIZE_4:
+        return (i32) byte;
+    case PIS_OPERAND_SIZE_8:
+        return (i64) byte;
+    default:
+        // unreachable
+        return 0;
+    }
+}

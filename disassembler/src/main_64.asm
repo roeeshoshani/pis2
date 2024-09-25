@@ -3,4 +3,5 @@ BITS 64
 global main
 main:
 
-sub [rax], ebx
+sub qword [rax + rbx], 1
+db 0x48, 0x29, 0x2c, 0x18
