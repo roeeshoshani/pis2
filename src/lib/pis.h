@@ -114,6 +114,7 @@
     _(PIS_OPCODE_UNSIGNED_LESS_THAN, )                                                             \
     _(PIS_OPCODE_SIGNED_BORROW, )                                                                  \
     _(PIS_OPCODE_JMP_COND, )                                                                       \
+    _(PIS_OPCODE_SIGN_EXTEND, )                                                                       \
     _(PIS_OPCODE_MUL, )
 STR_ENUM(pis_opcode, PIS_OPCODE);
 

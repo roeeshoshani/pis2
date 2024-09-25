@@ -338,6 +338,24 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(
             modrm_rm_read(ctx, &modrm_operands.reg_operand.reg, &modrm_operands.rm_operand.rm)
         );
+    } else if (first_opcode_byte == 0x63) {
+        // movsxd r, r/m
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+        if (operand_size == PIS_OPERAND_SIZE_8) {
+            pis_operand_t tmp32 = PIS_OPERAND(g_src_op_1_tmp_addr, PIS_OPERAND_SIZE_4);
+            CHECK_RETHROW(modrm_rm_read(ctx, &tmp32, &modrm_operands.rm_operand.rm));
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, modrm_operands.reg_operand.reg, tmp32)
+            );
+
+        } else {
+            // regular mov
+            CHECK_RETHROW(
+                modrm_rm_read(ctx, &modrm_operands.reg_operand.reg, &modrm_operands.rm_operand.rm)
+            );
+        }
     } else if (first_opcode_byte == 0x01) {
         // add r/m, r
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
