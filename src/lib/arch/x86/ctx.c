@@ -103,8 +103,9 @@ static err_t
 
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN2(
+        PIS_INSN3(
             PIS_OPCODE_EQUALS,
+            FLAGS_ZF,
             *calculation_result,
             PIS_OPERAND_CONST(0, calculation_result->size)
         )
