@@ -35,6 +35,8 @@
 
 #define PIS_OPERAND_REG(OFFSET, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_REG, OFFSET), SIZE))
 
+#define PIS_OPERAND_RAM(OFFSET, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_RAM, OFFSET), SIZE))
+
 #define PIS_OPERAND_TMP(OFFSET, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_TMP, OFFSET), SIZE))
 
 #define PIS_OPERAND_CONST(VALUE, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_CONST, VALUE), SIZE))
@@ -111,6 +113,7 @@
     _(PIS_OPCODE_SHIFT_RIGHT, )                                                                    \
     _(PIS_OPCODE_UNSIGNED_LESS_THAN, )                                                             \
     _(PIS_OPCODE_SIGNED_BORROW, )                                                                  \
+    _(PIS_OPCODE_JMP_COND, )                                                                       \
     _(PIS_OPCODE_MUL, )
 STR_ENUM(pis_opcode, PIS_OPCODE);
 

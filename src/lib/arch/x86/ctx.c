@@ -285,9 +285,10 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         u64 target = 0;
         CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target(ctx, &target));
 
-        // TODO: make the actual jump
-        CHECK_FAIL_TRACE("JA <target = %lx>", (unsigned long) target);
-
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_JMP_COND, res_tmp, PIS_OPERAND_RAM(target, PIS_OPERAND_SIZE_1))
+        );
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
