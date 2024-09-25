@@ -3,5 +3,4 @@ BITS 64
 global main
 main:
 
-sub qword [rax + rbx], 1
-db 0x48, 0x29, 0x2c, 0x18
+jmp rax

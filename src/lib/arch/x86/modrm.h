@@ -49,6 +49,13 @@ modrm_t modrm_decode_byte(u8 modrm_byte);
 
 sib_t sib_decode_byte(u8 sib_byte);
 
+err_t modrm_decode_rm_operand(
+    const post_prefixes_ctx_t* ctx,
+    const modrm_t* modrm,
+    pis_operand_size_t operand_size,
+    modrm_rm_operand_t* rm_operand
+);
+
 err_t modrm_fetch_and_process(const post_prefixes_ctx_t* ctx, modrm_operands_t* operands);
 
 err_t modrm_rm_write(

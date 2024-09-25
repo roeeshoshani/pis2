@@ -388,6 +388,30 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
                 modrm_operands.rm_operand.rm.addr_or_reg
             )
         );
+    } else if (first_opcode_byte == 0xff) {
+        // xxx r/m
+        modrm_t modrm = modrm_decode_byte(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx));
+
+        if (modrm.reg == 4) {
+            // jmp r/m
+
+            // decide the operand size
+            pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+            if (ctx->lift_ctx->pis_x86_ctx->cpumode == PIS_X86_CPUMODE_64_BIT) {
+                operand_size = PIS_OPERAND_SIZE_8;
+            }
+
+            modrm_rm_operand_t rm_operand = {};
+            CHECK_RETHROW(modrm_decode_rm_operand(ctx, &modrm, operand_size, &rm_operand));
+
+            pis_operand_t rm_tmp = PIS_OPERAND(g_src_op_1_tmp_addr, operand_size);
+            CHECK_RETHROW(modrm_rm_read(ctx, &rm_tmp, &rm_operand));
+
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, rm_tmp));
+        } else {
+            CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
+        }
+
     } else if (first_opcode_byte == 0x83) {
         // xxx r/m, imm8
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));

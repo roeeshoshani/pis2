@@ -296,6 +296,41 @@ cleanup:
     return err;
 }
 
+err_t modrm_decode_rm_operand(
+    const post_prefixes_ctx_t* ctx,
+    const modrm_t* modrm,
+    pis_operand_size_t operand_size,
+    modrm_rm_operand_t* rm_operand
+) {
+    err_t err = SUCCESS;
+
+    if (modrm->mod == 0b11) {
+        // in this case, the r/m field is a register and not a memory operand
+        pis_operand_t rm_reg_operand = reg_get_operand(
+            apply_rex_bit_to_reg_encoding(modrm->rm, ctx->prefixes->rex.b),
+            operand_size,
+            ctx->prefixes
+        );
+
+        *rm_operand = (modrm_rm_operand_t) {
+            .is_memory = false,
+            .addr_or_reg = rm_reg_operand,
+        };
+    } else {
+        // in this case, the r/m field is a memory operand
+        pis_operand_t rm_addr_tmp = PIS_OPERAND_TMP(0, ctx->addr_size);
+        CHECK_RETHROW(build_modrm_rm_addr_into(ctx, modrm, &rm_addr_tmp));
+
+        *rm_operand = (modrm_rm_operand_t) {
+            .is_memory = true,
+            .addr_or_reg = rm_addr_tmp,
+        };
+    }
+
+cleanup:
+    return err;
+}
+
 err_t modrm_fetch_and_process(const post_prefixes_ctx_t* ctx, modrm_operands_t* operands) {
     err_t err = SUCCESS;
 
@@ -310,29 +345,7 @@ err_t modrm_fetch_and_process(const post_prefixes_ctx_t* ctx, modrm_operands_t* 
     );
 
     modrm_rm_operand_t rm_operand = {};
-
-    if (modrm.mod == 0b11) {
-        // in this case, the r/m field is a register and not a memory operand
-        pis_operand_t rm_reg_operand = reg_get_operand(
-            apply_rex_bit_to_reg_encoding(modrm.rm, ctx->prefixes->rex.b),
-            operand_size,
-            ctx->prefixes
-        );
-
-        rm_operand = (modrm_rm_operand_t) {
-            .is_memory = false,
-            .addr_or_reg = rm_reg_operand,
-        };
-    } else {
-        // in this case, the r/m field is a memory operand
-        pis_operand_t rm_addr_tmp = PIS_OPERAND_TMP(0, ctx->addr_size);
-        CHECK_RETHROW(build_modrm_rm_addr_into(ctx, &modrm, &rm_addr_tmp));
-
-        rm_operand = (modrm_rm_operand_t) {
-            .is_memory = true,
-            .addr_or_reg = rm_addr_tmp,
-        };
-    }
+    CHECK_RETHROW(modrm_decode_rm_operand(ctx, &modrm, operand_size, &rm_operand));
 
     *operands = (modrm_operands_t) {
         .reg_operand =

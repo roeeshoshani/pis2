@@ -9,6 +9,13 @@
 
 #define PIS_LIFT_MAX_INSNS_AMOUNT (64)
 
+#define PIS_INSN1(OPCODE, OPERAND_1)                                                               \
+    ((pis_insn_t) {                                                                                \
+        .opcode = (OPCODE),                                                                        \
+        .operands = {(OPERAND_1)},                                                                 \
+        .operands_amount = 1,                                                                      \
+    })
+
 #define PIS_INSN2(OPCODE, OPERAND_1, OPERAND_2)                                                    \
     ((pis_insn_t) {                                                                                \
         .opcode = (OPCODE),                                                                        \
@@ -114,7 +121,8 @@
     _(PIS_OPCODE_UNSIGNED_LESS_THAN, )                                                             \
     _(PIS_OPCODE_SIGNED_BORROW, )                                                                  \
     _(PIS_OPCODE_JMP_COND, )                                                                       \
-    _(PIS_OPCODE_SIGN_EXTEND, )                                                                       \
+    _(PIS_OPCODE_JMP, )                                                                            \
+    _(PIS_OPCODE_SIGN_EXTEND, )                                                                    \
     _(PIS_OPCODE_MUL, )
 STR_ENUM(pis_opcode, PIS_OPCODE);
 
