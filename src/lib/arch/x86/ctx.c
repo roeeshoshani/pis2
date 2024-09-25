@@ -227,12 +227,67 @@ cleanup:
     return err;
 }
 
+static err_t rel_jmp_fetch_disp(const post_prefixes_ctx_t* ctx, u64* disp) {
+    err_t err = SUCCESS;
+    pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+    switch (operand_size) {
+    case PIS_OPERAND_SIZE_8: {
+        i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+        *disp = (i64) disp32;
+        break;
+    }
+    case PIS_OPERAND_SIZE_4: {
+        i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+        *disp = (i64) disp32;
+        break;
+    }
+    case PIS_OPERAND_SIZE_2: {
+        i16 disp16 = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
+        *disp = (i64) disp16;
+        break;
+    }
+    case PIS_OPERAND_SIZE_1:
+        // unreachable
+        CHECK_FAIL();
+    }
+cleanup:
+    return err;
+}
+
+static err_t rel_jmp_fetch_disp_and_calc_target(const post_prefixes_ctx_t* ctx, u64* target) {
+    err_t err = SUCCESS;
+
+    u64 disp = 0;
+    CHECK_RETHROW(rel_jmp_fetch_disp(ctx, &disp));
+
+    u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
+    *target = cur_insn_end_addr + disp;
+
+cleanup:
+    return err;
+}
+
 static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_opcode_byte) {
     err_t err = SUCCESS;
 
     UNUSED(ctx);
 
-    if (false) {
+    if (second_opcode_byte == 0x87) {
+        // ja rel
+        pis_operand_t a_tmp = PIS_OPERAND(g_src_op_1_tmp_addr, PIS_OPERAND_SIZE_1);
+        pis_operand_t b_tmp = PIS_OPERAND(g_src_op_2_tmp_addr, PIS_OPERAND_SIZE_1);
+        pis_operand_t res_tmp = PIS_OPERAND(g_calc_res_tmp_addr, PIS_OPERAND_SIZE_1);
+
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_NOT, a_tmp, FLAGS_CF));
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_NOT, b_tmp, FLAGS_ZF));
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, res_tmp, a_tmp, b_tmp));
+
+        u64 target = 0;
+        CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target(ctx, &target));
+
+        // TODO: make the actual jump
+        CHECK_FAIL_TRACE("JA <target = %lx>", (unsigned long) target);
+
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
