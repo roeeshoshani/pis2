@@ -303,6 +303,7 @@ cleanup:
 
 static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opcode_byte) {
     err_t err = SUCCESS;
+    modrm_operands_t modrm_operands = {};
 
     if ((first_opcode_byte & (~0b111)) == 0x50) {
         // push <reg>
@@ -327,41 +328,50 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         );
     } else if (first_opcode_byte == 0x89) {
         // move r/m, r
-        modrm_operands_t modrm_operands = {};
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(
             modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &modrm_operands.reg_operand.reg)
         );
     } else if (first_opcode_byte == 0x8b) {
         // move r, r/m
-        modrm_operands_t modrm_operands = {};
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(
             modrm_rm_read(ctx, &modrm_operands.reg_operand.reg, &modrm_operands.rm_operand.rm)
         );
     } else if (first_opcode_byte == 0x01) {
         // add r/m, r
-        modrm_operands_t modrm_operands = {};
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(do_add_modrm(ctx, &modrm_operands.rm_operand, &modrm_operands.reg_operand));
     } else if (first_opcode_byte == 0x03) {
         // add r, r/m
-        modrm_operands_t modrm_operands = {};
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(do_add_modrm(ctx, &modrm_operands.reg_operand, &modrm_operands.rm_operand));
     } else if (first_opcode_byte == 0x29) {
         // sub r/m, r
-        modrm_operands_t modrm_operands = {};
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(do_sub_modrm(ctx, &modrm_operands.rm_operand, &modrm_operands.reg_operand));
     } else if (first_opcode_byte == 0x2b) {
         // sub r, r/m
-        modrm_operands_t modrm_operands = {};
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(do_sub_modrm(ctx, &modrm_operands.reg_operand, &modrm_operands.rm_operand));
+    } else if (first_opcode_byte == 0x8d) {
+        // lea r, m
+
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+
+        // the rm operand must be a memory operand in case of `lea`.
+        CHECK(modrm_operands.rm_operand.rm.is_memory);
+
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(
+                PIS_OPCODE_MOVE,
+                modrm_operands.reg_operand.reg,
+                modrm_operands.rm_operand.rm.addr_or_reg
+            )
+        );
     } else if (first_opcode_byte == 0x83) {
         // xxx r/m, imm8
-        modrm_operands_t modrm_operands = {};
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
