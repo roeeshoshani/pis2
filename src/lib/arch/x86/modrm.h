@@ -42,6 +42,7 @@ typedef struct {
 typedef struct {
     modrm_operand_t rm_operand;
     modrm_operand_t reg_operand;
+    modrm_t modrm;
 } modrm_operands_t;
 
 modrm_t modrm_decode_byte(u8 modrm_byte);

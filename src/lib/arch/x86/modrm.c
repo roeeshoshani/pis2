@@ -345,7 +345,7 @@ err_t modrm_fetch_and_process(const post_prefixes_ctx_t* ctx, modrm_operands_t* 
                 .type = MODRM_OPERAND_TYPE_RM,
                 .rm = rm_operand,
             },
-
+        .modrm = modrm,
     };
 
 cleanup:
