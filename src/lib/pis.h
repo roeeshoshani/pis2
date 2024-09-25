@@ -166,6 +166,8 @@ err_t pis_lift_result_emit(pis_lift_result_t* result, const pis_insn_t* insn);
 
 void pis_lift_result_dump(const pis_lift_result_t* result);
 
+void pis_lift_result_reset(pis_lift_result_t* result);
+
 u32 pis_operand_size_to_bytes(pis_operand_size_t operand_size);
 
 u32 pis_operand_size_to_bits(pis_operand_size_t operand_size);

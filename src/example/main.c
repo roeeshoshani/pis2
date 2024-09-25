@@ -58,6 +58,8 @@ int main() {
         .cpumode = PIS_X86_CPUMODE_64_BIT,
     };
     while (cur_offset < code_len) {
+        pis_lift_result_reset(&result);
+
         CHECK_RETHROW(
             pis_x86_lift(&ctx, code + cur_offset, code_len - cur_offset, cur_offset, &result)
         );

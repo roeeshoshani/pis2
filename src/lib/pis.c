@@ -72,6 +72,11 @@ void pis_lift_result_dump(const pis_lift_result_t* result) {
     }
 }
 
+void pis_lift_result_reset(pis_lift_result_t* result) {
+    result->insns_amount = 0;
+    result->machine_insn_len = 0;
+}
+
 u32 pis_operand_size_to_bytes(pis_operand_size_t operand_size) {
     return (u32) operand_size;
 }
