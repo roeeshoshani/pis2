@@ -227,10 +227,26 @@ cleanup:
     return err;
 }
 
-static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
+static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_opcode_byte) {
     err_t err = SUCCESS;
 
-    u8 first_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+    UNUSED(ctx);
+
+    if (false) {
+    } else {
+        CHECK_FAIL_TRACE_CODE(
+            PIS_ERR_UNSUPPORTED_INSN,
+            "unsupported second opcode byte: 0x%x",
+            second_opcode_byte
+        );
+    }
+
+cleanup:
+    return err;
+}
+
+static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opcode_byte) {
+    err_t err = SUCCESS;
 
     if ((first_opcode_byte & (~0b111)) == 0x50) {
         // push <reg>
@@ -303,6 +319,11 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
         CHECK_RETHROW(do_sub(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp));
 
         CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+    } else if (first_opcode_byte == 0x0f) {
+        // opcode is longer than 1 byte
+        u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+
+        CHECK_RETHROW(lift_second_opcode_byte(ctx, second_opcode_byte));
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
@@ -310,6 +331,17 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
             first_opcode_byte
         );
     }
+
+cleanup:
+    return err;
+}
+
+static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    u8 first_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+
+    CHECK_RETHROW(lift_first_opcode_byte(ctx, first_opcode_byte));
 
 cleanup:
     return err;
