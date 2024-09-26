@@ -301,14 +301,21 @@ cleanup:
     return err;
 }
 
+u8 opcode_reg_extract(const post_prefixes_ctx_t* ctx, u8 opcode_byte) {
+    return apply_rex_bit_to_reg_encoding(opcode_byte & 0b111, ctx->prefixes->rex.b);
+}
+
+u8 opcode_reg_opcode_only(u8 opcode_byte) {
+    return opcode_byte & (~0b111);
+}
+
 static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opcode_byte) {
     err_t err = SUCCESS;
     modrm_operands_t modrm_operands = {};
 
-    if ((first_opcode_byte & (~0b111)) == 0x50) {
+    if (opcode_reg_opcode_only(first_opcode_byte) == 0x50) {
         // push <reg>
-        u8 reg_encoding =
-            apply_rex_bit_to_reg_encoding(first_opcode_byte & 0b111, ctx->prefixes->rex.b);
+        u8 reg_encoding = opcode_reg_extract(ctx, first_opcode_byte);
 
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_64_bit;
         pis_operand_t sp = ctx->lift_ctx->sp;
@@ -324,6 +331,31 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
                 PIS_OPCODE_STORE,
                 sp,
                 reg_get_operand(reg_encoding, operand_size, ctx->prefixes)
+            )
+        );
+    } else if (opcode_reg_opcode_only(first_opcode_byte) == 0x58) {
+        // pop <reg>
+        u8 reg_encoding = opcode_reg_extract(ctx, first_opcode_byte);
+
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_64_bit;
+        pis_operand_t sp = ctx->lift_ctx->sp;
+        u64 operand_size_bytes = pis_operand_size_to_bytes(operand_size);
+
+        pis_operand_t tmp = PIS_OPERAND(g_calc_res_tmp_addr, operand_size);
+
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_LOAD, tmp, sp));
+
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN_ADD2(sp, PIS_OPERAND_CONST(operand_size_bytes, sp.size))
+        );
+
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(
+                PIS_OPCODE_MOVE,
+                reg_get_operand(reg_encoding, operand_size, ctx->prefixes),
+                tmp
             )
         );
     } else if (first_opcode_byte == 0x89) {
