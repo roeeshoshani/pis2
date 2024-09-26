@@ -432,6 +432,14 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
+    } else if (first_opcode_byte == 0xe9) {
+        u64 target = 0;
+        CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target(ctx, &target));
+
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN1(PIS_OPCODE_JMP, PIS_OPERAND_RAM(target, PIS_OPERAND_SIZE_1))
+        );
     } else if (first_opcode_byte == 0x0f) {
         // opcode is longer than 1 byte
         u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
