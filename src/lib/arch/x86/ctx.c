@@ -242,10 +242,10 @@ typedef err_t (*modrm_binop_fn_t)(
 
 static err_t calc_binop_modrm(
     const post_prefixes_ctx_t* ctx,
+    modrm_binop_fn_t fn,
     const modrm_operand_t* dst,
     const modrm_operand_t* src,
-    pis_operand_t* result,
-    modrm_binop_fn_t fn
+    pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -264,14 +264,14 @@ cleanup:
 
 static err_t calc_and_store_binop_modrm(
     const post_prefixes_ctx_t* ctx,
+    modrm_binop_fn_t fn,
     const modrm_operand_t* dst,
-    const modrm_operand_t* src,
-    modrm_binop_fn_t fn
+    const modrm_operand_t* src
 ) {
     err_t err = SUCCESS;
 
     pis_operand_t res_tmp = {};
-    CHECK_RETHROW(calc_binop_modrm(ctx, dst, src, &res_tmp, fn));
+    CHECK_RETHROW(calc_binop_modrm(ctx, fn, dst, src, &res_tmp));
     CHECK_RETHROW(modrm_operand_write(ctx, dst, &res_tmp));
 
 cleanup:
@@ -496,54 +496,54 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
+            do_add,
             &modrm_operands.rm_operand,
-            &modrm_operands.reg_operand,
-            do_add
+            &modrm_operands.reg_operand
         ));
     } else if (first_opcode_byte == 0x03) {
         // add r, r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
+            do_add,
             &modrm_operands.reg_operand,
-            &modrm_operands.rm_operand,
-            do_add
+            &modrm_operands.rm_operand
         ));
     } else if (first_opcode_byte == 0x29) {
         // sub r/m, r
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
+            do_sub,
             &modrm_operands.rm_operand,
-            &modrm_operands.reg_operand,
-            do_sub
+            &modrm_operands.reg_operand
         ));
     } else if (first_opcode_byte == 0x2b) {
         // sub r, r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
+            do_sub,
             &modrm_operands.reg_operand,
-            &modrm_operands.rm_operand,
-            do_sub
+            &modrm_operands.rm_operand
         ));
     } else if (first_opcode_byte == 0x31) {
         // xor r/m, r
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
+            do_xor,
             &modrm_operands.rm_operand,
-            &modrm_operands.reg_operand,
-            do_xor
+            &modrm_operands.reg_operand
         ));
     } else if (first_opcode_byte == 0x33) {
         // xor r, r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
+            do_xor,
             &modrm_operands.reg_operand,
-            &modrm_operands.rm_operand,
-            do_xor
+            &modrm_operands.rm_operand
         ));
     } else if (first_opcode_byte == 0x39) {
         // cmp r/m, r
@@ -553,10 +553,10 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t res_tmp = {};
         CHECK_RETHROW(calc_binop_modrm(
             ctx,
+            do_sub,
             &modrm_operands.rm_operand,
             &modrm_operands.reg_operand,
-            &res_tmp,
-            do_sub
+            &res_tmp
         ));
     } else if (first_opcode_byte == 0x3b) {
         // cmp r, r/m
@@ -565,10 +565,10 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t res_tmp = {};
         CHECK_RETHROW(calc_binop_modrm(
             ctx,
+            do_sub,
             &modrm_operands.reg_operand,
             &modrm_operands.rm_operand,
-            &res_tmp,
-            do_sub
+            &res_tmp
         ));
     } else if (first_opcode_byte == 0x8d) {
         // lea r, m
