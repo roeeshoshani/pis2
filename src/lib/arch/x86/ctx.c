@@ -247,8 +247,7 @@ static err_t rel_jmp_fetch_disp(const post_prefixes_ctx_t* ctx, u64* disp) {
         break;
     }
     case PIS_OPERAND_SIZE_1:
-        // unreachable
-        CHECK_FAIL();
+        UNREACHABLE();
     }
 cleanup:
     return err;

@@ -137,8 +137,7 @@ static err_t build_modrm_rm_addr_16_into(
             break;
         }
         case 0b11:
-            // unreachable
-            CHECK_FAIL();
+            UNREACHABLE();
         }
     }
 cleanup:
@@ -193,8 +192,7 @@ static err_t build_modrm_rm_addr_32_into(
             break;
         }
         case 0b11:
-            // unreachable
-            CHECK_FAIL();
+            UNREACHABLE();
         }
     }
 
@@ -261,8 +259,7 @@ static err_t build_modrm_rm_addr_64_into(
             break;
         }
         case 0b11:
-            // unreachable
-            CHECK_FAIL();
+            UNREACHABLE();
         }
     }
 
@@ -289,8 +286,7 @@ static err_t build_modrm_rm_addr_into(
         CHECK_RETHROW(build_modrm_rm_addr_16_into(ctx, modrm, into));
         break;
     case PIS_OPERAND_SIZE_1:
-        // unreachable
-        CHECK_FAIL();
+        UNREACHABLE();
     }
 cleanup:
     return err;
@@ -418,8 +414,7 @@ err_t modrm_operand_read(
         CHECK_RETHROW(modrm_rm_read(ctx, read_into, &operand->rm));
         break;
     default:
-        // unreachable
-        CHECK_FAIL();
+        UNREACHABLE();
     }
 
 cleanup:
@@ -439,8 +434,7 @@ err_t modrm_operand_write(
         CHECK_RETHROW(modrm_rm_write(ctx, &operand->rm, to_write));
         break;
     default:
-        // unreachable
-        CHECK_FAIL();
+        UNREACHABLE();
     }
 
 cleanup:

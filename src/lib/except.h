@@ -24,6 +24,8 @@
 #define CHECK_FAIL_CODE(CODE) CHECK_CODE(false, CODE)
 #define CHECK_FAIL() CHECK(false)
 
+#define UNREACHABLE() CHECK_FAIL_TRACE("uncreachable code was reached")
+
 #define CHECK_RETHROW(EXPR)                                                                        \
     do {                                                                                           \
         err_t ___res = (EXPR);                                                                     \
