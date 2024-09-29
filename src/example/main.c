@@ -60,6 +60,8 @@ int main() {
     while (cur_offset < code_len) {
         pis_lift_result_reset(&result);
 
+        TRACE("TRYING TO PARSE INSN AT OFFSET 0x%lx", (unsigned long) cur_offset);
+
         CHECK_RETHROW(
             pis_x86_lift(&ctx, code + cur_offset, code_len - cur_offset, cur_offset, &result)
         );

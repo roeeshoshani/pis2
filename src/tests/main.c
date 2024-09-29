@@ -110,6 +110,13 @@ static err_t generic_test_lift_at_addr(
 
     CHECK_RETHROW_VERBOSE(assert_pis_lift_result_equals(&result, expected));
 
+    CHECK_TRACE(
+        result.machine_insn_len == code.len,
+        "expected the instruction to be %lu bytes, instead it was %lu bytes",
+        code.len,
+        result.machine_insn_len
+    );
+
 cleanup:
     return err;
 }
@@ -1124,6 +1131,29 @@ DEFINE_TEST(test_mov_r8_16_bit_mode) {
         CODE(0xb0, 0x12),
         PIS_X86_CPUMODE_16_BIT,
         EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, AL, PIS_OPERAND_CONST(0x12, PIS_OPERAND_SIZE_1)))
+    ));
+
+cleanup:
+    return err;
+}
+
+DEFINE_TEST(test_nop_modrm) {
+    err_t err = SUCCESS;
+
+    pis_operand_t addr_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_8);
+    pis_operand_t sib_tmp = PIS_OPERAND(g_sib_index_tmp_addr, PIS_OPERAND_SIZE_8);
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x66, 0x2e, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00),
+        PIS_X86_CPUMODE_64_BIT,
+
+        EXPECTED_INSNS(
+            PIS_INSN2(PIS_OPCODE_MOVE, addr_tmp, RAX),
+            PIS_INSN2(PIS_OPCODE_MOVE, sib_tmp, RAX),
+            PIS_INSN_MUL2(sib_tmp, PIS_OPERAND_CONST(1, PIS_OPERAND_SIZE_8)),
+            PIS_INSN_ADD2(addr_tmp, sib_tmp),
+            PIS_INSN_ADD2(addr_tmp, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_8)),
+        )
     ));
 
 cleanup:

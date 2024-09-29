@@ -321,8 +321,7 @@ cleanup:
 
 static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_opcode_byte) {
     err_t err = SUCCESS;
-
-    UNUSED(ctx);
+    modrm_operands_t modrm_operands = {};
 
     if (second_opcode_byte == 0x87) {
         // ja rel
@@ -343,9 +342,9 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         );
     } else if (second_opcode_byte == 0x1f) {
         // xxx r/m
-        modrm_t modrm = modrm_decode_byte(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx));
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
-        if (modrm.reg == 0) {
+        if (modrm_operands.modrm.reg == 0) {
             // nop r/m
 
             // don't emit anything, this is a nop
