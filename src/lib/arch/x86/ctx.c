@@ -81,12 +81,7 @@ static err_t
 
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN3(
-            PIS_OPCODE_GET_LOW_BITS,
-            g_parity_flag_low_byte_tmp,
-            *calculation_result,
-            PIS_OPERAND_CONST(8, PIS_OPERAND_SIZE_1)
-        )
+        PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, g_parity_flag_low_byte_tmp, *calculation_result)
     );
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
