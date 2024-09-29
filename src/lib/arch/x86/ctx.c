@@ -558,6 +558,18 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             &res_tmp,
             do_sub
         ));
+    } else if (first_opcode_byte == 0x3b) {
+        // cmp r, r/m
+
+        // perform subtraction but ignore the result
+        pis_operand_t res_tmp = {};
+        CHECK_RETHROW(calc_binop_modrm(
+            ctx,
+            &modrm_operands.reg_operand,
+            &modrm_operands.rm_operand,
+            &res_tmp,
+            do_sub
+        ));
     } else if (first_opcode_byte == 0x8d) {
         // lea r, m
 
