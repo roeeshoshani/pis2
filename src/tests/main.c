@@ -909,6 +909,71 @@ cleanup:
     return err;
 }
 
+DEFINE_TEST(test_rel_operand_16_bit_mode) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift_at_addr(
+        CODE(0xe9, 0x09, 0x00),
+        PIS_X86_CPUMODE_16_BIT,
+        EXPECTED_INSNS(PIS_INSN1(PIS_OPCODE_JMP, PIS_OPERAND_RAM(7, PIS_OPERAND_SIZE_1))),
+        (0xffff + 1) - 3 - 2
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift_at_addr(
+        CODE(0x66, 0xe9, 0x09, 0x00, 0x00, 0x00),
+        PIS_X86_CPUMODE_16_BIT,
+        EXPECTED_INSNS(PIS_INSN1(PIS_OPCODE_JMP, PIS_OPERAND_RAM(7, PIS_OPERAND_SIZE_1))),
+        (0xffffffffULL + 1) - 6 - 2
+    ));
+
+cleanup:
+    return err;
+}
+
+DEFINE_TEST(test_rel_operand_32_bit_mode) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift_at_addr(
+        CODE(0xe9, 0x09, 0x00, 0x00, 0x00),
+        PIS_X86_CPUMODE_32_BIT,
+        EXPECTED_INSNS(PIS_INSN1(PIS_OPCODE_JMP, PIS_OPERAND_RAM(7, PIS_OPERAND_SIZE_1))),
+        (0xffffffffULL + 1) - 5 - 2
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift_at_addr(
+        CODE(0x66, 0xe9, 0x09, 0x00),
+        PIS_X86_CPUMODE_32_BIT,
+        EXPECTED_INSNS(PIS_INSN1(PIS_OPCODE_JMP, PIS_OPERAND_RAM(7, PIS_OPERAND_SIZE_1))),
+        (0xffff + 1) - 4 - 2
+    ));
+
+
+cleanup:
+    return err;
+}
+
+DEFINE_TEST(test_rel_operand_64_bit_mode) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift_at_addr(
+        CODE(0xe9, 0x09, 0x00, 0x00, 0x00),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(PIS_INSN1(PIS_OPCODE_JMP, PIS_OPERAND_RAM(7, PIS_OPERAND_SIZE_1))),
+        0xffffffffffffffffULL - 5 - 2 + 1
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift_at_addr(
+        CODE(0x66, 0xe9, 0x09, 0x00),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(PIS_INSN1(PIS_OPCODE_JMP, PIS_OPERAND_RAM(7, PIS_OPERAND_SIZE_1))),
+        (0xffff + 1) - 4 - 2
+    ));
+
+
+cleanup:
+    return err;
+}
+
 int main() {
     err_t err = SUCCESS;
 

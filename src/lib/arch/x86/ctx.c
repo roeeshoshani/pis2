@@ -253,14 +253,42 @@ cleanup:
     return err;
 }
 
-static err_t rel_jmp_fetch_disp_and_calc_target(const post_prefixes_ctx_t* ctx, u64* target) {
+static pis_operand_size_t rel_jmp_ip_operand_size(const post_prefixes_ctx_t* ctx) {
+    return ctx->operand_sizes.insn_default_64_bit;
+}
+
+static u64 rel_jmp_mask_ip_value(const post_prefixes_ctx_t* ctx, u64 ip_value) {
+    pis_operand_size_t ip_operand_size = rel_jmp_ip_operand_size(ctx);
+    u32 ip_operand_size_bits = pis_operand_size_to_bits(ip_operand_size);
+    if (ip_operand_size_bits == 64) {
+        return ip_value;
+    } else {
+        u64 mask = (1UL << ip_operand_size_bits) - 1;
+        return ip_value & mask;
+    }
+}
+
+static err_t rel_jmp_fetch_disp_and_calc_target_addr(const post_prefixes_ctx_t* ctx, u64* target) {
     err_t err = SUCCESS;
 
     u64 disp = 0;
     CHECK_RETHROW(rel_jmp_fetch_disp(ctx, &disp));
 
     u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
-    *target = cur_insn_end_addr + disp;
+    *target = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr + disp);
+
+cleanup:
+    return err;
+}
+
+static err_t
+    rel_jmp_fetch_disp_and_calc_target(const post_prefixes_ctx_t* ctx, pis_operand_t* target) {
+    err_t err = SUCCESS;
+
+    u64 target_addr = 0;
+    CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target_addr(ctx, &target_addr));
+
+    *target = PIS_OPERAND_RAM(target_addr, PIS_OPERAND_SIZE_1);
 
 cleanup:
     return err;
@@ -282,7 +310,7 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, res_tmp, a_tmp, b_tmp));
 
         u64 target = 0;
-        CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target(ctx, &target));
+        CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target_addr(ctx, &target));
 
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
@@ -475,13 +503,11 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
     } else if (first_opcode_byte == 0xe9) {
-        u64 target = 0;
+        // jmp rel
+        pis_operand_t target = {};
         CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target(ctx, &target));
 
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN1(PIS_OPCODE_JMP, PIS_OPERAND_RAM(target, PIS_OPERAND_SIZE_1))
-        );
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, target));
     } else if (first_opcode_byte == 0xc3) {
         // ret
         pis_operand_size_t operand_size = ctx->lift_ctx->stack_addr_size;
