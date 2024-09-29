@@ -227,9 +227,20 @@ cleanup:
     return err;
 }
 
+static pis_operand_size_t rel_jmp_operand_size(const post_prefixes_ctx_t* ctx) {
+    if (ctx->lift_ctx->pis_x86_ctx->cpumode == PIS_X86_CPUMODE_64_BIT) {
+        // from the intel ia-32 spec:
+        // "In 64-bit mode the target operand will always be 64-bits because the operand size is
+        // forced to 64-bits for near branches"
+        return PIS_OPERAND_SIZE_8;
+    } else {
+        return ctx->operand_sizes.insn_default_not_64_bit;
+    }
+}
+
 static err_t rel_jmp_fetch_disp(const post_prefixes_ctx_t* ctx, u64* disp) {
     err_t err = SUCCESS;
-    pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+    pis_operand_size_t operand_size = rel_jmp_operand_size(ctx);
     switch (operand_size) {
     case PIS_OPERAND_SIZE_8: {
         i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
@@ -254,7 +265,7 @@ cleanup:
 }
 
 static pis_operand_size_t rel_jmp_ip_operand_size(const post_prefixes_ctx_t* ctx) {
-    return ctx->operand_sizes.insn_default_64_bit;
+    return rel_jmp_operand_size(ctx);
 }
 
 static u64 rel_jmp_mask_ip_value(const post_prefixes_ctx_t* ctx, u64 ip_value) {
@@ -347,6 +358,21 @@ u8 opcode_reg_opcode_only(u8 opcode_byte) {
     return opcode_byte & (~0b111);
 }
 
+static err_t do_push(const post_prefixes_ctx_t* ctx, const pis_operand_t* operand_to_push) {
+    err_t err = SUCCESS;
+
+    pis_operand_t sp = ctx->lift_ctx->sp;
+    u64 operand_size_bytes = pis_operand_size_to_bytes(operand_to_push->size);
+
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN_ADD2(sp, PIS_OPERAND_CONST_NEG(operand_size_bytes, sp.size))
+    );
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_STORE, sp, *operand_to_push));
+cleanup:
+    return err;
+}
+
 static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opcode_byte) {
     err_t err = SUCCESS;
     modrm_operands_t modrm_operands = {};
@@ -356,21 +382,9 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         u8 reg_encoding = opcode_reg_extract(ctx, first_opcode_byte);
 
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_64_bit;
-        pis_operand_t sp = ctx->lift_ctx->sp;
-        u64 operand_size_bytes = pis_operand_size_to_bytes(operand_size);
+        pis_operand_t pushed_reg = reg_get_operand(reg_encoding, operand_size, ctx->prefixes);
 
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN_ADD2(sp, PIS_OPERAND_CONST_NEG(operand_size_bytes, sp.size))
-        );
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(
-                PIS_OPCODE_STORE,
-                sp,
-                reg_get_operand(reg_encoding, operand_size, ctx->prefixes)
-            )
-        );
+        CHECK_RETHROW(do_push(ctx, &pushed_reg));
     } else if (opcode_reg_opcode_only(first_opcode_byte) == 0x58) {
         // pop <reg>
         u8 reg_encoding = opcode_reg_extract(ctx, first_opcode_byte);
@@ -506,6 +520,16 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         // jmp rel
         pis_operand_t target = {};
         CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target(ctx, &target));
+
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, target));
+    } else if (first_opcode_byte == 0xe8) {
+        // call rel
+        pis_operand_t target = {};
+        CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target(ctx, &target));
+
+        u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
+        u64 push_value = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr);
+        CHECK_RETHROW(do_push(ctx, &PIS_OPERAND_CONST(push_value, rel_jmp_operand_size(ctx))));
 
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, target));
     } else if (first_opcode_byte == 0xc3) {
