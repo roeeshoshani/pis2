@@ -26,7 +26,11 @@ dump64: $(OBJ64)
 
 .phony: debug64
 debug64: $(BIN64)
-	gdb -x gdbscript $(BIN64)
+	gdb -x gdbscript64 $(BIN64)
+
+.phony: debug32
+debug32: $(BIN32)
+	gdb -x gdbscript32 $(BIN32)
 
 build/%_64.o: src/%_64.asm
 	@mkdir -p $(@D)
