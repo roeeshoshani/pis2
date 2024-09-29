@@ -1054,6 +1054,82 @@ cleanup:
     return err;
 }
 
+DEFINE_TEST(test_mov_r8_64_bit_mode) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0xb7, 0xe4),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, BH, PIS_OPERAND_CONST(0xe4, PIS_OPERAND_SIZE_1)))
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x48, 0xb7, 0xe4),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, DIL, PIS_OPERAND_CONST(0xe4, PIS_OPERAND_SIZE_1)))
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x49, 0xb7, 0xe4),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, R15B, PIS_OPERAND_CONST(0xe4, PIS_OPERAND_SIZE_1))
+        )
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x41, 0xb0, 0x12),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, R8B, PIS_OPERAND_CONST(0x12, PIS_OPERAND_SIZE_1)))
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0x40, 0xb4, 0x55),
+        PIS_X86_CPUMODE_64_BIT,
+        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, SPL, PIS_OPERAND_CONST(0x55, PIS_OPERAND_SIZE_1)))
+    ));
+
+cleanup:
+    return err;
+}
+
+DEFINE_TEST(test_mov_r8_32_bit_mode) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0xb7, 0xe4),
+        PIS_X86_CPUMODE_32_BIT,
+        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, BH, PIS_OPERAND_CONST(0xe4, PIS_OPERAND_SIZE_1)))
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0xb0, 0x12),
+        PIS_X86_CPUMODE_32_BIT,
+        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, AL, PIS_OPERAND_CONST(0x12, PIS_OPERAND_SIZE_1)))
+    ));
+
+cleanup:
+    return err;
+}
+
+DEFINE_TEST(test_mov_r8_16_bit_mode) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0xb7, 0xe4),
+        PIS_X86_CPUMODE_16_BIT,
+        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, BH, PIS_OPERAND_CONST(0xe4, PIS_OPERAND_SIZE_1)))
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_test_lift(
+        CODE(0xb0, 0x12),
+        PIS_X86_CPUMODE_16_BIT,
+        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, AL, PIS_OPERAND_CONST(0x12, PIS_OPERAND_SIZE_1)))
+    ));
+
+cleanup:
+    return err;
+}
+
 int main() {
     err_t err = SUCCESS;
 

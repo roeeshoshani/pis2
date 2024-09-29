@@ -548,6 +548,16 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         );
 
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, tmp));
+    } else if (opcode_reg_opcode_only(first_opcode_byte) == 0xb0) {
+        // mov r8, imm8
+        u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        u8 reg_encoding = opcode_reg_extract(ctx, first_opcode_byte);
+        pis_operand_t reg_operand =
+            reg_get_operand(reg_encoding, PIS_OPERAND_SIZE_1, ctx->prefixes);
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_MOVE, reg_operand, PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1))
+        );
     } else if (first_opcode_byte == 0x0f) {
         // opcode is longer than 1 byte
         u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
