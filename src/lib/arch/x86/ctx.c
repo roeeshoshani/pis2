@@ -288,6 +288,17 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
             ctx->lift_ctx,
             PIS_INSN2(PIS_OPCODE_JMP_COND, res_tmp, PIS_OPERAND_RAM(target, PIS_OPERAND_SIZE_1))
         );
+    } else if (second_opcode_byte == 0x1f) {
+        // xxx r/m
+        modrm_t modrm = modrm_decode_byte(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx));
+
+        if (modrm.reg == 0) {
+            // nop r/m
+
+            // don't emit anything, this is a nop
+        } else {
+            CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
+        }
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
