@@ -240,10 +240,11 @@ typedef err_t (*modrm_binop_fn_t)(
     pis_operand_t* result
 );
 
-static err_t do_binop_modrm(
+static err_t calc_binop_modrm(
     const post_prefixes_ctx_t* ctx,
     const modrm_operand_t* dst,
     const modrm_operand_t* src,
+    pis_operand_t* result,
     modrm_binop_fn_t fn
 ) {
     err_t err = SUCCESS;
@@ -255,9 +256,22 @@ static err_t do_binop_modrm(
     CHECK_RETHROW(modrm_operand_read(ctx, &dst_tmp, dst));
     CHECK_RETHROW(modrm_operand_read(ctx, &src_tmp, src));
 
-    pis_operand_t res_tmp = {};
-    CHECK_RETHROW(fn(ctx, &dst_tmp, &src_tmp, &res_tmp));
+    CHECK_RETHROW(fn(ctx, &dst_tmp, &src_tmp, result));
 
+cleanup:
+    return err;
+}
+
+static err_t calc_and_store_binop_modrm(
+    const post_prefixes_ctx_t* ctx,
+    const modrm_operand_t* dst,
+    const modrm_operand_t* src,
+    modrm_binop_fn_t fn
+) {
+    err_t err = SUCCESS;
+
+    pis_operand_t res_tmp = {};
+    CHECK_RETHROW(calc_binop_modrm(ctx, dst, src, &res_tmp, fn));
     CHECK_RETHROW(modrm_operand_write(ctx, dst, &res_tmp));
 
 cleanup:
@@ -480,39 +494,70 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
     } else if (first_opcode_byte == 0x01) {
         // add r/m, r
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-        CHECK_RETHROW(
-            do_binop_modrm(ctx, &modrm_operands.rm_operand, &modrm_operands.reg_operand, do_add)
-        );
+        CHECK_RETHROW(calc_and_store_binop_modrm(
+            ctx,
+            &modrm_operands.rm_operand,
+            &modrm_operands.reg_operand,
+            do_add
+        ));
     } else if (first_opcode_byte == 0x03) {
         // add r, r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-        CHECK_RETHROW(
-            do_binop_modrm(ctx, &modrm_operands.reg_operand, &modrm_operands.rm_operand, do_add)
-        );
+        CHECK_RETHROW(calc_and_store_binop_modrm(
+            ctx,
+            &modrm_operands.reg_operand,
+            &modrm_operands.rm_operand,
+            do_add
+        ));
     } else if (first_opcode_byte == 0x29) {
         // sub r/m, r
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-        CHECK_RETHROW(
-            do_binop_modrm(ctx, &modrm_operands.rm_operand, &modrm_operands.reg_operand, do_sub)
-        );
+        CHECK_RETHROW(calc_and_store_binop_modrm(
+            ctx,
+            &modrm_operands.rm_operand,
+            &modrm_operands.reg_operand,
+            do_sub
+        ));
     } else if (first_opcode_byte == 0x2b) {
         // sub r, r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-        CHECK_RETHROW(
-            do_binop_modrm(ctx, &modrm_operands.reg_operand, &modrm_operands.rm_operand, do_sub)
-        );
+        CHECK_RETHROW(calc_and_store_binop_modrm(
+            ctx,
+            &modrm_operands.reg_operand,
+            &modrm_operands.rm_operand,
+            do_sub
+        ));
     } else if (first_opcode_byte == 0x31) {
         // xor r/m, r
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-        CHECK_RETHROW(
-            do_binop_modrm(ctx, &modrm_operands.rm_operand, &modrm_operands.reg_operand, do_xor)
-        );
+        CHECK_RETHROW(calc_and_store_binop_modrm(
+            ctx,
+            &modrm_operands.rm_operand,
+            &modrm_operands.reg_operand,
+            do_xor
+        ));
     } else if (first_opcode_byte == 0x33) {
         // xor r, r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-        CHECK_RETHROW(
-            do_binop_modrm(ctx, &modrm_operands.reg_operand, &modrm_operands.rm_operand, do_xor)
-        );
+        CHECK_RETHROW(calc_and_store_binop_modrm(
+            ctx,
+            &modrm_operands.reg_operand,
+            &modrm_operands.rm_operand,
+            do_xor
+        ));
+    } else if (first_opcode_byte == 0x39) {
+        // cmp r/m, r
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+
+        // perform subtraction but ignore the result
+        pis_operand_t res_tmp = {};
+        CHECK_RETHROW(calc_binop_modrm(
+            ctx,
+            &modrm_operands.rm_operand,
+            &modrm_operands.reg_operand,
+            &res_tmp,
+            do_sub
+        ));
     } else if (first_opcode_byte == 0x8d) {
         // lea r, m
 
