@@ -171,27 +171,6 @@ cleanup:
     return err;
 }
 
-static err_t do_add_modrm(
-    const post_prefixes_ctx_t* ctx, const modrm_operand_t* dst, const modrm_operand_t* src
-) {
-    err_t err = SUCCESS;
-
-    pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
-    pis_operand_t dst_tmp = PIS_OPERAND(g_src_op_1_tmp_addr, operand_size);
-    pis_operand_t src_tmp = PIS_OPERAND(g_src_op_2_tmp_addr, operand_size);
-
-    CHECK_RETHROW(modrm_operand_read(ctx, &dst_tmp, dst));
-    CHECK_RETHROW(modrm_operand_read(ctx, &src_tmp, src));
-
-    pis_operand_t res_tmp = {};
-    CHECK_RETHROW(do_add(ctx, &dst_tmp, &src_tmp, &res_tmp));
-
-    CHECK_RETHROW(modrm_operand_write(ctx, dst, &res_tmp));
-
-cleanup:
-    return err;
-}
-
 static err_t do_sub(
     const post_prefixes_ctx_t* ctx,
     const pis_operand_t* a,
@@ -220,8 +199,52 @@ cleanup:
     return err;
 }
 
-static err_t do_sub_modrm(
-    const post_prefixes_ctx_t* ctx, const modrm_operand_t* dst, const modrm_operand_t* src
+static err_t do_xor(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* a,
+    const pis_operand_t* b,
+    pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+    pis_operand_t res_tmp = PIS_OPERAND(g_calc_res_tmp_addr, operand_size);
+
+    // carry flag
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_CF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+    );
+
+    // overflow flag
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+    );
+
+    // perform the actual subtraction
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_XOR, res_tmp, *a, *b));
+
+    CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &res_tmp));
+
+    *result = res_tmp;
+
+cleanup:
+    return err;
+}
+
+typedef err_t (*modrm_binop_fn_t)(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* a,
+    const pis_operand_t* b,
+    pis_operand_t* result
+);
+
+static err_t do_binop_modrm(
+    const post_prefixes_ctx_t* ctx,
+    const modrm_operand_t* dst,
+    const modrm_operand_t* src,
+    modrm_binop_fn_t fn
 ) {
     err_t err = SUCCESS;
 
@@ -233,13 +256,14 @@ static err_t do_sub_modrm(
     CHECK_RETHROW(modrm_operand_read(ctx, &src_tmp, src));
 
     pis_operand_t res_tmp = {};
-    CHECK_RETHROW(do_sub(ctx, &dst_tmp, &src_tmp, &res_tmp));
+    CHECK_RETHROW(fn(ctx, &dst_tmp, &src_tmp, &res_tmp));
 
     CHECK_RETHROW(modrm_operand_write(ctx, dst, &res_tmp));
 
 cleanup:
     return err;
 }
+
 
 static pis_operand_size_t rel_jmp_operand_size(const post_prefixes_ctx_t* ctx) {
     if (ctx->lift_ctx->pis_x86_ctx->cpumode == PIS_X86_CPUMODE_64_BIT) {
@@ -456,19 +480,39 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
     } else if (first_opcode_byte == 0x01) {
         // add r/m, r
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-        CHECK_RETHROW(do_add_modrm(ctx, &modrm_operands.rm_operand, &modrm_operands.reg_operand));
+        CHECK_RETHROW(
+            do_binop_modrm(ctx, &modrm_operands.rm_operand, &modrm_operands.reg_operand, do_add)
+        );
     } else if (first_opcode_byte == 0x03) {
         // add r, r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-        CHECK_RETHROW(do_add_modrm(ctx, &modrm_operands.reg_operand, &modrm_operands.rm_operand));
+        CHECK_RETHROW(
+            do_binop_modrm(ctx, &modrm_operands.reg_operand, &modrm_operands.rm_operand, do_add)
+        );
     } else if (first_opcode_byte == 0x29) {
         // sub r/m, r
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-        CHECK_RETHROW(do_sub_modrm(ctx, &modrm_operands.rm_operand, &modrm_operands.reg_operand));
+        CHECK_RETHROW(
+            do_binop_modrm(ctx, &modrm_operands.rm_operand, &modrm_operands.reg_operand, do_sub)
+        );
     } else if (first_opcode_byte == 0x2b) {
         // sub r, r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-        CHECK_RETHROW(do_sub_modrm(ctx, &modrm_operands.reg_operand, &modrm_operands.rm_operand));
+        CHECK_RETHROW(
+            do_binop_modrm(ctx, &modrm_operands.reg_operand, &modrm_operands.rm_operand, do_sub)
+        );
+    } else if (first_opcode_byte == 0x31) {
+        // xor r/m, r
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+        CHECK_RETHROW(
+            do_binop_modrm(ctx, &modrm_operands.rm_operand, &modrm_operands.reg_operand, do_xor)
+        );
+    } else if (first_opcode_byte == 0x33) {
+        // xor r, r/m
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+        CHECK_RETHROW(
+            do_binop_modrm(ctx, &modrm_operands.reg_operand, &modrm_operands.rm_operand, do_xor)
+        );
     } else if (first_opcode_byte == 0x8d) {
         // lea r, m
 

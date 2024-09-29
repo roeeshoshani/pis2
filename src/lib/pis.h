@@ -108,6 +108,7 @@
     _(PIS_OPCODE_MOVE, )                                                                           \
     _(PIS_OPCODE_ADD, )                                                                            \
     _(PIS_OPCODE_SUB, )                                                                            \
+    _(PIS_OPCODE_XOR, )                                                                            \
     _(PIS_OPCODE_AND, )                                                                            \
     _(PIS_OPCODE_STORE, )                                                                          \
     _(PIS_OPCODE_LOAD, )                                                                           \
