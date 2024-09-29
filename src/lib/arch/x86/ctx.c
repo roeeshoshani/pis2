@@ -471,6 +471,22 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             ctx->lift_ctx,
             PIS_INSN1(PIS_OPCODE_JMP, PIS_OPERAND_RAM(target, PIS_OPERAND_SIZE_1))
         );
+    } else if (first_opcode_byte == 0xc3) {
+        // ret
+        pis_operand_size_t operand_size = ctx->lift_ctx->stack_addr_size;
+        pis_operand_t sp = ctx->lift_ctx->sp;
+        u64 operand_size_bytes = pis_operand_size_to_bytes(operand_size);
+
+        pis_operand_t tmp = PIS_OPERAND(g_calc_res_tmp_addr, operand_size);
+
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_LOAD, tmp, sp));
+
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN_ADD2(sp, PIS_OPERAND_CONST(operand_size_bytes, sp.size))
+        );
+
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, tmp));
     } else if (first_opcode_byte == 0x0f) {
         // opcode is longer than 1 byte
         u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
