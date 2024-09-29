@@ -560,6 +560,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         ));
     } else if (first_opcode_byte == 0x3b) {
         // cmp r, r/m
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
         // perform subtraction but ignore the result
         pis_operand_t res_tmp = {};
