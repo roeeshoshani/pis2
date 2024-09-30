@@ -2,11 +2,9 @@ BITS 64
 
 global main
 main:
-add rax, 5
-mov al, cl
-mov rax, [rbx]
-db 0x8b, 0xc8
-sete al
-sete [rax]
+mov rsi, [rax + rbx*2]
+
+db 0x66
+db 0x40, 0x0f, 0xb6, 0x34, 0x58
 shit:
 nop

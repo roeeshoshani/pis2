@@ -56,9 +56,14 @@ err_t modrm_decode_rm_operand(
     modrm_rm_operand_t* rm_operand
 );
 
-err_t modrm_fetch_and_process(
-    const post_prefixes_ctx_t* ctx, modrm_operands_t* operands, bool is_8_bit
+err_t modrm_fetch_and_process_with_operand_sizes(
+    const post_prefixes_ctx_t* ctx,
+    modrm_operands_t* operands,
+    pis_operand_size_t rm_size,
+    pis_operand_size_t reg_size
 );
+
+err_t modrm_fetch_and_process(const post_prefixes_ctx_t* ctx, modrm_operands_t* operands);
 
 err_t modrm_rm_write(
     const post_prefixes_ctx_t* ctx,

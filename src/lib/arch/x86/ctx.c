@@ -396,12 +396,18 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp));
     } else if (second_opcode_byte == 0x94) {
         // sete r/m8
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, true));
+        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
+            ctx,
+            &modrm_operands,
+            PIS_OPERAND_SIZE_1,
+            // don't care
+            PIS_OPERAND_SIZE_1
+        ));
 
         CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &FLAGS_ZF));
     } else if (second_opcode_byte == 0x1f) {
         // xxx r/m
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, false));
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
         if (modrm_operands.modrm.reg == 0) {
             // nop r/m
@@ -410,6 +416,17 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
+    } else if (second_opcode_byte == 0xb6) {
+        // movzx r, r/m8
+        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
+            ctx,
+            &modrm_operands,
+            PIS_OPERAND_SIZE_1,
+            ctx->operand_sizes.insn_default_not_64_bit
+        ));
+        CHECK_RETHROW(
+            modrm_rm_read(ctx, &modrm_operands.reg_operand.reg, &modrm_operands.rm_operand.rm)
+        );
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
@@ -484,19 +501,19 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         );
     } else if (first_opcode_byte == 0x89) {
         // move r/m, r
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, false));
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(
             modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &modrm_operands.reg_operand.reg)
         );
     } else if (first_opcode_byte == 0x8b) {
         // move r, r/m
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, false));
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(
             modrm_rm_read(ctx, &modrm_operands.reg_operand.reg, &modrm_operands.rm_operand.rm)
         );
     } else if (first_opcode_byte == 0x63) {
         // movsxd r, r/m
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, false));
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
         if (operand_size == PIS_OPERAND_SIZE_8) {
             pis_operand_t tmp32 = PIS_OPERAND(g_src_op_1_tmp_addr, PIS_OPERAND_SIZE_4);
@@ -514,7 +531,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         }
     } else if (first_opcode_byte == 0x01) {
         // add r/m, r
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, false));
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
             do_add,
@@ -523,7 +540,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         ));
     } else if (first_opcode_byte == 0x03) {
         // add r, r/m
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, false));
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
             do_add,
@@ -532,7 +549,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         ));
     } else if (first_opcode_byte == 0x29) {
         // sub r/m, r
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, false));
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
             do_sub,
@@ -541,7 +558,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         ));
     } else if (first_opcode_byte == 0x2b) {
         // sub r, r/m
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, false));
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
             do_sub,
@@ -550,7 +567,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         ));
     } else if (first_opcode_byte == 0x31) {
         // xor r/m, r
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, false));
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
             do_xor,
@@ -559,7 +576,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         ));
     } else if (first_opcode_byte == 0x33) {
         // xor r, r/m
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, false));
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
             do_xor,
@@ -568,7 +585,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         ));
     } else if (first_opcode_byte == 0x39) {
         // cmp r/m, r
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, false));
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
         // perform subtraction but ignore the result
         pis_operand_t res_tmp = {};
@@ -581,7 +598,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         ));
     } else if (first_opcode_byte == 0x3b) {
         // cmp r, r/m
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, false));
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
         // perform subtraction but ignore the result
         pis_operand_t res_tmp = {};
@@ -595,7 +612,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
     } else if (first_opcode_byte == 0x8d) {
         // lea r, m
 
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, false));
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
         // the rm operand must be a memory operand in case of `lea`.
         CHECK(modrm_operands.rm_operand.rm.is_memory);
@@ -634,7 +651,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
     } else if (first_opcode_byte == 0x83) {
         // xxx r/m, imm8
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, false));
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
         pis_operand_t rm_tmp = PIS_OPERAND(g_src_op_2_tmp_addr, operand_size);
@@ -702,13 +719,23 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         );
     } else if (first_opcode_byte == 0x88) {
         // mov r/m8, r8
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, true));
+        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
+            ctx,
+            &modrm_operands,
+            PIS_OPERAND_SIZE_1,
+            PIS_OPERAND_SIZE_1
+        ));
         CHECK_RETHROW(
             modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &modrm_operands.reg_operand.reg)
         );
     } else if (first_opcode_byte == 0x8a) {
         // mov r8, r/m8
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands, true));
+        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
+            ctx,
+            &modrm_operands,
+            PIS_OPERAND_SIZE_1,
+            PIS_OPERAND_SIZE_1
+        ));
         CHECK_RETHROW(
             modrm_rm_read(ctx, &modrm_operands.reg_operand.reg, &modrm_operands.rm_operand.rm)
         );
