@@ -676,6 +676,10 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             CHECK_RETHROW(do_add(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp));
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+        } else if (modrm_operands.modrm.reg == 7) {
+            // cmp r/m, imm8
+            pis_operand_t res_tmp = {};
+            CHECK_RETHROW(do_sub(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp));
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
