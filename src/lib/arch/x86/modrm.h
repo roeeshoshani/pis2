@@ -42,6 +42,7 @@ typedef struct {
 typedef struct {
     modrm_operand_t rm_operand;
     modrm_operand_t reg_operand;
+    modrm_operand_t reg8_operand;
     modrm_t modrm;
 } modrm_operands_t;
 

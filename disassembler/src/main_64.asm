@@ -2,10 +2,6 @@ BITS 64
 
 global main
 main:
-
-mov r8b, 0x12
-db 0xb7, 0xff
-db 0x49,0xb7, 0xff
-mov spl, 0x55
+mov [rax + rsi], al
 shit:
 nop

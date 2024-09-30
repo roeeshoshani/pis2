@@ -334,11 +334,9 @@ err_t modrm_fetch_and_process(const post_prefixes_ctx_t* ctx, modrm_operands_t* 
 
     pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
 
-    pis_operand_t reg_operand = reg_get_operand(
-        apply_rex_bit_to_reg_encoding(modrm.reg, ctx->prefixes->rex.r),
-        operand_size,
-        ctx->prefixes
-    );
+    u8 reg_encoding = apply_rex_bit_to_reg_encoding(modrm.reg, ctx->prefixes->rex.r);
+    pis_operand_t reg_operand = reg_get_operand(reg_encoding, operand_size, ctx->prefixes);
+    pis_operand_t reg8_operand = reg_get_operand(reg_encoding, PIS_OPERAND_SIZE_1, ctx->prefixes);
 
     modrm_rm_operand_t rm_operand = {};
     CHECK_RETHROW(modrm_decode_rm_operand(ctx, &modrm, operand_size, &rm_operand));
@@ -348,6 +346,11 @@ err_t modrm_fetch_and_process(const post_prefixes_ctx_t* ctx, modrm_operands_t* 
             {
                 .type = MODRM_OPERAND_TYPE_REG,
                 .reg = reg_operand,
+            },
+        .reg8_operand =
+            {
+                .type = MODRM_OPERAND_TYPE_REG,
+                .reg = reg8_operand,
             },
         .rm_operand =
             {
