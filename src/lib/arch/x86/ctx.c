@@ -424,8 +424,12 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
             PIS_OPERAND_SIZE_1,
             ctx->operand_sizes.insn_default_not_64_bit
         ));
-        CHECK_RETHROW(
-            modrm_rm_read(ctx, &modrm_operands.reg_operand.reg, &modrm_operands.rm_operand.rm)
+
+        pis_operand_t tmp8 = PIS_OPERAND(g_src_op_1_tmp_addr, PIS_OPERAND_SIZE_4);
+        CHECK_RETHROW(modrm_rm_read(ctx, &tmp8, &modrm_operands.rm_operand.rm));
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, modrm_operands.reg_operand.reg, tmp8)
         );
     } else {
         CHECK_FAIL_TRACE_CODE(
