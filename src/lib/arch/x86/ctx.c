@@ -466,6 +466,30 @@ cleanup:
     return err;
 }
 
+static err_t fetch_imm_operand(
+    const post_prefixes_ctx_t* ctx, pis_operand_size_t size, pis_operand_t* operand
+) {
+    err_t err = SUCCESS;
+    switch (size) {
+    case PIS_OPERAND_SIZE_1:
+        *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_1);
+        break;
+    case PIS_OPERAND_SIZE_2:
+        *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_2);
+        break;
+    case PIS_OPERAND_SIZE_4:
+        *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_4);
+        break;
+    case PIS_OPERAND_SIZE_8:
+        *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_8);
+        break;
+    default:
+        UNREACHABLE();
+    }
+cleanup:
+    return err;
+}
+
 static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opcode_byte) {
     err_t err = SUCCESS;
     modrm_operands_t modrm_operands = {};
@@ -754,6 +778,16 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             ctx->lift_ctx,
             PIS_INSN2(PIS_OPCODE_MOVE, AL, PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1))
         );
+    } else if (opcode_reg_opcode_only(first_opcode_byte) == 0xb8) {
+        // mov <reg>, imm
+        u8 reg_encoding = opcode_reg_extract(ctx, first_opcode_byte);
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+        pis_operand_t dst_reg = reg_get_operand(reg_encoding, operand_size, ctx->prefixes);
+
+        pis_operand_t imm = {};
+        CHECK_RETHROW(fetch_imm_operand(ctx, operand_size, &imm));
+
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, dst_reg, imm));
     } else if (first_opcode_byte == 0x0f) {
         // opcode is longer than 1 byte
         u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);

@@ -49,9 +49,25 @@
         ___cur;                                                                                    \
     })
 
+#define LIFT_CTX_CUR8(LIFT_CTX)                                                                    \
+    ({                                                                                             \
+        u64 ___cur = 0;                                                                            \
+        CHECK_RETHROW(lift_ctx_cur8(LIFT_CTX, &___cur));                                           \
+        ___cur;                                                                                    \
+    })
+
+#define LIFT_CTX_CUR8_ADVANCE(LIFT_CTX)                                                            \
+    ({                                                                                             \
+        u64 ___cur = 0;                                                                            \
+        CHECK_RETHROW(lift_ctx_cur8(LIFT_CTX, &___cur));                                           \
+        CHECK_RETHROW(lift_ctx_advance(LIFT_CTX, 8));                                              \
+        ___cur;                                                                                    \
+    })
+
 #define LIFT_CTX_ADVANCE1(LIFT_CTX) CHECK_RETHROW(lift_ctx_advance(LIFT_CTX, 1))
 #define LIFT_CTX_ADVANCE2(LIFT_CTX) CHECK_RETHROW(lift_ctx_advance(LIFT_CTX, 2))
 #define LIFT_CTX_ADVANCE4(LIFT_CTX) CHECK_RETHROW(lift_ctx_advance(LIFT_CTX, 4))
+#define LIFT_CTX_ADVANCE8(LIFT_CTX) CHECK_RETHROW(lift_ctx_advance(LIFT_CTX, 8))
 
 #define LIFT_CTX_EMIT(LIFT_CTX, INSN) PIS_LIFT_RESULT_EMIT((LIFT_CTX)->result, INSN)
 
@@ -80,6 +96,9 @@ err_t lift_ctx_cur2(lift_ctx_t* ctx, u16* cur_word);
 
 /// returns the current double word of the context.
 err_t lift_ctx_cur4(lift_ctx_t* ctx, u32* cur_dword);
+
+/// returns the current quad word of the context.
+err_t lift_ctx_cur8(lift_ctx_t* ctx, u64* cur_qword);
 
 /// returns the current index of the context.
 size_t lift_ctx_index(const lift_ctx_t* ctx);
