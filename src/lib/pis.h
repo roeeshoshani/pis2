@@ -44,6 +44,13 @@
 
 #define PIS_OPERAND_RAM(OFFSET, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_RAM, OFFSET), SIZE))
 
+/// `OFFSET` is the index-wide offset of the target pis instruction from the index of the current pis instruction.
+/// the offset may be negative. for example, an offset of 0 means jumping back to the current instruction and
+/// re-running it.
+#define PIS_OPERAND_REL(OFFSET) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_REL, (u64) (OFFSET)), PIS_OPERAND_SIZE_1))
+
+#define PIS_OPERAND_REL_SKIP_NEXT_INSN (PIS_OPERAND_REL(2))
+
 #define PIS_OPERAND_TMP(OFFSET, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_TMP, OFFSET), SIZE))
 
 #define PIS_OPERAND_CONST(VALUE, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_CONST, VALUE), SIZE))
@@ -131,6 +138,7 @@ STR_ENUM(pis_opcode, PIS_OPCODE);
     _(PIS_SPACE_CONST, )                                                                           \
     _(PIS_SPACE_REG, )                                                                             \
     _(PIS_SPACE_RAM, )                                                                             \
+    _(PIS_SPACE_REL, )                                                                             \
     _(PIS_SPACE_TMP, )
 STR_ENUM(pis_space, PIS_SPACE);
 

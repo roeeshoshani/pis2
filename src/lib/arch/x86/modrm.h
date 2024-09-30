@@ -42,7 +42,6 @@ typedef struct {
 typedef struct {
     modrm_operand_t rm_operand;
     modrm_operand_t reg_operand;
-    modrm_operand_t reg8_operand;
     modrm_t modrm;
 } modrm_operands_t;
 
@@ -57,7 +56,9 @@ err_t modrm_decode_rm_operand(
     modrm_rm_operand_t* rm_operand
 );
 
-err_t modrm_fetch_and_process(const post_prefixes_ctx_t* ctx, modrm_operands_t* operands);
+err_t modrm_fetch_and_process(
+    const post_prefixes_ctx_t* ctx, modrm_operands_t* operands, bool is_8_bit
+);
 
 err_t modrm_rm_write(
     const post_prefixes_ctx_t* ctx,
@@ -72,13 +73,9 @@ err_t modrm_rm_read(
 );
 
 err_t modrm_operand_read(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* read_into,
-    const modrm_operand_t* operand
+    const post_prefixes_ctx_t* ctx, const pis_operand_t* read_into, const modrm_operand_t* operand
 );
 
 err_t modrm_operand_write(
-    const post_prefixes_ctx_t* ctx,
-    const modrm_operand_t* operand,
-    const pis_operand_t* to_write
+    const post_prefixes_ctx_t* ctx, const modrm_operand_t* operand, const pis_operand_t* to_write
 );

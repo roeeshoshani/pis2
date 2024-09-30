@@ -2,6 +2,11 @@ BITS 64
 
 global main
 main:
-mov [rax + rsi], al
+add rax, 5
+mov al, cl
+mov rax, [rbx]
+db 0x8b, 0xc8
+sete al
+sete [rax]
 shit:
 nop
