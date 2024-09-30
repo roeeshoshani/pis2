@@ -43,10 +43,12 @@ static err_t parse_legacy_prefixes(lift_ctx_t* ctx, legacy_prefixes_t* parsed_pr
             break;
         }
 
-        // make sure that we don't have 2 prefixes of the same group
+        // make sure that we don't have 2 prefixes of the same group.
         legacy_prefix_t existing_prefix = prefixes.by_group[group];
         CHECK_TRACE_CODE(
-            existing_prefix == LEGACY_PREFIX_INVALID,
+            // allow using the same prefix multiple times, which basically has no effect.
+            // this is sometimes used by the compiler to generate NOPs of arbitrary lengths.
+            existing_prefix == LEGACY_PREFIX_INVALID || existing_prefix == cur_prefix,
             PIS_ERR_X86_2_LEGACY_PREFIXES_OF_SAME_GROUP,
             "prefix 0x%x and prefix 0x%x are of the same group %d",
             existing_prefix,
