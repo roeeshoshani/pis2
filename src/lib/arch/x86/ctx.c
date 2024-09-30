@@ -425,7 +425,7 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
             ctx->operand_sizes.insn_default_not_64_bit
         ));
 
-        pis_operand_t tmp8 = PIS_OPERAND(g_src_op_1_tmp_addr, PIS_OPERAND_SIZE_4);
+        pis_operand_t tmp8 = PIS_OPERAND(g_src_op_1_tmp_addr, PIS_OPERAND_SIZE_1);
         CHECK_RETHROW(modrm_rm_read(ctx, &tmp8, &modrm_operands.rm_operand.rm));
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
