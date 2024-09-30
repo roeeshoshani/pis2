@@ -712,6 +712,13 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(
             modrm_rm_read(ctx, &modrm_operands.reg_operand.reg, &modrm_operands.rm_operand.rm)
         );
+    } else if (first_opcode_byte == 0x24) {
+        // mov al, imm8
+        u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_MOVE, AL, PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1))
+        );
     } else if (first_opcode_byte == 0x0f) {
         // opcode is longer than 1 byte
         u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
