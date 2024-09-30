@@ -357,6 +357,21 @@ cleanup:
     return err;
 }
 
+static err_t do_cond_rel_jmp(const post_prefixes_ctx_t* ctx, const pis_operand_t* cond) {
+    err_t err = SUCCESS;
+
+    u64 target = 0;
+    CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target_addr(ctx, &target));
+
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN2(PIS_OPCODE_JMP_COND, *cond, PIS_OPERAND_RAM(target, PIS_OPERAND_SIZE_1))
+    );
+
+cleanup:
+    return err;
+}
+
 static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_opcode_byte) {
     err_t err = SUCCESS;
     modrm_operands_t modrm_operands = {};
@@ -371,13 +386,14 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_NOT, b_tmp, FLAGS_ZF));
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, res_tmp, a_tmp, b_tmp));
 
-        u64 target = 0;
-        CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target_addr(ctx, &target));
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp));
+    } else if (second_opcode_byte == 0x85) {
+        // jne rel
+        pis_operand_t res_tmp = PIS_OPERAND(g_calc_res_tmp_addr, PIS_OPERAND_SIZE_1);
 
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_JMP_COND, res_tmp, PIS_OPERAND_RAM(target, PIS_OPERAND_SIZE_1))
-        );
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_NOT, res_tmp, FLAGS_ZF));
+
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp));
     } else if (second_opcode_byte == 0x1f) {
         // xxx r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
