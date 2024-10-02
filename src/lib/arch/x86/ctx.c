@@ -811,6 +811,24 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
+    } else if (first_opcode_byte == 0x6b) {
+        // imul r, r/m, imm8
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+        u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+
+        pis_operand_t rm_value = PIS_OPERAND(g_src_op_1_tmp_addr, operand_size);
+        CHECK_RETHROW(modrm_rm_read(ctx, &rm_value, &modrm_operands.rm_operand.rm));
+
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(
+                PIS_OPCODE_SIGNED_MUL,
+                modrm_operands.reg_operand.reg,
+                rm_value,
+                PIS_OPERAND_CONST(imm, operand_size)
+            )
+        );
     } else if (first_opcode_byte == 0x0f) {
         // opcode is longer than 1 byte
         u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);

@@ -56,7 +56,7 @@ static err_t build_sib_addr_into(
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, sib_tmp, index_reg_operand));
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN_MUL2(sib_tmp, PIS_OPERAND_CONST(1 << sib.scale, ctx->addr_size))
+            PIS_INSN_UMUL2(sib_tmp, PIS_OPERAND_CONST(1 << sib.scale, ctx->addr_size))
         );
 
         // add the scaled index to the address

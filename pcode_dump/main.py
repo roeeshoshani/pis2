@@ -3,7 +3,7 @@ from pypcode import *
 ctx = Context("x86:LE:64:default")
 
 code_str = '''
-29 18
+48 6b 45 e8 18
 '''
 code_hex = code_str.strip().replace(' ', '')
 code = bytes.fromhex(code_hex)
