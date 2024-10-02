@@ -233,12 +233,11 @@ cleanup:
     return err;
 }
 
-typedef err_t (*modrm_binop_fn_t)(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* a,
-    const pis_operand_t* b,
-    pis_operand_t* result
-);
+typedef err_t (*modrm_binop_fn_t
+)(const post_prefixes_ctx_t* ctx,
+  const pis_operand_t* a,
+  const pis_operand_t* b,
+  pis_operand_t* result);
 
 static err_t calc_binop_modrm(
     const post_prefixes_ctx_t* ctx,
@@ -830,8 +829,11 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
     } else if (first_opcode_byte == 0x6b) {
         // imul r, r/m, imm8
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-        u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+
+        i8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        u64 imm = pis_sign_extend_byte(imm8, operand_size);
 
         pis_operand_t rm_value = PIS_OPERAND(g_src_op_1_tmp_addr, operand_size);
         CHECK_RETHROW(modrm_rm_read(ctx, &rm_value, &modrm_operands.rm_operand.rm));
