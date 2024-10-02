@@ -1,5 +1,4 @@
 #include "modrm.h"
-#include "arch/x86/tmps.h"
 #include "except.h"
 #include "lift_ctx.h"
 #include "pis.h"
@@ -51,7 +50,7 @@ static err_t build_sib_addr_into(
         // no index
     } else {
         // build the scaled index into a tmp
-        pis_operand_t sib_tmp = PIS_OPERAND(g_sib_index_tmp_addr, ctx->addr_size);
+        pis_operand_t sib_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, ctx->addr_size);
         pis_operand_t index_reg_operand = reg_get_operand(index, ctx->addr_size, ctx->prefixes);
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, sib_tmp, index_reg_operand));
         LIFT_CTX_EMIT(

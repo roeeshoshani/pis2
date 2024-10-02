@@ -1,6 +1,5 @@
 #include "arch/x86/ctx.h"
 #include "arch/x86/regs.h"
-#include "arch/x86/tmps.h"
 #include "errors.h"
 #include "except.h"
 #include "pis.h"
@@ -258,10 +257,10 @@ cleanup:
 
 DEFINE_TEST(test_modrm_64_bit_mode) {
     err_t err = SUCCESS;
-    pis_operand_t addr_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_8);
-    pis_operand_t addr32_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_4);
-    pis_operand_t sib_tmp = PIS_OPERAND(g_sib_index_tmp_addr, PIS_OPERAND_SIZE_8);
-    pis_operand_t sib32_tmp = PIS_OPERAND(g_sib_index_tmp_addr, PIS_OPERAND_SIZE_4);
+    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_8);
+    pis_operand_t addr32_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_4);
+    pis_operand_t sib_tmp = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_8);
+    pis_operand_t sib32_tmp = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_4);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x89, 0xe5),
@@ -531,9 +530,9 @@ cleanup:
 
 DEFINE_TEST(test_modrm_32_bit_mode) {
     err_t err = SUCCESS;
-    pis_operand_t addr_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_4);
-    pis_operand_t addr16_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_2);
-    pis_operand_t sib_tmp = PIS_OPERAND(g_sib_index_tmp_addr, PIS_OPERAND_SIZE_4);
+    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_4);
+    pis_operand_t addr16_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_2);
+    pis_operand_t sib_tmp = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_4);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x89, 0xe5),
@@ -780,9 +779,9 @@ cleanup:
 
 DEFINE_TEST(test_modrm_16_bit_mode) {
     err_t err = SUCCESS;
-    pis_operand_t addr_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_2);
-    pis_operand_t addr32_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_4);
-    pis_operand_t sib_tmp = PIS_OPERAND(g_sib_index_tmp_addr, PIS_OPERAND_SIZE_4);
+    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_2);
+    pis_operand_t addr32_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_4);
+    pis_operand_t sib_tmp = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_4);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x89, 0xe5),
@@ -1140,8 +1139,8 @@ cleanup:
 DEFINE_TEST(test_nop_modrm) {
     err_t err = SUCCESS;
 
-    pis_operand_t addr_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_8);
-    pis_operand_t sib_tmp = PIS_OPERAND(g_sib_index_tmp_addr, PIS_OPERAND_SIZE_8);
+    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_8);
+    pis_operand_t sib_tmp = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_8);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x66, 0x2e, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00),
@@ -1163,8 +1162,8 @@ cleanup:
 DEFINE_TEST(test_movsxd) {
     err_t err = SUCCESS;
 
-    pis_operand_t addr_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_8);
-    pis_operand_t tmp32 = PIS_OPERAND(g_src_op_1_tmp_addr, PIS_OPERAND_SIZE_4);
+    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_8);
+    pis_operand_t tmp32 = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_4);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x48, 0x63, 0x00),
@@ -1201,8 +1200,8 @@ cleanup:
 DEFINE_TEST(test_movzx_16_bit_mode) {
     err_t err = SUCCESS;
 
-    pis_operand_t addr_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_2);
-    pis_operand_t tmp8 = PIS_OPERAND(g_src_op_1_tmp_addr, PIS_OPERAND_SIZE_1);
+    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_2);
+    pis_operand_t tmp8 = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_1);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x0f, 0xb6, 0x00),
@@ -1233,8 +1232,8 @@ cleanup:
 DEFINE_TEST(test_movzx_32_bit_mode) {
     err_t err = SUCCESS;
 
-    pis_operand_t addr_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_4);
-    pis_operand_t tmp8 = PIS_OPERAND(g_src_op_1_tmp_addr, PIS_OPERAND_SIZE_1);
+    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_4);
+    pis_operand_t tmp8 = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_1);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x0f, 0xb6, 0x00),
@@ -1263,8 +1262,8 @@ cleanup:
 DEFINE_TEST(test_movzx_64_bit_mode) {
     err_t err = SUCCESS;
 
-    pis_operand_t addr_tmp = PIS_OPERAND(g_modrm_rm_tmp_addr, PIS_OPERAND_SIZE_8);
-    pis_operand_t tmp8 = PIS_OPERAND(g_src_op_1_tmp_addr, PIS_OPERAND_SIZE_1);
+    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_8);
+    pis_operand_t tmp8 = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_1);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x0f, 0xb6, 0x00),

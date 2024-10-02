@@ -71,12 +71,20 @@
 
 #define LIFT_CTX_EMIT(LIFT_CTX, INSN) PIS_LIFT_RESULT_EMIT((LIFT_CTX)->result, INSN)
 
+#define LIFT_CTX_NEW_TMP(LIFT_CTX, SIZE)                                                           \
+    ({                                                                                             \
+        pis_operand_t ___tmp = {};                                                                 \
+        CHECK_RETHROW(lift_ctx_new_tmp((LIFT_CTX), (SIZE), &___tmp));                              \
+        ___tmp;                                                                                    \
+    })
+
 typedef struct {
     const pis_x86_ctx_t* pis_x86_ctx;
     const u8* start;
     const u8* cur;
     const u8* end;
     u64 cur_insn_addr;
+    u64 cur_tmp_offset;
     pis_lift_result_t* result;
     pis_operand_size_t stack_addr_size;
     pis_operand_t sp;
@@ -102,3 +110,6 @@ err_t lift_ctx_cur8(lift_ctx_t* ctx, u64* cur_qword);
 
 /// returns the current index of the context.
 size_t lift_ctx_index(const lift_ctx_t* ctx);
+
+/// returns a new unique temporary operand of the given size.
+err_t lift_ctx_new_tmp(lift_ctx_t* ctx, pis_operand_size_t size, pis_operand_t* new_tmp);
