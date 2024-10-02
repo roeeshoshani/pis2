@@ -393,6 +393,9 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_NOT, res_tmp, FLAGS_CF));
 
         CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp));
+    } else if (second_opcode_byte == 0x84) {
+        // je rel
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &FLAGS_ZF));
     } else if (second_opcode_byte == 0x85) {
         // jne rel
         pis_operand_t res_tmp = PIS_OPERAND(g_calc_res_tmp_addr, PIS_OPERAND_SIZE_1);
