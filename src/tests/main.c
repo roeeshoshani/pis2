@@ -79,6 +79,7 @@ static err_t
     }
     for (size_t i = 0; i < expected.amount; i++) {
         if (!pis_insn_equals(&result->insns[i], &expected.insns[i])) {
+            TRACE("instruction mismatch at index %lu", i);
             TRACE("expected insn:");
             pis_insn_dump(&expected.insns[i]);
             TRACE();
@@ -260,7 +261,7 @@ DEFINE_TEST(test_modrm_64_bit_mode) {
     pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_8);
     pis_operand_t addr32_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_4);
     pis_operand_t sib_tmp = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_8);
-    pis_operand_t sib32_tmp = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_4);
+    pis_operand_t sib32_tmp = PIS_OPERAND_TMP(4, PIS_OPERAND_SIZE_4);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x89, 0xe5),
@@ -532,7 +533,7 @@ DEFINE_TEST(test_modrm_32_bit_mode) {
     err_t err = SUCCESS;
     pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_4);
     pis_operand_t addr16_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_2);
-    pis_operand_t sib_tmp = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_4);
+    pis_operand_t sib_tmp = PIS_OPERAND_TMP(4, PIS_OPERAND_SIZE_4);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x89, 0xe5),
@@ -781,7 +782,7 @@ DEFINE_TEST(test_modrm_16_bit_mode) {
     err_t err = SUCCESS;
     pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_2);
     pis_operand_t addr32_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_4);
-    pis_operand_t sib_tmp = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_4);
+    pis_operand_t sib_tmp = PIS_OPERAND_TMP(4, PIS_OPERAND_SIZE_4);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x89, 0xe5),
@@ -1201,7 +1202,7 @@ DEFINE_TEST(test_movzx_16_bit_mode) {
     err_t err = SUCCESS;
 
     pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_2);
-    pis_operand_t tmp8 = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_1);
+    pis_operand_t tmp8 = PIS_OPERAND_TMP(2, PIS_OPERAND_SIZE_1);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x0f, 0xb6, 0x00),
@@ -1233,7 +1234,7 @@ DEFINE_TEST(test_movzx_32_bit_mode) {
     err_t err = SUCCESS;
 
     pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_4);
-    pis_operand_t tmp8 = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_1);
+    pis_operand_t tmp8 = PIS_OPERAND_TMP(4, PIS_OPERAND_SIZE_1);
 
     CHECK_RETHROW_VERBOSE(generic_test_lift(
         CODE(0x0f, 0xb6, 0x00),

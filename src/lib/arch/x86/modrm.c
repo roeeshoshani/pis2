@@ -313,7 +313,7 @@ err_t modrm_decode_rm_operand(
         };
     } else {
         // in this case, the r/m field is a memory operand
-        pis_operand_t rm_addr_tmp = PIS_OPERAND_TMP(0, ctx->addr_size);
+        pis_operand_t rm_addr_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, ctx->addr_size);
         CHECK_RETHROW(build_modrm_rm_addr_into(ctx, modrm, &rm_addr_tmp));
 
         *rm_operand = (modrm_rm_operand_t) {
