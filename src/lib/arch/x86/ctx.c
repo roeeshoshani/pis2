@@ -151,7 +151,9 @@ static err_t do_add(
 ) {
     err_t err = SUCCESS;
 
-    pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+    CHECK(a->size == b->size);
+    pis_operand_size_t operand_size = a->size;
+
     pis_operand_t res_tmp = PIS_OPERAND(g_calc_res_tmp_addr, operand_size);
 
     // carry flag
@@ -179,7 +181,9 @@ static err_t do_sub(
 ) {
     err_t err = SUCCESS;
 
-    pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+    CHECK(a->size == b->size);
+    pis_operand_size_t operand_size = a->size;
+
     pis_operand_t res_tmp = PIS_OPERAND(g_calc_res_tmp_addr, operand_size);
 
     // carry flag
@@ -199,6 +203,40 @@ cleanup:
     return err;
 }
 
+static err_t do_and(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* a,
+    const pis_operand_t* b,
+    pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    CHECK(a->size == b->size);
+    pis_operand_size_t operand_size = a->size;
+
+    pis_operand_t res_tmp = PIS_OPERAND(g_calc_res_tmp_addr, operand_size);
+
+    // set CF and OF to zero
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_CF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+    );
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+    );
+
+    // perform the actual bitwide and operation
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, res_tmp, *a, *b));
+
+    CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &res_tmp));
+
+    *result = res_tmp;
+
+cleanup:
+    return err;
+}
+
 static err_t do_xor(
     const post_prefixes_ctx_t* ctx,
     const pis_operand_t* a,
@@ -207,7 +245,9 @@ static err_t do_xor(
 ) {
     err_t err = SUCCESS;
 
-    pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+    CHECK(a->size == b->size);
+    pis_operand_size_t operand_size = a->size;
+
     pis_operand_t res_tmp = PIS_OPERAND(g_calc_res_tmp_addr, operand_size);
 
     // carry flag
@@ -535,6 +575,25 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
                 tmp
             )
         );
+    } else if (opcode_reg_opcode_only(first_opcode_byte) == 0x90) {
+        // xchg [e/r]ax, r
+        u8 reg_encoding = opcode_reg_extract(ctx, first_opcode_byte);
+
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+
+        pis_operand_t ax_operand = PIS_OPERAND(RAX.addr, operand_size);
+        pis_operand_t reg_operand = reg_get_operand(reg_encoding, operand_size, ctx->prefixes);
+
+        if (pis_operand_equals(&ax_operand, &reg_operand)) {
+            // exchange [e/r]ax with itself, this is a nop, so don't emit anything
+        } else {
+            // actual exchange operation
+            pis_operand_t tmp = PIS_OPERAND(g_src_op_1_tmp_addr, operand_size);
+
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, ax_operand));
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, ax_operand, reg_operand));
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, reg_operand, tmp));
+        }
     } else if (first_opcode_byte == 0x89) {
         // move r/m, r
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
@@ -826,6 +885,12 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
+    } else if (first_opcode_byte == 0xa8) {
+        // test al, imm8
+        u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+
+        pis_operand_t res = {};
+        CHECK_RETHROW(do_and(ctx, &AL, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1), &res));
     } else if (first_opcode_byte == 0x6b) {
         // imul r, r/m, imm8
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
