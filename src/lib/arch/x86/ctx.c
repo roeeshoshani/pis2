@@ -838,6 +838,21 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t rm_value = PIS_OPERAND(g_src_op_1_tmp_addr, operand_size);
         CHECK_RETHROW(modrm_rm_read(ctx, &rm_value, &modrm_operands.rm_operand.rm));
 
+        // update CF
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(
+                PIS_OPCODE_SIGNED_MUL_OVERFLOW,
+                FLAGS_CF,
+                rm_value,
+                PIS_OPERAND_CONST(imm, operand_size)
+            )
+        );
+
+        // update OF
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, FLAGS_CF));
+
+        // perform the actual multiplication
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
             PIS_INSN3(

@@ -33,7 +33,7 @@
 #define PIS_INSN_ADD2(OPERAND_1, OPERAND_2)                                                        \
     PIS_INSN3(PIS_OPCODE_ADD, OPERAND_1, OPERAND_1, OPERAND_2)
 
-#define PIS_INSN_UMUL2(OPERAND_1, OPERAND_2)                                                        \
+#define PIS_INSN_UMUL2(OPERAND_1, OPERAND_2)                                                       \
     PIS_INSN3(PIS_OPCODE_UNSIGNED_MUL, OPERAND_1, OPERAND_1, OPERAND_2)
 
 #define PIS_ADDR(SPACE, OFFSET) ((pis_addr_t) {.space = (SPACE), .offset = (OFFSET)})
@@ -44,10 +44,11 @@
 
 #define PIS_OPERAND_RAM(OFFSET, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_RAM, OFFSET), SIZE))
 
-/// `OFFSET` is the index-wide offset of the target pis instruction from the index of the current pis instruction.
-/// the offset may be negative. for example, an offset of 0 means jumping back to the current instruction and
-/// re-running it.
-#define PIS_OPERAND_REL(OFFSET) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_REL, (u64) (OFFSET)), PIS_OPERAND_SIZE_1))
+/// `OFFSET` is the index-wide offset of the target pis instruction from the index of the current
+/// pis instruction. the offset may be negative. for example, an offset of 0 means jumping back to
+/// the current instruction and re-running it.
+#define PIS_OPERAND_REL(OFFSET)                                                                    \
+    (PIS_OPERAND(PIS_ADDR(PIS_SPACE_REL, (u64) (OFFSET)), PIS_OPERAND_SIZE_1))
 
 #define PIS_OPERAND_REL_SKIP_NEXT_INSN (PIS_OPERAND_REL(2))
 
@@ -132,7 +133,8 @@
     _(PIS_OPCODE_JMP, )                                                                            \
     _(PIS_OPCODE_SIGN_EXTEND, )                                                                    \
     _(PIS_OPCODE_ZERO_EXTEND, )                                                                    \
-    _(PIS_OPCODE_SIGNED_MUL, )                                                                    \
+    _(PIS_OPCODE_SIGNED_MUL, )                                                                     \
+    _(PIS_OPCODE_SIGNED_MUL_OVERFLOW, )                                                            \
     _(PIS_OPCODE_UNSIGNED_MUL, )
 STR_ENUM(pis_opcode, PIS_OPCODE);
 
