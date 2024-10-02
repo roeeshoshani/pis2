@@ -716,6 +716,19 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
+    } else if (first_opcode_byte == 0xc6) {
+        // xxx r/m8, imm8
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+
+        u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        pis_operand_t imm_operand = PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1);
+
+        if (modrm_operands.modrm.reg == 0) {
+            // mov r/m8, imm8
+            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &imm_operand));
+        } else {
+            CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
+        }
     } else if (first_opcode_byte == 0xe9) {
         // jmp rel
         pis_operand_t target = {};
