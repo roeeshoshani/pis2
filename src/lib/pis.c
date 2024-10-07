@@ -1,5 +1,6 @@
 #include "pis.h"
 #include "errors.h"
+#include "except.h"
 #include "trace.h"
 
 STR_ENUM_IMPL(pis_opcode, PIS_OPCODE);
@@ -108,4 +109,27 @@ u64 pis_sign_extend_byte(i8 byte, pis_operand_size_t desired_size) {
         // unreachable
         return 0;
     }
+}
+
+err_t pis_addr_add(const pis_addr_t* addr, u64 amount, pis_addr_t* new_addr) {
+    err_t err = SUCCESS;
+    CHECK_CODE(addr->offset <= UINT64_MAX - amount, PIS_ERR_ADDR_OVERFLOW);
+
+    pis_addr_t sum = *addr;
+    sum.offset += amount;
+
+    *new_addr = sum;
+
+cleanup:
+    return err;
+}
+
+pis_endianness_t pis_endianness_native() {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+    return PIS_ENDIANNESS_LITTLE;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+    return PIS_ENDIANNESS_BIG;
+#else
+#    error "unknown endianness"
+#endif
 }

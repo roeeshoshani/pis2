@@ -147,6 +147,11 @@ STR_ENUM(pis_opcode, PIS_OPCODE);
 STR_ENUM(pis_space, PIS_SPACE);
 
 typedef enum {
+    PIS_ENDIANNESS_LITTLE,
+    PIS_ENDIANNESS_BIG,
+} pis_endianness_t;
+
+typedef enum {
     /// 1 byte
     PIS_OPERAND_SIZE_1 = 1,
     /// 2 bytes
@@ -201,3 +206,7 @@ u32 pis_operand_size_to_bits(pis_operand_size_t operand_size);
 u64 pis_const_negate(u64 const_value, u32 operand_size);
 
 u64 pis_sign_extend_byte(i8 byte, pis_operand_size_t desired_size);
+
+err_t pis_addr_add(const pis_addr_t* addr, u64 amount, pis_addr_t* new_addr);
+
+pis_endianness_t pis_endianness_native();
