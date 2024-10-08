@@ -1,9 +1,10 @@
 #include "emu.h"
-#include "emu/storage.h"
+#include "emu/mem_storage.h"
 #include "errors.h"
 #include "except.h"
 #include "pis.h"
 #include "utils.h"
+#include <cstdint>
 #include <endian.h>
 #include <limits.h>
 
@@ -56,6 +57,32 @@ cleanup:
     return err;
 }
 
+static err_t read_mem_bytes(const pis_emu_t* emu, u64 addr, u8* bytes, size_t len) {
+    err_t err = SUCCESS;
+
+    CHECK_CODE(addr <= UINT64_MAX - len, PIS_ERR_ADDR_OVERFLOW);
+
+    for (size_t i = 0; i < len; i++) {
+        CHECK_RETHROW(pis_emu_mem_storage_read_byte(&emu->mem_storage, addr + i, &bytes[i]));
+    }
+
+cleanup:
+    return err;
+}
+
+static err_t write_mem_bytes(pis_emu_t* emu, u64 addr, const u8* bytes, size_t len) {
+    err_t err = SUCCESS;
+
+    CHECK_CODE(addr <= UINT64_MAX - len, PIS_ERR_ADDR_OVERFLOW);
+
+    for (size_t i = 0; i < len; i++) {
+        CHECK_RETHROW(pis_emu_mem_storage_write_byte(&emu->mem_storage, addr + i, bytes[i]));
+    }
+
+cleanup:
+    return err;
+}
+
 typedef union {
     u8 bytes[sizeof(u64)];
     u64 u64;
@@ -77,13 +104,13 @@ static err_t read_operand(const pis_emu_t* emu, const pis_operand_t* operand, u6
 
     size_t operand_size_in_bytes = pis_operand_size_to_bytes(operand->size);
 
-    u64_bytes_t value = {.u64 = 0};
-    CHECK(operand_size_in_bytes <= ARRAY_SIZE(value.bytes));
-    CHECK_RETHROW(read_bytes(emu, &operand->addr, value.bytes, operand_size_in_bytes));
+    u64_bytes_t converter = {.u64 = 0};
+    CHECK(operand_size_in_bytes <= ARRAY_SIZE(converter.bytes));
+    CHECK_RETHROW(read_bytes(emu, &operand->addr, converter.bytes, operand_size_in_bytes));
 
-    endianness_swap_bytes_if_needed(emu, value.bytes, operand_size_in_bytes);
+    endianness_swap_bytes_if_needed(emu, converter.bytes, operand_size_in_bytes);
 
-    *operand_value = value.u64;
+    *operand_value = converter.u64;
 
 cleanup:
     return err;
@@ -94,11 +121,44 @@ static err_t write_operand(pis_emu_t* emu, const pis_operand_t* operand, u64 val
 
     size_t operand_size_in_bytes = pis_operand_size_to_bytes(operand->size);
 
-    u64_bytes_t fixed_value = {.u64 = value};
-    CHECK(operand_size_in_bytes <= ARRAY_SIZE(fixed_value.bytes));
-    endianness_swap_bytes_if_needed(emu, fixed_value.bytes, operand_size_in_bytes);
+    u64_bytes_t converter = {.u64 = value};
+    CHECK(operand_size_in_bytes <= ARRAY_SIZE(converter.bytes));
+    endianness_swap_bytes_if_needed(emu, converter.bytes, operand_size_in_bytes);
 
-    CHECK_RETHROW(write_bytes(emu, &operand->addr, fixed_value.bytes, operand_size_in_bytes));
+    CHECK_RETHROW(write_bytes(emu, &operand->addr, converter.bytes, operand_size_in_bytes));
+
+cleanup:
+    return err;
+}
+
+static err_t
+    read_mem_value(const pis_emu_t* emu, u64 addr, pis_operand_size_t value_size, u64* value) {
+    err_t err = SUCCESS;
+
+    size_t operand_size_in_bytes = pis_operand_size_to_bytes(value_size);
+
+    u64_bytes_t converter = {.u64 = 0};
+    CHECK(operand_size_in_bytes <= ARRAY_SIZE(converter.bytes));
+    CHECK_RETHROW(read_mem_bytes(emu, addr, converter.bytes, operand_size_in_bytes));
+
+    endianness_swap_bytes_if_needed(emu, converter.bytes, operand_size_in_bytes);
+
+    *value = converter.u64;
+
+cleanup:
+    return err;
+}
+
+static err_t write_mem_value(pis_emu_t* emu, u64 addr, u64 value, pis_operand_size_t value_size) {
+    err_t err = SUCCESS;
+
+    size_t operand_size_in_bytes = pis_operand_size_to_bytes(value_size);
+
+    u64_bytes_t converter = {.u64 = value};
+    CHECK(operand_size_in_bytes <= ARRAY_SIZE(converter.bytes));
+    endianness_swap_bytes_if_needed(emu, converter.bytes, operand_size_in_bytes);
+
+    CHECK_RETHROW(write_mem_bytes(emu, addr, converter.bytes, operand_size_in_bytes));
 
 cleanup:
     return err;
@@ -132,7 +192,7 @@ DEFINE_BINARY_OPERATOR(and, &);
 static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
     err_t err = SUCCESS;
     switch (insn->opcode) {
-    case PIS_OPCODE_MOVE:
+    case PIS_OPCODE_MOVE: {
         CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
 
         u64 value = 0;
@@ -141,6 +201,7 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         CHECK_RETHROW(write_operand(emu, &insn->operands[0], value));
 
         break;
+    }
     case PIS_OPCODE_ADD:
         CHECK_RETHROW(run_binary_operator(emu, insn, binary_operator_add));
         break;
@@ -153,10 +214,28 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
     case PIS_OPCODE_AND:
         CHECK_RETHROW(run_binary_operator(emu, insn, binary_operator_and));
         break;
-    case PIS_OPCODE_STORE:
+    case PIS_OPCODE_STORE: {
+        u64 value = 0;
+        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &value));
+
+        u64 addr = 0;
+        CHECK_RETHROW(read_operand(emu, &insn->operands[0], &value));
+
+        CHECK_RETHROW(write_mem_value(emu, addr, value, insn->operands[1].size));
+
         break;
-    case PIS_OPCODE_LOAD:
+    }
+    case PIS_OPCODE_LOAD: {
+        u64 addr = 0;
+        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &addr));
+
+        u64 value = 0;
+        CHECK_RETHROW(read_mem_value(emu, addr, insn->operands[0].size, &value));
+
+        CHECK_RETHROW(write_operand(emu, &insn->operands[0], value));
+
         break;
+    }
     case PIS_OPCODE_UNSIGNED_CARRY:
         break;
     case PIS_OPCODE_SIGNED_CARRY:
