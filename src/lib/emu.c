@@ -9,6 +9,7 @@
 #include <limits.h>
 
 typedef u64 (*binary_operator_fn_t)(u64 lhs, u64 rhs);
+typedef i64 (*signed_binary_operator_fn_t)(i64 lhs, i64 rhs);
 
 static err_t
     read_byte_off(const pis_emu_t* emu, const pis_addr_t* addr, u64 offset, u8* byte_value) {
@@ -213,8 +214,37 @@ cleanup:
     return err;
 }
 
+static err_t run_signed_binary_operator(
+    pis_emu_t* emu, const pis_insn_t* insn, signed_binary_operator_fn_t fn
+) {
+    err_t err = SUCCESS;
+    CHECK_CODE(insn->operands_amount == 3, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+    // make sure that all operands are of the same size
+    CHECK_CODE(
+        insn->operands[0].size == insn->operands[1].size &&
+            insn->operands[1].size == insn->operands[2].size,
+        PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+    );
+
+    i64 lhs = 0;
+    CHECK_RETHROW(read_operand_signed(emu, &insn->operands[1], &lhs));
+    i64 rhs = 0;
+    CHECK_RETHROW(read_operand_signed(emu, &insn->operands[2], &rhs));
+
+    i64 result = fn(lhs, rhs);
+    CHECK_RETHROW(write_operand(emu, &insn->operands[0], (u64) result));
+cleanup:
+    return err;
+}
+
 #define DEFINE_BINARY_OPERATOR(NAME, OP)                                                           \
     static u64 binary_operator_##NAME(u64 lhs, u64 rhs) {                                          \
+        return lhs OP rhs;                                                                         \
+    }
+
+#define DEFINE_SIGNED_BINARY_OPERATOR(NAME, OP)                                                    \
+    static i64 signed_binary_operator_##NAME(i64 lhs, i64 rhs) {                                   \
         return lhs OP rhs;                                                                         \
     }
 
@@ -223,6 +253,8 @@ DEFINE_BINARY_OPERATOR(sub, -);
 DEFINE_BINARY_OPERATOR(xor, ^);
 DEFINE_BINARY_OPERATOR(and, &);
 DEFINE_BINARY_OPERATOR(shr, >>);
+DEFINE_BINARY_OPERATOR(mul, *);
+DEFINE_SIGNED_BINARY_OPERATOR(mul, *);
 
 static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
     err_t err = SUCCESS;
@@ -478,15 +510,67 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
     case PIS_OPCODE_JMP:
         UNREACHABLE();
         break;
-    case PIS_OPCODE_SIGN_EXTEND:
+    case PIS_OPCODE_SIGN_EXTEND: {
+        CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+        // check operand sizes
+        CHECK_CODE(
+            insn->operands[0].size > insn->operands[1].size,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        );
+
+        i64 value = 0;
+        CHECK_RETHROW(read_operand_signed(emu, &insn->operands[1], &value));
+
+        CHECK_RETHROW(write_operand(emu, &insn->operands[0], value));
+
         break;
-    case PIS_OPCODE_ZERO_EXTEND:
+    }
+    case PIS_OPCODE_ZERO_EXTEND: {
+        CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+        // check operand sizes
+        CHECK_CODE(
+            insn->operands[0].size > insn->operands[1].size,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        );
+
+        u64 value = 0;
+        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &value));
+
+        CHECK_RETHROW(write_operand(emu, &insn->operands[0], value));
+
         break;
+    }
     case PIS_OPCODE_SIGNED_MUL:
+        CHECK_RETHROW(run_signed_binary_operator(emu, insn, signed_binary_operator_mul));
         break;
-    case PIS_OPCODE_SIGNED_MUL_OVERFLOW:
+    case PIS_OPCODE_SIGNED_MUL_OVERFLOW: {
+        CHECK_CODE(insn->operands_amount == 3, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+        // check operand sizes
+        CHECK_CODE(
+            insn->operands[1].size == insn->operands[2].size,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        );
+        CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
+
+        u64 lhs = 0;
+        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &lhs));
+
+        u64 rhs = 0;
+        CHECK_RETHROW(read_operand(emu, &insn->operands[2], &rhs));
+
+        u64 result = lhs * rhs;
+
+        bool is_overflow = (rhs != 0) && ((result / rhs) != lhs);
+
+        CHECK_RETHROW(write_operand(emu, &insn->operands[0], (u64) is_overflow));
+
         break;
+    }
     case PIS_OPCODE_UNSIGNED_MUL:
+        CHECK_RETHROW(run_binary_operator(emu, insn, binary_operator_mul));
         break;
     }
 cleanup:
