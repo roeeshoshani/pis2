@@ -222,6 +222,7 @@ DEFINE_BINARY_OPERATOR(add, +);
 DEFINE_BINARY_OPERATOR(sub, -);
 DEFINE_BINARY_OPERATOR(xor, ^);
 DEFINE_BINARY_OPERATOR(and, &);
+DEFINE_BINARY_OPERATOR(shr, >>);
 
 static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
     err_t err = SUCCESS;
@@ -349,21 +350,133 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         break;
     }
-    case PIS_OPCODE_PARITY:
+    case PIS_OPCODE_PARITY: {
+        CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+        // check operand sizes
+        CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
+
+        u64 value = 0;
+        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &value));
+
+        // naive calculation of parity. we don't care about performance here.
+        u32 value_size_in_bits = pis_operand_size_to_bits(insn->operands[1].size);
+        u32 bits_amount = 0;
+        for (size_t i = 0; i < value_size_in_bits; i++) {
+            if (((value >> i) & 1) != 0) {
+                bits_amount++;
+            }
+        }
+        bool parity_bit = bits_amount % 2 == 0;
+
+        CHECK_RETHROW(write_operand(emu, &insn->operands[0], (u64) parity_bit));
+
         break;
-    case PIS_OPCODE_EQUALS:
+    }
+    case PIS_OPCODE_EQUALS: {
+        CHECK_CODE(insn->operands_amount == 3, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+        // check operand sizes
+        CHECK_CODE(
+            insn->operands[1].size == insn->operands[2].size,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        );
+        CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
+
+        u64 lhs = 0;
+        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &lhs));
+
+        u64 rhs = 0;
+        CHECK_RETHROW(read_operand(emu, &insn->operands[2], &rhs));
+
+        bool equals = lhs == rhs;
+
+        CHECK_RETHROW(write_operand(emu, &insn->operands[0], (u64) equals));
+
         break;
-    case PIS_OPCODE_NOT:
+    }
+    case PIS_OPCODE_NOT: {
+        CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+        // check operand sizes
+        CHECK_CODE(
+            insn->operands[0].size == insn->operands[1].size,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        );
+
+        u64 value = 0;
+        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &value));
+
+        u64 result = ~value;
+
+        CHECK_RETHROW(write_operand(emu, &insn->operands[0], result));
+
         break;
+    }
     case PIS_OPCODE_SHIFT_RIGHT:
+        CHECK_RETHROW(run_binary_operator(emu, insn, binary_operator_shr));
         break;
-    case PIS_OPCODE_UNSIGNED_LESS_THAN:
+    case PIS_OPCODE_UNSIGNED_LESS_THAN: {
+        CHECK_CODE(insn->operands_amount == 3, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+        // check operand sizes
+        CHECK_CODE(
+            insn->operands[1].size == insn->operands[2].size,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        );
+        CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
+
+        u64 lhs = 0;
+        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &lhs));
+
+        u64 rhs = 0;
+        CHECK_RETHROW(read_operand(emu, &insn->operands[2], &rhs));
+
+        bool result = lhs < rhs;
+
+        CHECK_RETHROW(write_operand(emu, &insn->operands[0], (u64) result));
+
         break;
-    case PIS_OPCODE_SIGNED_BORROW:
+    }
+    case PIS_OPCODE_SIGNED_BORROW: {
+        CHECK_CODE(insn->operands_amount == 3, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+        // check operand sizes
+        CHECK_CODE(
+            insn->operands[1].size == insn->operands[2].size,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        );
+        CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
+
+        u64 lhs = 0;
+        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &lhs));
+
+        u64 rhs = 0;
+        CHECK_RETHROW(read_operand(emu, &insn->operands[2], &rhs));
+
+        u64 result = lhs - rhs;
+
+        pis_operand_size_t src_operand_size = insn->operands[1].size;
+        u32 src_operand_size_in_bits = pis_operand_size_to_bits(src_operand_size);
+        u32 sign_bit_shift_amount = src_operand_size_in_bits - 1;
+
+        u64 lhs_sign_bit = (lhs >> sign_bit_shift_amount) & 1;
+        u64 rhs_sign_bit = (rhs >> sign_bit_shift_amount) & 1;
+        u64 result_sign_bit = (result >> sign_bit_shift_amount) & 1;
+
+        // signed overflow occurs when subtracting a rhs of a different sign than the lhs makes the
+        // sign of the lhs change.
+        bool is_overflow = lhs_sign_bit != rhs_sign_bit && lhs_sign_bit != result_sign_bit;
+
+        CHECK_RETHROW(write_operand(emu, &insn->operands[0], (u64) is_overflow));
+
         break;
+    }
     case PIS_OPCODE_JMP_COND:
+        UNREACHABLE();
         break;
     case PIS_OPCODE_JMP:
+        UNREACHABLE();
         break;
     case PIS_OPCODE_SIGN_EXTEND:
         break;
