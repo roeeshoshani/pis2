@@ -270,11 +270,12 @@ cleanup:
     return err;
 }
 
-typedef err_t (*modrm_binop_fn_t
-)(const post_prefixes_ctx_t* ctx,
-  const pis_operand_t* a,
-  const pis_operand_t* b,
-  pis_operand_t* result);
+typedef err_t (*modrm_binop_fn_t)(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* a,
+    const pis_operand_t* b,
+    pis_operand_t* result
+);
 
 static err_t calc_binop_modrm(
     const post_prefixes_ctx_t* ctx,
@@ -358,13 +359,8 @@ static pis_operand_size_t rel_jmp_ip_operand_size(const post_prefixes_ctx_t* ctx
 
 static u64 rel_jmp_mask_ip_value(const post_prefixes_ctx_t* ctx, u64 ip_value) {
     pis_operand_size_t ip_operand_size = rel_jmp_ip_operand_size(ctx);
-    u32 ip_operand_size_bits = pis_operand_size_to_bits(ip_operand_size);
-    if (ip_operand_size_bits == 64) {
-        return ip_value;
-    } else {
-        u64 mask = (1UL << ip_operand_size_bits) - 1;
-        return ip_value & mask;
-    }
+    u64 mask = pis_operand_size_max_unsigned_value(ip_operand_size);
+    return ip_value & mask;
 }
 
 static err_t rel_jmp_fetch_disp_and_calc_target_addr(const post_prefixes_ctx_t* ctx, u64* target) {
