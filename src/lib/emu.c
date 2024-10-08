@@ -229,6 +229,12 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
     case PIS_OPCODE_MOVE: {
         CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
 
+        // check operand sizes
+        CHECK_CODE(
+            insn->operands[0].size == insn->operands[1].size,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        );
+
         u64 value = 0;
         CHECK_RETHROW(read_operand(emu, &insn->operands[1], &value));
 
@@ -327,8 +333,22 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         break;
     }
-    case PIS_OPCODE_GET_LOW_BITS:
+    case PIS_OPCODE_GET_LOW_BITS: {
+        CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+        // check operand sizes
+        CHECK_CODE(
+            insn->operands[0].size < insn->operands[1].size,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        );
+
+        u64 value = 0;
+        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &value));
+
+        CHECK_RETHROW(write_operand(emu, &insn->operands[0], value));
+
         break;
+    }
     case PIS_OPCODE_PARITY:
         break;
     case PIS_OPCODE_EQUALS:
