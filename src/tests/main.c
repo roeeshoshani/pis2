@@ -1370,6 +1370,18 @@ DEFINE_TEST(test_push_reg_64_bit_mode) {
         x86_generic_test_push_reg(&g_emu, CODE(0x66, 0x49, 0x50), PIS_X86_CPUMODE_64_BIT, &RSP, &R8)
     );
 
+    // push rsp
+    pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RSP, MAGIC64_1));
+    CHECK_RETHROW_VERBOSE(x86_generic_test_push(
+        &g_emu,
+        CODE(0x54),
+        PIS_X86_CPUMODE_64_BIT,
+        &RSP,
+        MAGIC64_1,
+        PIS_OPERAND_SIZE_8
+    ));
+
 
 cleanup:
     return err;
