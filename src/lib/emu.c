@@ -108,15 +108,22 @@ static void endianness_swap_bytes_if_needed(const pis_emu_t* emu, u8* bytes, siz
 err_t pis_emu_read_operand(const pis_emu_t* emu, const pis_operand_t* operand, u64* operand_value) {
     err_t err = SUCCESS;
 
-    size_t operand_size_in_bytes = pis_operand_size_to_bytes(operand->size);
+    if (operand->addr.space == PIS_SPACE_CONST) {
+        u64 const_value = operand->addr.offset;
+        u64 max_value = pis_operand_size_max_unsigned_value(operand->size);
+        CHECK(const_value <= max_value);
+        *operand_value = const_value;
+    } else {
+        size_t operand_size_in_bytes = pis_operand_size_to_bytes(operand->size);
 
-    u64_bytes_t converter = {.u64 = 0};
-    CHECK(operand_size_in_bytes <= ARRAY_SIZE(converter.bytes));
-    CHECK_RETHROW(read_bytes(emu, &operand->addr, converter.bytes, operand_size_in_bytes));
+        u64_bytes_t converter = {.u64 = 0};
+        CHECK(operand_size_in_bytes <= ARRAY_SIZE(converter.bytes));
+        CHECK_RETHROW(read_bytes(emu, &operand->addr, converter.bytes, operand_size_in_bytes));
 
-    endianness_swap_bytes_if_needed(emu, converter.bytes, operand_size_in_bytes);
+        endianness_swap_bytes_if_needed(emu, converter.bytes, operand_size_in_bytes);
 
-    *operand_value = converter.u64;
+        *operand_value = converter.u64;
+    }
 
 cleanup:
     return err;
