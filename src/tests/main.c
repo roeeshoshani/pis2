@@ -1,5 +1,6 @@
 #include "arch/x86/ctx.h"
 #include "arch/x86/regs.h"
+#include "emu.h"
 #include "errors.h"
 #include "except.h"
 #include "pis.h"
@@ -51,6 +52,11 @@ typedef struct {
         .name = STRINGIFY(NAME),                                                                   \
     };                                                                                             \
     static err_t NAME()
+
+#define MAGIC64_1 (0x1122334455667788)
+#define MAGIC64_2 (0xaabbccddaabbccdd)
+
+static pis_emu_t g_emu = {};
 
 // define an example trace function
 void trace(const char* format, ...) {
@@ -1294,6 +1300,104 @@ DEFINE_TEST(test_movzx_64_bit_mode) {
             PIS_INSN2(PIS_OPCODE_LOAD, tmp8, addr_tmp),
             PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, RAX, tmp8)
         )
+    ));
+
+cleanup:
+    return err;
+}
+
+static err_t x86_emulate_insn(pis_emu_t* emu, code_t code, pis_x86_cpumode_t cpumode, u64 addr) {
+    err_t err = SUCCESS;
+
+    pis_lift_result_t result = {};
+
+    pis_x86_ctx_t ctx = {
+        .cpumode = cpumode,
+    };
+
+    CHECK_RETHROW_VERBOSE(pis_x86_lift(&ctx, code.code, code.len, addr, &result));
+
+    CHECK_TRACE(
+        result.machine_insn_len == code.len,
+        "expected the instruction to be %lu bytes, instead it was %lu bytes",
+        code.len,
+        result.machine_insn_len
+    );
+
+    CHECK_RETHROW_VERBOSE(pis_emu_run(emu, &result));
+
+cleanup:
+    return err;
+}
+
+static err_t x86_generic_test_push(
+    pis_emu_t* emu,
+    code_t code,
+    pis_x86_cpumode_t cpumode,
+    const pis_operand_t* sp,
+    u64 expected_pushed_value,
+    pis_operand_size_t expected_pushed_value_size
+) {
+    err_t err = SUCCESS;
+
+    u64 orig_sp = 0;
+    CHECK_RETHROW_VERBOSE(pis_emu_read_operand(emu, sp, &orig_sp));
+
+    CHECK_RETHROW_VERBOSE(x86_emulate_insn(&g_emu, code, cpumode, 0));
+
+    // check the new sp value
+    u64 new_sp = 0;
+    CHECK_RETHROW_VERBOSE(pis_emu_read_operand(emu, sp, &orig_sp));
+    CHECK(new_sp == orig_sp - pis_operand_size_to_bytes(expected_pushed_value_size));
+
+    // check the written memory value
+    u64 written_mem_value = 0;
+    CHECK_RETHROW_VERBOSE(
+        pis_emu_read_mem_value(&g_emu, new_sp, expected_pushed_value_size, &written_mem_value)
+    );
+    CHECK(written_mem_value == expected_pushed_value);
+
+cleanup:
+    return err;
+}
+
+static err_t x86_generic_test_push_reg(
+    pis_emu_t* emu,
+    code_t code,
+    pis_x86_cpumode_t cpumode,
+    const pis_operand_t* sp,
+    u64 sp_addr,
+    const pis_operand_t* pushed_reg,
+    u64 pushed_value
+) {
+    err_t err = SUCCESS;
+
+    pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, sp, sp_addr));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, pushed_reg, pushed_value));
+    CHECK_RETHROW_VERBOSE(
+        x86_generic_test_push(&g_emu, code, cpumode, sp, pushed_value, pushed_reg->size)
+    );
+
+    u64 reg_value_after_push = 0;
+    CHECK_RETHROW_VERBOSE(pis_emu_read_operand(emu, pushed_reg, &reg_value_after_push));
+    CHECK(reg_value_after_push == pushed_value);
+
+cleanup:
+    return err;
+}
+
+DEFINE_TEST(test_push_emu) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(x86_generic_test_push_reg(
+        &g_emu,
+        CODE(0x55),
+        PIS_X86_CPUMODE_64_BIT,
+        &RSP,
+        MAGIC64_1,
+        &RBP,
+        MAGIC64_2
     ));
 
 cleanup:

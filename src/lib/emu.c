@@ -4,12 +4,17 @@
 #include "except.h"
 #include "pis.h"
 #include "utils.h"
-#include <cstdint>
 #include <endian.h>
 #include <limits.h>
+#include <string.h>
 
 typedef u64 (*binary_operator_fn_t)(u64 lhs, u64 rhs);
 typedef i64 (*signed_binary_operator_fn_t)(i64 lhs, i64 rhs);
+
+void pis_emu_init(pis_emu_t* emu, pis_endianness_t endianness) {
+    memset(emu, 0, sizeof(pis_emu_t));
+    emu->endianness = endianness;
+}
 
 static err_t
     read_byte_off(const pis_emu_t* emu, const pis_addr_t* addr, u64 offset, u8* byte_value) {
@@ -100,7 +105,7 @@ static void endianness_swap_bytes_if_needed(const pis_emu_t* emu, u8* bytes, siz
     }
 }
 
-static err_t read_operand(const pis_emu_t* emu, const pis_operand_t* operand, u64* operand_value) {
+err_t pis_emu_read_operand(const pis_emu_t* emu, const pis_operand_t* operand, u64* operand_value) {
     err_t err = SUCCESS;
 
     size_t operand_size_in_bytes = pis_operand_size_to_bytes(operand->size);
@@ -117,7 +122,7 @@ cleanup:
     return err;
 }
 
-static err_t write_operand(pis_emu_t* emu, const pis_operand_t* operand, u64 value) {
+err_t pis_emu_write_operand(pis_emu_t* emu, const pis_operand_t* operand, u64 value) {
     err_t err = SUCCESS;
 
     size_t operand_size_in_bytes = pis_operand_size_to_bytes(operand->size);
@@ -132,8 +137,9 @@ cleanup:
     return err;
 }
 
-static err_t
-    read_mem_value(const pis_emu_t* emu, u64 addr, pis_operand_size_t value_size, u64* value) {
+err_t pis_emu_read_mem_value(
+    const pis_emu_t* emu, u64 addr, pis_operand_size_t value_size, u64* value
+) {
     err_t err = SUCCESS;
 
     size_t operand_size_in_bytes = pis_operand_size_to_bytes(value_size);
@@ -150,7 +156,7 @@ cleanup:
     return err;
 }
 
-static err_t write_mem_value(pis_emu_t* emu, u64 addr, u64 value, pis_operand_size_t value_size) {
+err_t pis_emu_write_mem_value(pis_emu_t* emu, u64 addr, u64 value, pis_operand_size_t value_size) {
     err_t err = SUCCESS;
 
     size_t operand_size_in_bytes = pis_operand_size_to_bytes(value_size);
@@ -180,11 +186,12 @@ static i64 sign_extend_value(u64 value, pis_operand_size_t value_size) {
     return (i64) result;
 }
 
-static err_t
-    read_operand_signed(const pis_emu_t* emu, const pis_operand_t* operand, i64* operand_value) {
+err_t pis_emu_read_operand_signed(
+    const pis_emu_t* emu, const pis_operand_t* operand, i64* operand_value
+) {
     err_t err = SUCCESS;
     u64 unsigned_value = 0;
-    CHECK_RETHROW(read_operand(emu, operand, &unsigned_value));
+    CHECK_RETHROW(pis_emu_read_operand(emu, operand, &unsigned_value));
 
     *operand_value = sign_extend_value(unsigned_value, operand->size);
 
@@ -204,12 +211,12 @@ static err_t run_binary_operator(pis_emu_t* emu, const pis_insn_t* insn, binary_
     );
 
     u64 lhs = 0;
-    CHECK_RETHROW(read_operand(emu, &insn->operands[1], &lhs));
+    CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &lhs));
     u64 rhs = 0;
-    CHECK_RETHROW(read_operand(emu, &insn->operands[2], &rhs));
+    CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[2], &rhs));
 
     u64 result = fn(lhs, rhs);
-    CHECK_RETHROW(write_operand(emu, &insn->operands[0], result));
+    CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], result));
 cleanup:
     return err;
 }
@@ -228,12 +235,12 @@ static err_t run_signed_binary_operator(
     );
 
     i64 lhs = 0;
-    CHECK_RETHROW(read_operand_signed(emu, &insn->operands[1], &lhs));
+    CHECK_RETHROW(pis_emu_read_operand_signed(emu, &insn->operands[1], &lhs));
     i64 rhs = 0;
-    CHECK_RETHROW(read_operand_signed(emu, &insn->operands[2], &rhs));
+    CHECK_RETHROW(pis_emu_read_operand_signed(emu, &insn->operands[2], &rhs));
 
     i64 result = fn(lhs, rhs);
-    CHECK_RETHROW(write_operand(emu, &insn->operands[0], (u64) result));
+    CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], (u64) result));
 cleanup:
     return err;
 }
@@ -256,7 +263,7 @@ DEFINE_BINARY_OPERATOR(shr, >>);
 DEFINE_BINARY_OPERATOR(mul, *);
 DEFINE_SIGNED_BINARY_OPERATOR(mul, *);
 
-static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
+err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
     err_t err = SUCCESS;
     switch (insn->opcode) {
     case PIS_OPCODE_MOVE: {
@@ -269,9 +276,9 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         );
 
         u64 value = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &value));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &value));
 
-        CHECK_RETHROW(write_operand(emu, &insn->operands[0], value));
+        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], value));
 
         break;
     }
@@ -289,23 +296,23 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         break;
     case PIS_OPCODE_STORE: {
         u64 value = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &value));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &value));
 
         u64 addr = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[0], &value));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[0], &value));
 
-        CHECK_RETHROW(write_mem_value(emu, addr, value, insn->operands[1].size));
+        CHECK_RETHROW(pis_emu_write_mem_value(emu, addr, value, insn->operands[1].size));
 
         break;
     }
     case PIS_OPCODE_LOAD: {
         u64 addr = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &addr));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &addr));
 
         u64 value = 0;
-        CHECK_RETHROW(read_mem_value(emu, addr, insn->operands[0].size, &value));
+        CHECK_RETHROW(pis_emu_read_mem_value(emu, addr, insn->operands[0].size, &value));
 
-        CHECK_RETHROW(write_operand(emu, &insn->operands[0], value));
+        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], value));
 
         break;
     }
@@ -320,15 +327,15 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
 
         u64 lhs = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &lhs));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &lhs));
         u64 rhs = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[2], &rhs));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[2], &rhs));
 
         pis_operand_size_t src_operand_size = insn->operands[1].size;
         u64 max_value = pis_operand_size_max_unsigned_value(src_operand_size);
         bool is_overflow = lhs > max_value - rhs;
 
-        CHECK_RETHROW(write_operand(emu, &insn->operands[0], (u64) is_overflow));
+        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], (u64) is_overflow));
 
         break;
     }
@@ -343,10 +350,10 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
 
         u64 lhs = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &lhs));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &lhs));
 
         u64 rhs = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[2], &rhs));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[2], &rhs));
 
         u64 result = lhs + rhs;
 
@@ -362,7 +369,7 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         // different sign.
         bool is_overflow = lhs_sign_bit == rhs_sign_bit && lhs_sign_bit != result_sign_bit;
 
-        CHECK_RETHROW(write_operand(emu, &insn->operands[0], (u64) is_overflow));
+        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], (u64) is_overflow));
 
         break;
     }
@@ -376,9 +383,9 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         );
 
         u64 value = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &value));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &value));
 
-        CHECK_RETHROW(write_operand(emu, &insn->operands[0], value));
+        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], value));
 
         break;
     }
@@ -389,7 +396,7 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
 
         u64 value = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &value));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &value));
 
         // naive calculation of parity. we don't care about performance here.
         u32 value_size_in_bits = pis_operand_size_to_bits(insn->operands[1].size);
@@ -401,7 +408,7 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         }
         bool parity_bit = bits_amount % 2 == 0;
 
-        CHECK_RETHROW(write_operand(emu, &insn->operands[0], (u64) parity_bit));
+        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], (u64) parity_bit));
 
         break;
     }
@@ -416,14 +423,14 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
 
         u64 lhs = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &lhs));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &lhs));
 
         u64 rhs = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[2], &rhs));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[2], &rhs));
 
         bool equals = lhs == rhs;
 
-        CHECK_RETHROW(write_operand(emu, &insn->operands[0], (u64) equals));
+        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], (u64) equals));
 
         break;
     }
@@ -437,11 +444,11 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         );
 
         u64 value = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &value));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &value));
 
         u64 result = ~value;
 
-        CHECK_RETHROW(write_operand(emu, &insn->operands[0], result));
+        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], result));
 
         break;
     }
@@ -459,14 +466,14 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
 
         u64 lhs = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &lhs));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &lhs));
 
         u64 rhs = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[2], &rhs));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[2], &rhs));
 
         bool result = lhs < rhs;
 
-        CHECK_RETHROW(write_operand(emu, &insn->operands[0], (u64) result));
+        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], (u64) result));
 
         break;
     }
@@ -481,10 +488,10 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
 
         u64 lhs = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &lhs));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &lhs));
 
         u64 rhs = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[2], &rhs));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[2], &rhs));
 
         u64 result = lhs - rhs;
 
@@ -500,7 +507,7 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         // sign of the lhs change.
         bool is_overflow = lhs_sign_bit != rhs_sign_bit && lhs_sign_bit != result_sign_bit;
 
-        CHECK_RETHROW(write_operand(emu, &insn->operands[0], (u64) is_overflow));
+        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], (u64) is_overflow));
 
         break;
     }
@@ -520,9 +527,9 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         );
 
         i64 value = 0;
-        CHECK_RETHROW(read_operand_signed(emu, &insn->operands[1], &value));
+        CHECK_RETHROW(pis_emu_read_operand_signed(emu, &insn->operands[1], &value));
 
-        CHECK_RETHROW(write_operand(emu, &insn->operands[0], value));
+        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], value));
 
         break;
     }
@@ -536,9 +543,9 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         );
 
         u64 value = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &value));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &value));
 
-        CHECK_RETHROW(write_operand(emu, &insn->operands[0], value));
+        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], value));
 
         break;
     }
@@ -556,16 +563,16 @@ static err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
 
         u64 lhs = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[1], &lhs));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &lhs));
 
         u64 rhs = 0;
-        CHECK_RETHROW(read_operand(emu, &insn->operands[2], &rhs));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[2], &rhs));
 
         u64 result = lhs * rhs;
 
         bool is_overflow = (rhs != 0) && ((result / rhs) != lhs);
 
-        CHECK_RETHROW(write_operand(emu, &insn->operands[0], (u64) is_overflow));
+        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], (u64) is_overflow));
 
         break;
     }

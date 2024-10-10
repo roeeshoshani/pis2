@@ -270,12 +270,11 @@ cleanup:
     return err;
 }
 
-typedef err_t (*modrm_binop_fn_t)(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* a,
-    const pis_operand_t* b,
-    pis_operand_t* result
-);
+typedef err_t (*modrm_binop_fn_t
+)(const post_prefixes_ctx_t* ctx,
+  const pis_operand_t* a,
+  const pis_operand_t* b,
+  pis_operand_t* result);
 
 static err_t calc_binop_modrm(
     const post_prefixes_ctx_t* ctx,
