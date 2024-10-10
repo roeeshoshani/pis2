@@ -500,11 +500,19 @@ static err_t do_push(const post_prefixes_ctx_t* ctx, const pis_operand_t* operan
     pis_operand_t sp = ctx->lift_ctx->sp;
     u64 operand_size_bytes = pis_operand_size_to_bytes(operand_to_push->size);
 
+    // read the pushed operand into a tmp before subtracting sp. this makes sure that instructions
+    // like `push rsp` behave properly, by pushing the original value, before the subtraction.
+    pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_to_push->size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, *operand_to_push));
+
+    // subtract sp
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
         PIS_INSN_ADD2(sp, PIS_OPERAND_CONST_NEG(operand_size_bytes, sp.size))
     );
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_STORE, sp, *operand_to_push));
+
+    // write the memory
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_STORE, sp, tmp));
 cleanup:
     return err;
 }
