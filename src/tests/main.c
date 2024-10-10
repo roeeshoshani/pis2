@@ -1347,7 +1347,7 @@ static err_t x86_generic_test_push(
 
     // check the new sp value
     u64 new_sp = 0;
-    CHECK_RETHROW_VERBOSE(pis_emu_read_operand(emu, sp, &orig_sp));
+    CHECK_RETHROW_VERBOSE(pis_emu_read_operand(emu, sp, &new_sp));
     CHECK(new_sp == orig_sp - pis_operand_size_to_bytes(expected_pushed_value_size));
 
     // check the written memory value
