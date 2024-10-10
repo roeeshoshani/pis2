@@ -159,16 +159,6 @@ cleanup:
 }
 
 static err_t
-    generic_test_push_reg_mode_64(code_t code, pis_operand_t pushed_reg, u64 rsp_add_amount) {
-    err_t err = SUCCESS;
-    CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg(code, PIS_X86_CPUMODE_64_BIT, pushed_reg, rsp_add_amount, RSP)
-    );
-cleanup:
-    return err;
-}
-
-static err_t
     generic_test_push_reg_mode_32(code_t code, pis_operand_t pushed_reg, u32 esp_add_amount) {
     err_t err = SUCCESS;
     CHECK_RETHROW_VERBOSE(
@@ -184,49 +174,6 @@ static err_t
     CHECK_RETHROW_VERBOSE(
         generic_test_push_reg(code, PIS_X86_CPUMODE_16_BIT, pushed_reg, sp_add_amount, SP)
     );
-cleanup:
-    return err;
-}
-
-DEFINE_TEST(test_push_reg_64_bit_mode) {
-    err_t err = SUCCESS;
-
-    // regular 64 bit push
-    CHECK_RETHROW_VERBOSE(generic_test_push_reg_mode_64(CODE(0x50), RAX, 0xfffffffffffffff8));
-    CHECK_RETHROW_VERBOSE(generic_test_push_reg_mode_64(CODE(0x55), RBP, 0xfffffffffffffff8));
-
-    // REX.B 64 bit push
-    CHECK_RETHROW_VERBOSE(generic_test_push_reg_mode_64(CODE(0x41, 0x50), R8, 0xfffffffffffffff8));
-    CHECK_RETHROW_VERBOSE(generic_test_push_reg_mode_64(CODE(0x41, 0x55), R13, 0xfffffffffffffff8));
-
-    // operand size override 64 bit push
-    CHECK_RETHROW_VERBOSE(generic_test_push_reg_mode_64(CODE(0x66, 0x50), AX, 0xfffffffffffffffe));
-    CHECK_RETHROW_VERBOSE(generic_test_push_reg_mode_64(CODE(0x66, 0x55), BP, 0xfffffffffffffffe));
-
-    // operand size override and REX.B 64 bit push
-    CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg_mode_64(CODE(0x66, 0x41, 0x50), R8W, 0xfffffffffffffffe)
-    );
-    CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg_mode_64(CODE(0x66, 0x41, 0x55), R13W, 0xfffffffffffffffe)
-    );
-
-    // operand size override and REX.W 64 bit push
-    CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg_mode_64(CODE(0x66, 0x48, 0x50), RAX, 0xfffffffffffffff8)
-    );
-    CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg_mode_64(CODE(0x66, 0x48, 0x55), RBP, 0xfffffffffffffff8)
-    );
-
-    // operand size override and REX.BW 64 bit push
-    CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg_mode_64(CODE(0x66, 0x49, 0x50), R8, 0xfffffffffffffff8)
-    );
-    CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg_mode_64(CODE(0x66, 0x49, 0x55), R13, 0xfffffffffffffff8)
-    );
-
 cleanup:
     return err;
 }
@@ -1366,11 +1313,12 @@ static err_t x86_generic_test_push_reg(
     code_t code,
     pis_x86_cpumode_t cpumode,
     const pis_operand_t* sp,
-    u64 sp_addr,
-    const pis_operand_t* pushed_reg,
-    u64 pushed_value
+    const pis_operand_t* pushed_reg
 ) {
     err_t err = SUCCESS;
+
+    u64 sp_addr = MAGIC64_1 & pis_operand_size_max_unsigned_value(sp->size);
+    u64 pushed_value = MAGIC64_2 & pis_operand_size_max_unsigned_value(pushed_reg->size);
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
     CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, sp, sp_addr));
@@ -1387,18 +1335,41 @@ cleanup:
     return err;
 }
 
-DEFINE_TEST(test_push_emu) {
+DEFINE_TEST(test_push_reg_64_bit_mode) {
     err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(
+        x86_generic_test_push_reg(&g_emu, CODE(0x55), PIS_X86_CPUMODE_64_BIT, &RSP, &RBP)
+    );
+
+    CHECK_RETHROW_VERBOSE(
+        x86_generic_test_push_reg(&g_emu, CODE(0x41, 0x51), PIS_X86_CPUMODE_64_BIT, &RSP, &R9)
+    );
+
+    CHECK_RETHROW_VERBOSE(
+        x86_generic_test_push_reg(&g_emu, CODE(0x66, 0x52), PIS_X86_CPUMODE_64_BIT, &RSP, &DX)
+    );
 
     CHECK_RETHROW_VERBOSE(x86_generic_test_push_reg(
         &g_emu,
-        CODE(0x55),
+        CODE(0x66, 0x41, 0x53),
         PIS_X86_CPUMODE_64_BIT,
         &RSP,
-        MAGIC64_1,
-        &RBP,
-        MAGIC64_2
+        &R11W
     ));
+
+    CHECK_RETHROW_VERBOSE(x86_generic_test_push_reg(
+        &g_emu,
+        CODE(0x66, 0x48, 0x55),
+        PIS_X86_CPUMODE_64_BIT,
+        &RSP,
+        &RBP
+    ));
+
+    CHECK_RETHROW_VERBOSE(
+        x86_generic_test_push_reg(&g_emu, CODE(0x66, 0x49, 0x50), PIS_X86_CPUMODE_64_BIT, &RSP, &R8)
+    );
+
 
 cleanup:
     return err;
