@@ -306,7 +306,7 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &value));
 
         u64 addr = 0;
-        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[0], &value));
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[0], &addr));
 
         CHECK_RETHROW(pis_emu_write_mem_value(emu, addr, value, insn->operands[1].size));
 
