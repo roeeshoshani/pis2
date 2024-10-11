@@ -107,6 +107,25 @@ cleanup:
     return err;
 }
 
+static err_t cond_negate(
+    const post_prefixes_ctx_t* ctx, const pis_operand_t* cond, const pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    CHECK(cond->size == PIS_OPERAND_SIZE_1);
+    CHECK(result->size == PIS_OPERAND_SIZE_1);
+
+    // condition negation is done by `XOR`ing with 1.
+    // we can't use `NOT` because it flips all bits, not only the lowest bit.
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_XOR, *result, *cond, PIS_OPERAND_CONST(1, PIS_OPERAND_SIZE_1))
+    );
+
+cleanup:
+    return err;
+}
+
 static err_t extract_mos_significant_bit(
     const post_prefixes_ctx_t* ctx, const pis_operand_t* value, const pis_operand_t* result
 ) {
@@ -425,15 +444,15 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         pis_operand_t b_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
         pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
 
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_NOT, a_tmp, FLAGS_CF));
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_NOT, b_tmp, FLAGS_ZF));
+        CHECK_RETHROW(cond_negate(ctx, &a_tmp, &FLAGS_CF));
+        CHECK_RETHROW(cond_negate(ctx, &b_tmp, &FLAGS_ZF));
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, res_tmp, a_tmp, b_tmp));
 
         CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp));
     } else if (second_opcode_byte == 0x83) {
         // jae rel
         pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_NOT, res_tmp, FLAGS_CF));
+        CHECK_RETHROW(cond_negate(ctx, &res_tmp, &FLAGS_CF));
 
         CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp));
     } else if (second_opcode_byte == 0x82) {
@@ -446,7 +465,7 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         // jne rel
         pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
 
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_NOT, res_tmp, FLAGS_ZF));
+        CHECK_RETHROW(cond_negate(ctx, &res_tmp, &FLAGS_ZF));
 
         CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp));
     } else if (second_opcode_byte == 0x94) {
@@ -556,7 +575,7 @@ cleanup:
 /// generates a ternary expression with conditional expressions.
 static err_t cond_expr_ternary(
     const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* if_cond,
+    const pis_operand_t* cond,
     const pis_operand_t* then_value,
     const pis_operand_t* else_value,
     pis_operand_t* result
@@ -564,16 +583,15 @@ static err_t cond_expr_ternary(
     err_t err = SUCCESS;
 
     // make sure that all operands are one byte conditional expressions.
-    CHECK(if_cond->size == 1);
-    CHECK(then_value->size == 1);
-    CHECK(else_value->size == 1);
+    CHECK(cond->size == PIS_OPERAND_SIZE_1);
+    CHECK(then_value->size == PIS_OPERAND_SIZE_1);
+    CHECK(else_value->size == PIS_OPERAND_SIZE_1);
 
     pis_operand_t not_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_NOT, not_cond, *if_cond));
-
+    CHECK_RETHROW(cond_negate(ctx, cond, &not_cond));
 
     pis_operand_t true_case = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, true_case, *if_cond, *then_value));
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, true_case, *cond, *then_value));
 
     pis_operand_t false_case = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, false_case, not_cond, *else_value));
