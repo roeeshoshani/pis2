@@ -2,6 +2,6 @@ BITS 64
 
 global main
 main:
-add rax, rbx
+sub rax, rbx
 shit:
 nop

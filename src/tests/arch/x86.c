@@ -1460,7 +1460,7 @@ cleanup:
     return err;
 }
 
-static err_t generic_test_add_flags_both_orders(
+static err_t generic_test_add_flags_commutative(
     u64 a, u64 b, bool parity_flag, bool carry_flag, bool overflow_flag
 ) {
     err_t err = SUCCESS;
@@ -1478,20 +1478,59 @@ cleanup:
 DEFINE_TEST(test_add_flags) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW_VERBOSE(generic_test_add_flags_both_orders(UINT64_MAX, 1ULL, true, true, false));
+    CHECK_RETHROW_VERBOSE(generic_test_add_flags_commutative(1ULL, 1ULL, false, false, false));
 
-    CHECK_RETHROW_VERBOSE(generic_test_add_flags_both_orders(1ULL, 1ULL, false, false, false));
+    CHECK_RETHROW_VERBOSE(generic_test_add_flags_commutative(UINT64_MAX, 1ULL, true, true, false));
 
-    CHECK_RETHROW_VERBOSE(generic_test_add_flags_both_orders(1ULL, INT64_MAX, true, false, true));
+    CHECK_RETHROW_VERBOSE(generic_test_add_flags_commutative(1ULL, INT64_MAX, true, false, true));
 
-    CHECK_RETHROW_VERBOSE(generic_test_add_flags_both_orders(1ULL, INT64_MAX, true, false, true));
-
-    CHECK_RETHROW_VERBOSE(
-        generic_test_add_flags_both_orders(INT64_MAX, INT64_MAX, false, false, true)
+    CHECK_RETHROW_VERBOSE(generic_test_add_flags_commutative(INT64_MIN, INT64_MIN, true, true, true)
     );
 
-    CHECK_RETHROW_VERBOSE(generic_test_add_flags_both_orders(INT64_MIN, INT64_MIN, true, true, true)
-    );
+cleanup:
+    return err;
+}
+
+static err_t generic_test_sub_flags(
+    u64 lhs, u64 rhs, bool parity_flag, bool carry_flag, bool overflow_flag
+) {
+    err_t err = SUCCESS;
+
+    pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RAX, lhs));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RBX, rhs));
+
+    CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, CODE(0x48, 0x29, 0xd8), PIS_X86_CPUMODE_64_BIT, 0));
+
+    // make sure that rax now contains the result
+    u64 res = lhs - rhs;
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, res));
+
+    // make sure that rbx is unchanged
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RBX, rhs));
+
+    // verify flags
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_ZF, res == 0));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_SF, ((i64) res < 0)));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_PF, parity_flag));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_CF, carry_flag));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_OF, overflow_flag));
+
+cleanup:
+    return err;
+}
+
+DEFINE_TEST(test_sub_flags) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(generic_test_sub_flags(1ULL, 1ULL, true, false, false));
+
+    CHECK_RETHROW_VERBOSE(generic_test_sub_flags(0, 1ULL, true, true, false));
+
+    CHECK_RETHROW_VERBOSE(generic_test_sub_flags(INT64_MIN, 1ULL, true, false, true));
+
+    CHECK_RETHROW_VERBOSE(generic_test_sub_flags(INT64_MAX, INT64_MIN, true, true, true));
 
 cleanup:
     return err;
