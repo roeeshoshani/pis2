@@ -10,77 +10,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-
-static err_t
-    assert_pis_lift_result_equals(const pis_lift_result_t* result, expected_insns_t expected) {
-    err_t err = SUCCESS;
-    if (result->insns_amount != expected.amount) {
-        TRACE("expected %lu insns, got %lu insns", expected.amount, result->insns_amount);
-
-        TRACE("expected insns:");
-        for (size_t i = 0; i < expected.amount; i++) {
-            pis_insn_dump(&expected.insns[i]);
-            TRACE();
-        }
-
-        TRACE("intead got:");
-        pis_lift_result_dump(result);
-
-        CHECK_FAIL();
-    }
-    for (size_t i = 0; i < expected.amount; i++) {
-        if (!pis_insn_equals(&result->insns[i], &expected.insns[i])) {
-            TRACE("instruction mismatch at index %lu", i);
-            TRACE("expected insn:");
-            pis_insn_dump(&expected.insns[i]);
-            TRACE();
-
-            TRACE("instead got:");
-            pis_insn_dump(&result->insns[i]);
-            TRACE();
-
-            CHECK_FAIL();
-        }
-    }
-cleanup:
-    return err;
-}
-
-static err_t generic_test_lift_at_addr(
-    code_t code, pis_x86_cpumode_t cpumode, expected_insns_t expected, u64 addr
-) {
-    err_t err = SUCCESS;
-
-    pis_lift_result_t result = {};
-
-    pis_x86_ctx_t ctx = {
-        .cpumode = cpumode,
-    };
-
-    CHECK_RETHROW_VERBOSE(pis_x86_lift(&ctx, code.code, code.len, addr, &result));
-
-    CHECK_RETHROW_VERBOSE(assert_pis_lift_result_equals(&result, expected));
-
-    CHECK_TRACE(
-        result.machine_insn_len == code.len,
-        "expected the instruction to be %lu bytes, instead it was %lu bytes",
-        code.len,
-        result.machine_insn_len
-    );
-
-cleanup:
-    return err;
-}
-
-static err_t generic_test_lift(code_t code, pis_x86_cpumode_t cpumode, expected_insns_t expected) {
-    err_t err = SUCCESS;
-
-    CHECK_RETHROW_VERBOSE(generic_test_lift_at_addr(code, cpumode, expected, 0));
-
-cleanup:
-    return err;
-}
-
 static err_t emulate_insn(pis_emu_t* emu, code_t code, pis_x86_cpumode_t cpumode, u64 addr) {
     err_t err = SUCCESS;
 
@@ -1061,39 +990,42 @@ cleanup:
     return err;
 }
 
-DEFINE_TEST(test_mov_r8_64_bit_mode) {
+static err_t generic_test_mov_r8_imm8(
+    code_t code, pis_x86_cpumode_t cpumode, const pis_operand_t* reg, u8 value
+) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
-        CODE(0xb7, 0xe4),
-        PIS_X86_CPUMODE_64_BIT,
-        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, BH, PIS_OPERAND_CONST(0xe4, PIS_OPERAND_SIZE_1)))
-    ));
+    pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+    CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, code, cpumode, 0));
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
-        CODE(0x48, 0xb7, 0xe4),
-        PIS_X86_CPUMODE_64_BIT,
-        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, DIL, PIS_OPERAND_CONST(0xe4, PIS_OPERAND_SIZE_1)))
-    ));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, reg, value));
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
-        CODE(0x49, 0xb7, 0xe4),
-        PIS_X86_CPUMODE_64_BIT,
-        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, R15B, PIS_OPERAND_CONST(0xe4, PIS_OPERAND_SIZE_1))
-        )
-    ));
+cleanup:
+    return err;
+}
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
-        CODE(0x41, 0xb0, 0x12),
-        PIS_X86_CPUMODE_64_BIT,
-        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, R8B, PIS_OPERAND_CONST(0x12, PIS_OPERAND_SIZE_1)))
-    ));
+DEFINE_TEST(test_mov_r8_imm8_64_bit_mode) {
+    err_t err = SUCCESS;
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
-        CODE(0x40, 0xb4, 0x55),
-        PIS_X86_CPUMODE_64_BIT,
-        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, SPL, PIS_OPERAND_CONST(0x55, PIS_OPERAND_SIZE_1)))
-    ));
+    CHECK_RETHROW_VERBOSE(
+        generic_test_mov_r8_imm8(CODE(0xb7, 0xe4), PIS_X86_CPUMODE_64_BIT, &BH, 0xe4)
+    );
+
+    CHECK_RETHROW_VERBOSE(
+        generic_test_mov_r8_imm8(CODE(0x48, 0xb7, 0xe4), PIS_X86_CPUMODE_64_BIT, &DIL, 0xe4)
+    );
+
+    CHECK_RETHROW_VERBOSE(
+        generic_test_mov_r8_imm8(CODE(0x49, 0xb7, 0xe4), PIS_X86_CPUMODE_64_BIT, &R15B, 0xe4)
+    );
+
+    CHECK_RETHROW_VERBOSE(
+        generic_test_mov_r8_imm8(CODE(0x41, 0xb0, 0x12), PIS_X86_CPUMODE_64_BIT, &R8B, 0x12)
+    );
+
+    CHECK_RETHROW_VERBOSE(
+        generic_test_mov_r8_imm8(CODE(0x40, 0xb4, 0x55), PIS_X86_CPUMODE_64_BIT, &SPL, 0x55)
+    );
 
 cleanup:
     return err;
@@ -1102,17 +1034,13 @@ cleanup:
 DEFINE_TEST(test_mov_r8_32_bit_mode) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
-        CODE(0xb7, 0xe4),
-        PIS_X86_CPUMODE_32_BIT,
-        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, BH, PIS_OPERAND_CONST(0xe4, PIS_OPERAND_SIZE_1)))
-    ));
+    CHECK_RETHROW_VERBOSE(
+        generic_test_mov_r8_imm8(CODE(0xb7, 0xe4), PIS_X86_CPUMODE_32_BIT, &BH, 0xe4)
+    );
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
-        CODE(0xb0, 0x12),
-        PIS_X86_CPUMODE_32_BIT,
-        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, AL, PIS_OPERAND_CONST(0x12, PIS_OPERAND_SIZE_1)))
-    ));
+    CHECK_RETHROW_VERBOSE(
+        generic_test_mov_r8_imm8(CODE(0xb0, 0x12), PIS_X86_CPUMODE_32_BIT, &AL, 0x12)
+    );
 
 cleanup:
     return err;
@@ -1121,17 +1049,14 @@ cleanup:
 DEFINE_TEST(test_mov_r8_16_bit_mode) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
-        CODE(0xb7, 0xe4),
-        PIS_X86_CPUMODE_16_BIT,
-        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, BH, PIS_OPERAND_CONST(0xe4, PIS_OPERAND_SIZE_1)))
-    ));
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
-        CODE(0xb0, 0x12),
-        PIS_X86_CPUMODE_16_BIT,
-        EXPECTED_INSNS(PIS_INSN2(PIS_OPCODE_MOVE, AL, PIS_OPERAND_CONST(0x12, PIS_OPERAND_SIZE_1)))
-    ));
+    CHECK_RETHROW_VERBOSE(
+        generic_test_mov_r8_imm8(CODE(0xb7, 0xe4), PIS_X86_CPUMODE_16_BIT, &BH, 0xe4)
+    );
+
+    CHECK_RETHROW_VERBOSE(
+        generic_test_mov_r8_imm8(CODE(0xb0, 0x12), PIS_X86_CPUMODE_16_BIT, &AL, 0x12)
+    );
 
 cleanup:
     return err;
@@ -1140,21 +1065,17 @@ cleanup:
 DEFINE_TEST(test_nop_modrm) {
     err_t err = SUCCESS;
 
-    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_8);
-    pis_operand_t sib_tmp = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_8);
-
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
+    pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+    CHECK_RETHROW_VERBOSE(emulate_insn(
+        &g_emu,
         CODE(0x66, 0x2e, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-
-        EXPECTED_INSNS(
-            PIS_INSN2(PIS_OPCODE_MOVE, addr_tmp, RAX),
-            PIS_INSN2(PIS_OPCODE_MOVE, sib_tmp, RAX),
-            PIS_INSN_UMUL2(sib_tmp, PIS_OPERAND_CONST(1, PIS_OPERAND_SIZE_8)),
-            PIS_INSN_ADD2(addr_tmp, sib_tmp),
-            PIS_INSN_ADD2(addr_tmp, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_8)),
-        )
+        0
     ));
+
+    // make sure that no memowry was written
+    CHECK(g_emu.mem_storage.used_slots_amount == 0);
+
 
 cleanup:
     return err;
