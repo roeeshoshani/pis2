@@ -1413,9 +1413,11 @@ cleanup:
     return err;
 }
 
-static err_t generic_test_add_flags(
-    u64 lhs, u64 rhs, bool parity_flag, bool carry_flag, bool overflow_flag
-) {
+static bool calc_parity_bit(u64 value) {
+    return !__builtin_parity(value & UINT8_MAX);
+}
+
+static err_t generic_test_add_flags(u64 lhs, u64 rhs, bool carry_flag, bool overflow_flag) {
     err_t err = SUCCESS;
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
@@ -1435,7 +1437,7 @@ static err_t generic_test_add_flags(
     // verify flags
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_ZF, sum == 0));
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_SF, ((i64) sum < 0)));
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_PF, parity_flag));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_PF, calc_parity_bit(sum)));
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_CF, carry_flag));
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_OF, overflow_flag));
 
@@ -1443,15 +1445,13 @@ cleanup:
     return err;
 }
 
-static err_t generic_test_add_flags_commutative(
-    u64 a, u64 b, bool parity_flag, bool carry_flag, bool overflow_flag
-) {
+static err_t generic_test_add_flags_commutative(u64 a, u64 b, bool carry_flag, bool overflow_flag) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW_VERBOSE(generic_test_add_flags(a, b, parity_flag, carry_flag, overflow_flag));
+    CHECK_RETHROW_VERBOSE(generic_test_add_flags(a, b, carry_flag, overflow_flag));
     if (a != b) {
         // try swapping the lhs and the rhs, it should behave the same.
-        CHECK_RETHROW_VERBOSE(generic_test_add_flags(b, a, parity_flag, carry_flag, overflow_flag));
+        CHECK_RETHROW_VERBOSE(generic_test_add_flags(b, a, carry_flag, overflow_flag));
     }
 
 cleanup:
@@ -1461,22 +1461,19 @@ cleanup:
 DEFINE_TEST(test_add_flags) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW_VERBOSE(generic_test_add_flags_commutative(1ULL, 1ULL, false, false, false));
+    CHECK_RETHROW_VERBOSE(generic_test_add_flags_commutative(1ULL, 1ULL, false, false));
 
-    CHECK_RETHROW_VERBOSE(generic_test_add_flags_commutative(UINT64_MAX, 1ULL, true, true, false));
+    CHECK_RETHROW_VERBOSE(generic_test_add_flags_commutative(UINT64_MAX, 1ULL, true, false));
 
-    CHECK_RETHROW_VERBOSE(generic_test_add_flags_commutative(1ULL, INT64_MAX, true, false, true));
+    CHECK_RETHROW_VERBOSE(generic_test_add_flags_commutative(1ULL, INT64_MAX, false, true));
 
-    CHECK_RETHROW_VERBOSE(generic_test_add_flags_commutative(INT64_MIN, INT64_MIN, true, true, true)
-    );
+    CHECK_RETHROW_VERBOSE(generic_test_add_flags_commutative(INT64_MIN, INT64_MIN, true, true));
 
 cleanup:
     return err;
 }
 
-static err_t generic_test_sub_flags(
-    u64 lhs, u64 rhs, bool parity_flag, bool carry_flag, bool overflow_flag
-) {
+static err_t generic_test_sub_flags(u64 lhs, u64 rhs, bool carry_flag, bool overflow_flag) {
     err_t err = SUCCESS;
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
@@ -1496,7 +1493,7 @@ static err_t generic_test_sub_flags(
     // verify flags
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_ZF, res == 0));
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_SF, ((i64) res < 0)));
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_PF, parity_flag));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_PF, calc_parity_bit(res)));
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_CF, carry_flag));
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_OF, overflow_flag));
 
@@ -1507,13 +1504,69 @@ cleanup:
 DEFINE_TEST(test_sub_flags) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW_VERBOSE(generic_test_sub_flags(1ULL, 1ULL, true, false, false));
+    CHECK_RETHROW_VERBOSE(generic_test_sub_flags(1ULL, 1ULL, false, false));
 
-    CHECK_RETHROW_VERBOSE(generic_test_sub_flags(0, 1ULL, true, true, false));
+    CHECK_RETHROW_VERBOSE(generic_test_sub_flags(0, 1ULL, true, false));
 
-    CHECK_RETHROW_VERBOSE(generic_test_sub_flags(INT64_MIN, 1ULL, true, false, true));
+    CHECK_RETHROW_VERBOSE(generic_test_sub_flags(INT64_MIN, 1ULL, false, true));
 
-    CHECK_RETHROW_VERBOSE(generic_test_sub_flags(INT64_MAX, INT64_MIN, true, true, true));
+    CHECK_RETHROW_VERBOSE(generic_test_sub_flags(INT64_MAX, INT64_MIN, true, true));
+
+cleanup:
+    return err;
+}
+
+static err_t generic_test_shl_flags(
+    u64 lhs,
+    u8 shift_amount,
+    bool orig_carry_flag,
+    bool orig_overflow_flag,
+    bool new_carry_flag,
+    bool new_overflow_flag
+) {
+    err_t err = SUCCESS;
+
+    pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RAX, lhs));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &FLAGS_CF, orig_carry_flag));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &FLAGS_OF, orig_overflow_flag));
+
+    u8 code[] = {0x48, 0xc1, 0xe0, shift_amount};
+    CHECK_RETHROW_VERBOSE(emulate_insn(
+        &g_emu,
+        (code_t) {
+            .code = code,
+            .len = ARRAY_SIZE(code),
+        },
+        PIS_X86_CPUMODE_64_BIT,
+        0
+    ));
+
+    // make sure that rax now contains the result
+    u64 res = lhs << shift_amount;
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, res));
+
+    // verify flags
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_ZF, res == 0));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_SF, ((i64) res < 0)));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_PF, calc_parity_bit(res)));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_CF, new_carry_flag));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_OF, new_overflow_flag));
+
+cleanup:
+    return err;
+}
+
+DEFINE_TEST(test_shl_flags) {
+    err_t err = SUCCESS;
+
+    // make sure carry flag is overwritten by last shifted bit
+    CHECK_RETHROW_VERBOSE(generic_test_shl_flags(~(1ULL << 62), 2, true, false, false, false));
+    CHECK_RETHROW_VERBOSE(generic_test_shl_flags(1ULL << 62, 2, false, false, true, false));
+
+    // make sure that the carry flag is not affected by previously shifted bits
+    CHECK_RETHROW_VERBOSE(generic_test_shl_flags(1ULL << 63, 2, true, false, false, false));
 
 cleanup:
     return err;
