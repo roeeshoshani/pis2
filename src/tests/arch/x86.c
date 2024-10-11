@@ -1551,11 +1551,12 @@ static err_t generic_test_shl_flags_full(
     ));
 
     // make sure that rax now contains the result
-    u64 res = lhs << shift_amount;
+    u64 masked_shift_amount = shift_amount & 0b111111;
+    u64 res = lhs << masked_shift_amount;
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, res));
 
     // verify flags
-    if (shift_amount != 0) {
+    if (masked_shift_amount != 0) {
         CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_ZF, res == 0));
         CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_SF, ((i64) res < 0)));
         CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_PF, calc_parity_bit(res)));
@@ -1621,6 +1622,10 @@ DEFINE_TEST(test_shl_flags) {
     // make sure that no flags are affected with a zero shift count
     CHECK_RETHROW_VERBOSE(generic_test_shl_flags(UINT64_MAX, 0, false, false, false, false));
     CHECK_RETHROW_VERBOSE(generic_test_shl_flags(UINT64_MAX, 0, true, true, true, true));
+
+    // make sure that no flags are affected with a shift count that results in zero after masking it
+    CHECK_RETHROW_VERBOSE(generic_test_shl_flags(UINT64_MAX, 1 << 7, false, false, false, false));
+    CHECK_RETHROW_VERBOSE(generic_test_shl_flags(UINT64_MAX, 1 << 7, true, true, true, true));
 
 cleanup:
     return err;
