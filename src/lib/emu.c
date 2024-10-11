@@ -271,6 +271,8 @@ DEFINE_BINARY_OPERATOR(add, +);
 DEFINE_BINARY_OPERATOR(sub, -);
 DEFINE_BINARY_OPERATOR(xor, ^);
 DEFINE_BINARY_OPERATOR(and, &);
+DEFINE_BINARY_OPERATOR(or, |);
+DEFINE_BINARY_OPERATOR(shl, <<);
 DEFINE_BINARY_OPERATOR(shr, >>);
 DEFINE_BINARY_OPERATOR(mul, *);
 DEFINE_SIGNED_BINARY_OPERATOR(mul, *);
@@ -305,6 +307,12 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         break;
     case PIS_OPCODE_AND:
         CHECK_RETHROW(run_binary_operator(emu, insn, binary_operator_and));
+        break;
+    case PIS_OPCODE_OR:
+        CHECK_RETHROW(run_binary_operator(emu, insn, binary_operator_or));
+        break;
+    case PIS_OPCODE_SHIFT_LEFT:
+        CHECK_RETHROW(run_binary_operator(emu, insn, binary_operator_shl));
         break;
     case PIS_OPCODE_STORE: {
         u64 value = 0;

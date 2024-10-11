@@ -1,3 +1,4 @@
 BITS 16
-db 0xe8, 0x09, 0x00
+movzx  ax,BYTE  [bx]
+movzx  eax,BYTE [bx]
 

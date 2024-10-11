@@ -118,6 +118,7 @@
     _(PIS_OPCODE_SUB, )                                                                            \
     _(PIS_OPCODE_XOR, )                                                                            \
     _(PIS_OPCODE_AND, )                                                                            \
+    _(PIS_OPCODE_OR, )                                                                             \
     _(PIS_OPCODE_STORE, )                                                                          \
     _(PIS_OPCODE_LOAD, )                                                                           \
     _(PIS_OPCODE_UNSIGNED_CARRY, )                                                                 \
@@ -127,6 +128,7 @@
     _(PIS_OPCODE_EQUALS, )                                                                         \
     _(PIS_OPCODE_NOT, )                                                                            \
     _(PIS_OPCODE_SHIFT_RIGHT, )                                                                    \
+    _(PIS_OPCODE_SHIFT_LEFT, )                                                                    \
     _(PIS_OPCODE_UNSIGNED_LESS_THAN, )                                                             \
     _(PIS_OPCODE_SIGNED_BORROW, )                                                                  \
     _(PIS_OPCODE_JMP_COND, )                                                                       \
