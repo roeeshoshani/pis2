@@ -112,7 +112,12 @@ static err_t emu_assert_operand_equals(
     u64 actual_value = 0;
     CHECK_RETHROW_VERBOSE(pis_emu_read_operand(emu, operand, &actual_value));
 
-    CHECK(actual_value == desired_value);
+    CHECK_TRACE(
+        actual_value == desired_value,
+        "expected value %lx, instead got %lx",
+        desired_value,
+        actual_value
+    );
 
 cleanup:
     return err;
@@ -1455,10 +1460,38 @@ cleanup:
     return err;
 }
 
+static err_t generic_test_add_flags_both_orders(
+    u64 a, u64 b, bool parity_flag, bool carry_flag, bool overflow_flag
+) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(generic_test_add_flags(a, b, parity_flag, carry_flag, overflow_flag));
+    if (a != b) {
+        // try swapping the lhs and the rhs, it should behave the same.
+        CHECK_RETHROW_VERBOSE(generic_test_add_flags(b, a, parity_flag, carry_flag, overflow_flag));
+    }
+
+cleanup:
+    return err;
+}
+
 DEFINE_TEST(test_add_flags) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW_VERBOSE(generic_test_add_flags(UINT64_MAX, 1ULL, true, true, false));
+    CHECK_RETHROW_VERBOSE(generic_test_add_flags_both_orders(UINT64_MAX, 1ULL, true, true, false));
+
+    CHECK_RETHROW_VERBOSE(generic_test_add_flags_both_orders(1ULL, 1ULL, false, false, false));
+
+    CHECK_RETHROW_VERBOSE(generic_test_add_flags_both_orders(1ULL, INT64_MAX, true, false, true));
+
+    CHECK_RETHROW_VERBOSE(generic_test_add_flags_both_orders(1ULL, INT64_MAX, true, false, true));
+
+    CHECK_RETHROW_VERBOSE(
+        generic_test_add_flags_both_orders(INT64_MAX, INT64_MAX, false, false, true)
+    );
+
+    CHECK_RETHROW_VERBOSE(generic_test_add_flags_both_orders(INT64_MIN, INT64_MIN, true, true, true)
+    );
 
 cleanup:
     return err;
