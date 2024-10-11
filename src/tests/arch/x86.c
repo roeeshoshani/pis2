@@ -1401,7 +1401,7 @@ DEFINE_TEST(test_push_reg_32_bit_mode) {
     );
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg(&g_emu, CODE(0x66, 0x50), PIS_X86_CPUMODE_32_BIT, &ESP, &BP)
+        generic_test_push_reg(&g_emu, CODE(0x66, 0x55), PIS_X86_CPUMODE_32_BIT, &ESP, &BP)
     );
 
 cleanup:
@@ -1413,11 +1413,11 @@ DEFINE_TEST(test_push_reg_16_bit_mode) {
 
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg(&g_emu, CODE(0x50), PIS_X86_CPUMODE_16_BIT, &ESP, &AX)
+        generic_test_push_reg(&g_emu, CODE(0x50), PIS_X86_CPUMODE_16_BIT, &SP, &AX)
     );
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg(&g_emu, CODE(0x66, 0x50), PIS_X86_CPUMODE_16_BIT, &ESP, &EAX)
+        generic_test_push_reg(&g_emu, CODE(0x66, 0x50), PIS_X86_CPUMODE_16_BIT, &SP, &EAX)
     );
 
 cleanup:
