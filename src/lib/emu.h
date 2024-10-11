@@ -8,6 +8,8 @@ typedef struct {
     pis_emu_storage_t storage;
     pis_emu_mem_storage_t mem_storage;
     pis_endianness_t endianness;
+    bool did_jump;
+    u64 jump_addr;
 } pis_emu_t;
 
 void pis_emu_init(pis_emu_t* emu, pis_endianness_t endianness);

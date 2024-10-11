@@ -762,8 +762,6 @@ cleanup:
 
 DEFINE_TEST(test_modrm_16_bit_mode) {
     err_t err = SUCCESS;
-    pis_operand_t addr32_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_4);
-    pis_operand_t sib_tmp = PIS_OPERAND_TMP(4, PIS_OPERAND_SIZE_4);
 
     CHECK_RETHROW_VERBOSE(
         generic_test_mov_reg_reg(CODE(0x89, 0xe5), PIS_X86_CPUMODE_16_BIT, &BP, &SP)
@@ -898,51 +896,81 @@ cleanup:
     return err;
 }
 
+static err_t generic_test_jmp(
+    code_t code, pis_x86_cpumode_t cpumode, u64 addr, u64 expected_jump_target_addr
+) {
+    err_t err = SUCCESS;
+
+    pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+    CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, code, cpumode, addr));
+    CHECK(g_emu.did_jump);
+    CHECK(g_emu.jump_addr == expected_jump_target_addr);
+cleanup:
+    return err;
+}
+
+static err_t generic_test_call(
+    code_t code,
+    pis_x86_cpumode_t cpumode,
+    const pis_operand_t* sp,
+    pis_operand_size_t pushed_value_size,
+    u64 addr,
+    u64 expected_jump_target_addr
+) {
+    err_t err = SUCCESS;
+
+    pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+
+    u64 sp_value = MAGIC64_1 & pis_operand_size_max_unsigned_value(sp->size);
+
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, sp, sp_value));
+
+    CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, code, cpumode, addr));
+
+    u64 new_sp = sp_value - pis_operand_size_to_bytes(pushed_value_size);
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, sp, new_sp));
+
+    u64 pushed_value = (addr + code.len) & pis_operand_size_max_unsigned_value(pushed_value_size);
+    CHECK_RETHROW_VERBOSE(
+        emu_assert_mem_value_equals(&g_emu, new_sp, pushed_value_size, pushed_value)
+    );
+
+    CHECK(g_emu.did_jump);
+    CHECK(g_emu.jump_addr == expected_jump_target_addr);
+cleanup:
+    return err;
+}
+
 DEFINE_TEST(test_rel_operand_16_bit_mode) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift_at_addr(
-        CODE(0xe9, 0x09, 0x00),
-        PIS_X86_CPUMODE_16_BIT,
-        EXPECTED_INSNS(PIS_INSN1(PIS_OPCODE_JMP, PIS_OPERAND_RAM(7, PIS_OPERAND_SIZE_1))),
-        (0xffff + 1) - 3 - 2
-    ));
+    CHECK_RETHROW_VERBOSE(
+        generic_test_jmp(CODE(0xe9, 0x09, 0x00), PIS_X86_CPUMODE_16_BIT, (0xffff + 1) - 3 - 2, 7)
+    );
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift_at_addr(
+    CHECK_RETHROW_VERBOSE(generic_test_jmp(
         CODE(0x66, 0xe9, 0x09, 0x00, 0x00, 0x00),
         PIS_X86_CPUMODE_16_BIT,
-        EXPECTED_INSNS(PIS_INSN1(PIS_OPCODE_JMP, PIS_OPERAND_RAM(7, PIS_OPERAND_SIZE_1))),
-        (0xffffffffULL + 1) - 6 - 2
+        (0xffffffffULL + 1) - 6 - 2,
+        7
     ));
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift_at_addr(
+    CHECK_RETHROW_VERBOSE(generic_test_call(
         CODE(0xe8, 0x09, 0x00),
         PIS_X86_CPUMODE_16_BIT,
-        EXPECTED_INSNS(
-            PIS_INSN_ADD2(SP, PIS_OPERAND_CONST_NEG(2, PIS_OPERAND_SIZE_2)),
-            PIS_INSN2(
-                PIS_OPCODE_STORE,
-                SP,
-                PIS_OPERAND_CONST((0xffff + 1) - 2, PIS_OPERAND_SIZE_2)
-            ),
-            PIS_INSN1(PIS_OPCODE_JMP, PIS_OPERAND_RAM(7, PIS_OPERAND_SIZE_1))
-        ),
-        (0xffff + 1) - 3 - 2
+        &SP,
+        PIS_OPERAND_SIZE_2,
+        (0xffff + 1) - 3 - 2,
+        7
     ));
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift_at_addr(
+    CHECK_RETHROW_VERBOSE(generic_test_call(
         CODE(0x66, 0xe8, 0x09, 0x00, 0x00, 0x00),
         PIS_X86_CPUMODE_16_BIT,
-        EXPECTED_INSNS(
-            PIS_INSN_ADD2(SP, PIS_OPERAND_CONST_NEG(4, PIS_OPERAND_SIZE_2)),
-            PIS_INSN2(
-                PIS_OPCODE_STORE,
-                SP,
-                PIS_OPERAND_CONST((0xffffffffULL + 1) - 2, PIS_OPERAND_SIZE_4)
-            ),
-            PIS_INSN1(PIS_OPCODE_JMP, PIS_OPERAND_RAM(7, PIS_OPERAND_SIZE_1))
-        ),
-        (0xffffffffULL + 1) - 6 - 2
+        &SP,
+        PIS_OPERAND_SIZE_4,
+        (0xffffffffULL + 1) - 6 - 2,
+        7
     ));
 
 cleanup:
@@ -1298,16 +1326,16 @@ static err_t generic_test_push(
     CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, code, cpumode, 0));
 
     // check the new sp value
-    u64 new_sp = 0;
-    CHECK_RETHROW_VERBOSE(pis_emu_read_operand(emu, sp, &new_sp));
-    CHECK(new_sp == orig_sp - pis_operand_size_to_bytes(expected_pushed_value_size));
+    u64 new_sp = orig_sp - pis_operand_size_to_bytes(expected_pushed_value_size);
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(emu, sp, new_sp));
 
     // check the written memory value
-    u64 written_mem_value = 0;
-    CHECK_RETHROW_VERBOSE(
-        pis_emu_read_mem_value(&g_emu, new_sp, expected_pushed_value_size, &written_mem_value)
-    );
-    CHECK(written_mem_value == expected_pushed_value);
+    CHECK_RETHROW_VERBOSE(emu_assert_mem_value_equals(
+        &g_emu,
+        new_sp,
+        expected_pushed_value_size,
+        expected_pushed_value
+    ));
 
 cleanup:
     return err;
@@ -1332,9 +1360,7 @@ static err_t generic_test_push_reg(
         generic_test_push(&g_emu, code, cpumode, sp, pushed_value, pushed_reg->size)
     );
 
-    u64 reg_value_after_push = 0;
-    CHECK_RETHROW_VERBOSE(pis_emu_read_operand(emu, pushed_reg, &reg_value_after_push));
-    CHECK(reg_value_after_push == pushed_value);
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(emu, pushed_reg, pushed_value));
 
 cleanup:
     return err;

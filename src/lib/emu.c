@@ -522,7 +522,24 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         UNREACHABLE();
         break;
     case PIS_OPCODE_JMP:
-        UNREACHABLE();
+        CHECK_CODE(insn->operands_amount == 1, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+        const pis_operand_t* jump_target = &insn->operands[0];
+
+        // determine the jump target address
+        u64 addr = 0;
+        switch (jump_target->addr.space) {
+        case PIS_SPACE_RAM:
+            // jump to a fixed ram address
+            addr = jump_target->addr.offset;
+            break;
+        default:
+            // symbolic address, evaluate it
+            CHECK_RETHROW(pis_emu_read_operand(emu, jump_target, &addr));
+        }
+
+        emu->did_jump = true;
+        emu->jump_addr = addr;
         break;
     case PIS_OPCODE_SIGN_EXTEND: {
         CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
