@@ -1169,6 +1169,26 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
+    } else if (first_opcode_byte == 0xd3) {
+        // xxx r/m, cl
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+        pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+        CHECK_RETHROW(modrm_operand_read(ctx, &rm_tmp, &modrm_operands.rm_operand));
+
+        pis_operand_t cl_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, cl_zero_extended, CL));
+
+        if (modrm_operands.modrm.reg == 4) {
+            // shl/sal r/m, cl
+            pis_operand_t res_tmp = {};
+            CHECK_RETHROW(do_shl(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
+
+            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+        } else {
+            CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
+        }
     } else if (first_opcode_byte == 0x0f) {
         // opcode is longer than 1 byte
         u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
