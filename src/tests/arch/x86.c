@@ -1066,6 +1066,7 @@ DEFINE_TEST(test_nop_modrm) {
     err_t err = SUCCESS;
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RAX, 0));
     CHECK_RETHROW_VERBOSE(emulate_insn(
         &g_emu,
         CODE(0x66, 0x2e, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00),
@@ -1081,39 +1082,125 @@ cleanup:
     return err;
 }
 
+static err_t generic_test_mov_sign_extend_reg_modrm(
+    code_t code,
+    pis_x86_cpumode_t cpumode,
+    const pis_operand_t* dst_reg,
+    const pis_operand_t* addr_reg,
+    u64 mem_value,
+    pis_operand_size_t mem_value_size
+) {
+    err_t err = SUCCESS;
+
+    CHECK(dst_reg->size >= mem_value_size);
+
+    pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+
+    u64 addr = MAGIC64_1 & pis_operand_size_max_unsigned_value(addr_reg->size);
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, addr_reg, addr));
+
+    CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(&g_emu, addr, mem_value, mem_value_size));
+
+    CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, code, cpumode, 0));
+
+    u32 mem_value_size_in_bits = pis_operand_size_to_bits(mem_value_size);
+    u64 sign_bit = mem_value >> (mem_value_size_in_bits - 1);
+
+    u64 sign_extended_mem_value = mem_value;
+    if (sign_bit) {
+        // value is signed, sign extend it
+        u64 sign_extension_bits =
+            ((pis_operand_size_max_unsigned_value(dst_reg->size) >> mem_value_size_in_bits)
+             << mem_value_size_in_bits);
+        sign_extended_mem_value |= sign_extension_bits;
+    }
+
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, dst_reg, sign_extended_mem_value));
+
+cleanup:
+    return err;
+}
+
 DEFINE_TEST(test_movsxd) {
     err_t err = SUCCESS;
 
-    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_8);
-    pis_operand_t tmp32 = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_4);
-
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
+    CHECK_RETHROW_VERBOSE(generic_test_mov_sign_extend_reg_modrm(
         CODE(0x48, 0x63, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-        EXPECTED_INSNS(
-            PIS_INSN2(PIS_OPCODE_MOVE, addr_tmp, RAX),
-            PIS_INSN2(PIS_OPCODE_LOAD, tmp32, addr_tmp),
-            PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, RAX, tmp32)
-        )
+        &RAX,
+        &RAX,
+        0x12345678,
+        PIS_OPERAND_SIZE_4
+    ));
+    CHECK_RETHROW_VERBOSE(generic_test_mov_sign_extend_reg_modrm(
+        CODE(0x48, 0x63, 0x00),
+        PIS_X86_CPUMODE_64_BIT,
+        &RAX,
+        &RAX,
+        0x87654321,
+        PIS_OPERAND_SIZE_4
     ));
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
+    CHECK_RETHROW_VERBOSE(generic_test_mov_sign_extend_reg_modrm(
         CODE(0x63, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-        EXPECTED_INSNS(
-            PIS_INSN2(PIS_OPCODE_MOVE, addr_tmp, RAX),
-            PIS_INSN2(PIS_OPCODE_LOAD, EAX, addr_tmp)
-        )
+        &EAX,
+        &RAX,
+        0x12345678,
+        PIS_OPERAND_SIZE_4
+    ));
+    CHECK_RETHROW_VERBOSE(generic_test_mov_sign_extend_reg_modrm(
+        CODE(0x63, 0x00),
+        PIS_X86_CPUMODE_64_BIT,
+        &EAX,
+        &RAX,
+        0x87654321,
+        PIS_OPERAND_SIZE_4
     ));
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
+    CHECK_RETHROW_VERBOSE(generic_test_mov_sign_extend_reg_modrm(
         CODE(0x66, 0x63, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-        EXPECTED_INSNS(
-            PIS_INSN2(PIS_OPCODE_MOVE, addr_tmp, RAX),
-            PIS_INSN2(PIS_OPCODE_LOAD, AX, addr_tmp)
-        )
+        &AX,
+        &RAX,
+        0x1234,
+        PIS_OPERAND_SIZE_2
     ));
+    CHECK_RETHROW_VERBOSE(generic_test_mov_sign_extend_reg_modrm(
+        CODE(0x66, 0x63, 0x00),
+        PIS_X86_CPUMODE_64_BIT,
+        &AX,
+        &RAX,
+        0x8765,
+        PIS_OPERAND_SIZE_2
+    ));
+
+cleanup:
+    return err;
+}
+
+static err_t generic_test_mov_zero_extend_reg_modrm(
+    code_t code,
+    pis_x86_cpumode_t cpumode,
+    const pis_operand_t* dst_reg,
+    const pis_operand_t* addr_reg,
+    pis_operand_size_t mem_value_size
+) {
+    err_t err = SUCCESS;
+
+    CHECK(dst_reg->size >= mem_value_size);
+
+    pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+
+    u64 addr = MAGIC64_1 & pis_operand_size_max_unsigned_value(addr_reg->size);
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, addr_reg, addr));
+
+    u64 mem_value = MAGIC64_2 & pis_operand_size_max_unsigned_value(mem_value_size);
+    CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(&g_emu, addr, mem_value, mem_value_size));
+
+    CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, code, cpumode, 0));
+
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, dst_reg, mem_value));
 
 cleanup:
     return err;
@@ -1122,29 +1209,20 @@ cleanup:
 DEFINE_TEST(test_movzx_16_bit_mode) {
     err_t err = SUCCESS;
 
-    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_2);
-    pis_operand_t tmp8 = PIS_OPERAND_TMP(2, PIS_OPERAND_SIZE_1);
-
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
-        CODE(0x0f, 0xb6, 0x00),
+    CHECK_RETHROW_VERBOSE(generic_test_mov_zero_extend_reg_modrm(
+        CODE(0x0f, 0xb6, 0x07),
         PIS_X86_CPUMODE_16_BIT,
-        EXPECTED_INSNS(
-            PIS_INSN2(PIS_OPCODE_MOVE, addr_tmp, BX),
-            PIS_INSN_ADD2(addr_tmp, SI),
-            PIS_INSN2(PIS_OPCODE_LOAD, tmp8, addr_tmp),
-            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, AX, tmp8)
-        )
+        &AX,
+        &BX,
+        PIS_OPERAND_SIZE_1
     ));
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
-        CODE(0x66, 0x0f, 0xb6, 0x00),
+    CHECK_RETHROW_VERBOSE(generic_test_mov_zero_extend_reg_modrm(
+        CODE(0x66, 0x0f, 0xb6, 0x07),
         PIS_X86_CPUMODE_16_BIT,
-        EXPECTED_INSNS(
-            PIS_INSN2(PIS_OPCODE_MOVE, addr_tmp, BX),
-            PIS_INSN_ADD2(addr_tmp, SI),
-            PIS_INSN2(PIS_OPCODE_LOAD, tmp8, addr_tmp),
-            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, EAX, tmp8)
-        )
+        &EAX,
+        &BX,
+        PIS_OPERAND_SIZE_1
     ));
 
 cleanup:
@@ -1154,27 +1232,20 @@ cleanup:
 DEFINE_TEST(test_movzx_32_bit_mode) {
     err_t err = SUCCESS;
 
-    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_4);
-    pis_operand_t tmp8 = PIS_OPERAND_TMP(4, PIS_OPERAND_SIZE_1);
-
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
+    CHECK_RETHROW_VERBOSE(generic_test_mov_zero_extend_reg_modrm(
         CODE(0x0f, 0xb6, 0x00),
         PIS_X86_CPUMODE_32_BIT,
-        EXPECTED_INSNS(
-            PIS_INSN2(PIS_OPCODE_MOVE, addr_tmp, EAX),
-            PIS_INSN2(PIS_OPCODE_LOAD, tmp8, addr_tmp),
-            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, EAX, tmp8)
-        )
+        &EAX,
+        &EAX,
+        PIS_OPERAND_SIZE_1
     ));
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
+    CHECK_RETHROW_VERBOSE(generic_test_mov_zero_extend_reg_modrm(
         CODE(0x66, 0x0f, 0xb6, 0x00),
         PIS_X86_CPUMODE_32_BIT,
-        EXPECTED_INSNS(
-            PIS_INSN2(PIS_OPCODE_MOVE, addr_tmp, EAX),
-            PIS_INSN2(PIS_OPCODE_LOAD, tmp8, addr_tmp),
-            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, AX, tmp8)
-        )
+        &AX,
+        &EAX,
+        PIS_OPERAND_SIZE_1
     ));
 
 cleanup:
@@ -1184,37 +1255,28 @@ cleanup:
 DEFINE_TEST(test_movzx_64_bit_mode) {
     err_t err = SUCCESS;
 
-    pis_operand_t addr_tmp = PIS_OPERAND_TMP(0, PIS_OPERAND_SIZE_8);
-    pis_operand_t tmp8 = PIS_OPERAND_TMP(8, PIS_OPERAND_SIZE_1);
-
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
+    CHECK_RETHROW_VERBOSE(generic_test_mov_zero_extend_reg_modrm(
         CODE(0x0f, 0xb6, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-        EXPECTED_INSNS(
-            PIS_INSN2(PIS_OPCODE_MOVE, addr_tmp, RAX),
-            PIS_INSN2(PIS_OPCODE_LOAD, tmp8, addr_tmp),
-            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, EAX, tmp8)
-        )
+        &EAX,
+        &RAX,
+        PIS_OPERAND_SIZE_1
     ));
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
+    CHECK_RETHROW_VERBOSE(generic_test_mov_zero_extend_reg_modrm(
         CODE(0x66, 0x0f, 0xb6, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-        EXPECTED_INSNS(
-            PIS_INSN2(PIS_OPCODE_MOVE, addr_tmp, RAX),
-            PIS_INSN2(PIS_OPCODE_LOAD, tmp8, addr_tmp),
-            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, AX, tmp8)
-        )
+        &AX,
+        &RAX,
+        PIS_OPERAND_SIZE_1
     ));
 
-    CHECK_RETHROW_VERBOSE(generic_test_lift(
+    CHECK_RETHROW_VERBOSE(generic_test_mov_zero_extend_reg_modrm(
         CODE(0x48, 0x0f, 0xb6, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-        EXPECTED_INSNS(
-            PIS_INSN2(PIS_OPCODE_MOVE, addr_tmp, RAX),
-            PIS_INSN2(PIS_OPCODE_LOAD, tmp8, addr_tmp),
-            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, RAX, tmp8)
-        )
+        &RAX,
+        &RAX,
+        PIS_OPERAND_SIZE_1
     ));
 
 cleanup:
