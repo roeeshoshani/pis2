@@ -677,7 +677,7 @@ static err_t shl_calc_overflow_flag(
     CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_1, &new_overflow_flag_value, &FLAGS_OF, &result)
     );
 
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_CF, result));
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, result));
 
 cleanup:
     return err;
