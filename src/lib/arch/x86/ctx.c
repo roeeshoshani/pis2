@@ -74,16 +74,39 @@ static pis_operand_size_t
     }
 }
 
+
+static err_t calc_parity_flag_into(
+    const post_prefixes_ctx_t* ctx, const pis_operand_t* value, const pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    pis_operand_t low_byte_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, low_byte_tmp, *value));
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_PARITY, *result, low_byte_tmp));
+
+cleanup:
+    return err;
+}
+
 static err_t
     calc_parity_flag(const post_prefixes_ctx_t* ctx, const pis_operand_t* calculation_result) {
     err_t err = SUCCESS;
 
-    pis_operand_t low_byte_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    CHECK_RETHROW(calc_parity_flag_into(ctx, calculation_result, &FLAGS_PF));
+
+cleanup:
+    return err;
+}
+
+static err_t calc_zero_flag_into(
+    const post_prefixes_ctx_t* ctx, const pis_operand_t* value, const pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, low_byte_tmp, *calculation_result)
+        PIS_INSN3(PIS_OPCODE_EQUALS, *result, *value, PIS_OPERAND_CONST(0, value->size))
     );
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_PARITY, FLAGS_PF, low_byte_tmp));
 
 cleanup:
     return err;
@@ -93,15 +116,7 @@ static err_t
     calc_zero_flag(const post_prefixes_ctx_t* ctx, const pis_operand_t* calculation_result) {
     err_t err = SUCCESS;
 
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN3(
-            PIS_OPCODE_EQUALS,
-            FLAGS_ZF,
-            *calculation_result,
-            PIS_OPERAND_CONST(0, calculation_result->size)
-        )
-    );
+    CHECK_RETHROW(calc_zero_flag_into(ctx, calculation_result, &FLAGS_ZF));
 
 cleanup:
     return err;
@@ -126,7 +141,7 @@ cleanup:
     return err;
 }
 
-static err_t extract_mos_significant_bit(
+static err_t extract_most_significant_bit(
     const post_prefixes_ctx_t* ctx, const pis_operand_t* value, const pis_operand_t* result
 ) {
     err_t err = SUCCESS;
@@ -152,7 +167,7 @@ static err_t
     calc_sign_flag(const post_prefixes_ctx_t* ctx, const pis_operand_t* calculation_result) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(extract_mos_significant_bit(ctx, calculation_result, &FLAGS_SF));
+    CHECK_RETHROW(extract_most_significant_bit(ctx, calculation_result, &FLAGS_SF));
 
 cleanup:
     return err;
@@ -578,7 +593,7 @@ static err_t cond_expr_ternary(
     const pis_operand_t* cond,
     const pis_operand_t* then_value,
     const pis_operand_t* else_value,
-    pis_operand_t* result
+    const pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -596,10 +611,7 @@ static err_t cond_expr_ternary(
     pis_operand_t false_case = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, false_case, not_cond, *else_value));
 
-    pis_operand_t final_expr = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, final_expr, true_case, false_case));
-
-    *result = final_expr;
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, *result, true_case, false_case));
 
 cleanup:
     return err;
@@ -627,7 +639,8 @@ static err_t shl_calc_carry_flag(
         PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, shifted_by_count_minus_1, *to_shift, count_minus_1)
     );
     pis_operand_t last_extracted_bit = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    CHECK_RETHROW(extract_mos_significant_bit(ctx, &shifted_by_count_minus_1, &last_extracted_bit));
+    CHECK_RETHROW(extract_most_significant_bit(ctx, &shifted_by_count_minus_1, &last_extracted_bit)
+    );
 
     // now, we only want to set the carry flag if the count is non-zero, otherwise we want to use
     // the original CF value.
@@ -637,10 +650,7 @@ static err_t shl_calc_carry_flag(
         PIS_INSN3(PIS_OPCODE_EQUALS, is_count_0, *count, PIS_OPERAND_CONST(0, operand_size))
     );
 
-    pis_operand_t result = {};
-    CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_0, &FLAGS_CF, &last_extracted_bit, &result));
-
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_CF, result));
+    CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_0, &FLAGS_CF, &last_extracted_bit, &FLAGS_CF));
 
 cleanup:
     return err;
@@ -660,7 +670,7 @@ static err_t shl_calc_overflow_flag(
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, shifted, *to_shift, *count));
 
     pis_operand_t msb = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    CHECK_RETHROW(extract_mos_significant_bit(ctx, &shifted, &msb));
+    CHECK_RETHROW(extract_most_significant_bit(ctx, &shifted, &msb));
 
     pis_operand_t new_overflow_flag_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_XOR, new_overflow_flag_value, msb, FLAGS_CF));
@@ -673,11 +683,40 @@ static err_t shl_calc_overflow_flag(
         PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_CONST(1, operand_size))
     );
 
-    pis_operand_t result = {};
-    CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_1, &new_overflow_flag_value, &FLAGS_OF, &result)
+    CHECK_RETHROW(
+        cond_expr_ternary(ctx, &is_count_1, &new_overflow_flag_value, &FLAGS_OF, &FLAGS_OF)
     );
 
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, result));
+cleanup:
+    return err;
+}
+
+static err_t shl_calc_parity_zero_sign_flags(
+    const post_prefixes_ctx_t* ctx, const pis_operand_t* count, const pis_operand_t* shift_result
+) {
+    err_t err = SUCCESS;
+
+    CHECK(count->size == shift_result->size);
+    pis_operand_size_t operand_size = shift_result->size;
+
+    // only modify the flags if the count is non-zero
+    pis_operand_t is_count_0 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_0, *count, PIS_OPERAND_CONST(0, operand_size))
+    );
+
+    pis_operand_t new_pf = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    CHECK_RETHROW(calc_parity_flag_into(ctx, shift_result, &new_pf));
+    CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_0, &FLAGS_PF, &new_pf, &FLAGS_PF));
+
+    pis_operand_t new_zf = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    CHECK_RETHROW(calc_zero_flag_into(ctx, shift_result, &new_zf));
+    CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_0, &FLAGS_ZF, &new_zf, &FLAGS_ZF));
+
+    pis_operand_t new_sf = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    CHECK_RETHROW(extract_most_significant_bit(ctx, shift_result, &new_sf));
+    CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_0, &FLAGS_SF, &new_sf, &FLAGS_SF));
 
 cleanup:
     return err;
@@ -714,7 +753,7 @@ static err_t do_shl(
     // perform the actual shift
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, res_tmp, *a, count));
 
-    CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &res_tmp));
+    CHECK_RETHROW(shl_calc_parity_zero_sign_flags(ctx, &count, &res_tmp));
 
     *result = res_tmp;
 
