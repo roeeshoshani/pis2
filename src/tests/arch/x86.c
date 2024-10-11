@@ -7,6 +7,7 @@
 #include "pis.h"
 #include "utils.h"
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 
 
@@ -1419,6 +1420,45 @@ DEFINE_TEST(test_push_reg_16_bit_mode) {
     CHECK_RETHROW_VERBOSE(
         generic_test_push_reg(&g_emu, CODE(0x66, 0x50), PIS_X86_CPUMODE_16_BIT, &SP, &EAX)
     );
+
+cleanup:
+    return err;
+}
+
+static err_t generic_test_add_flags(
+    u64 lhs, u64 rhs, bool parity_flag, bool carry_flag, bool overflow_flag
+) {
+    err_t err = SUCCESS;
+
+    pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RAX, lhs));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RBX, rhs));
+
+    CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, CODE(0x48, 0x01, 0xd8), PIS_X86_CPUMODE_64_BIT, 0));
+
+    // make sure that rax now contains the sum
+    u64 sum = lhs + rhs;
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, sum));
+
+    // make sure that rbx is unchanged
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RBX, rhs));
+
+    // verify flags
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_ZF, sum == 0));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_SF, ((i64) sum < 0)));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_PF, parity_flag));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_CF, carry_flag));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_OF, overflow_flag));
+
+cleanup:
+    return err;
+}
+
+DEFINE_TEST(test_add_flags) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(generic_test_add_flags(UINT64_MAX, 1ULL, true, true, false));
 
 cleanup:
     return err;

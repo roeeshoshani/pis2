@@ -211,10 +211,15 @@ static err_t run_binary_operator(pis_emu_t* emu, const pis_insn_t* insn, binary_
     CHECK_CODE(insn->operands_amount == 3, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
 
     // make sure that all operands are of the same size
-    CHECK_CODE(
+    CHECK_TRACE_CODE(
         insn->operands[0].size == insn->operands[1].size &&
             insn->operands[1].size == insn->operands[2].size,
-        PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        PIS_ERR_EMU_OPERAND_SIZE_MISMATCH,
+        "operand size mismatch in binary operator %s, operand sizes: %u %u %u",
+        pis_opcode_to_str(insn->opcode),
+        insn->operands[0].size,
+        insn->operands[1].size,
+        insn->operands[2].size
     );
 
     u64 lhs = 0;

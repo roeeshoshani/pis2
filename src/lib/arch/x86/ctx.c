@@ -113,15 +113,18 @@ static err_t
 
     u64 shift_amount = pis_operand_size_to_bits(calculation_result->size) - 1;
 
+    pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, calculation_result->size);
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
         PIS_INSN3(
             PIS_OPCODE_SHIFT_RIGHT,
-            FLAGS_SF,
+            tmp,
             *calculation_result,
-            PIS_OPERAND_CONST(shift_amount, PIS_OPERAND_SIZE_1)
+            PIS_OPERAND_CONST(shift_amount, calculation_result->size)
         )
     );
+
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, FLAGS_SF, tmp));
 
 cleanup:
     return err;
