@@ -1613,12 +1613,6 @@ cleanup:
 DEFINE_TEST(test_shl_flags) {
     err_t err = SUCCESS;
 
-    // make sure that the carry flag is overwritten by last shifted bit
-    CHECK_RETHROW_VERBOSE(generic_test_shl_flags(~(1ULL << 62), 2, true, false, false, false));
-    CHECK_RETHROW_VERBOSE(generic_test_shl_flags(~(1ULL << 62), 2, false, false, false, false));
-    CHECK_RETHROW_VERBOSE(generic_test_shl_flags(1ULL << 62, 2, false, false, true, false));
-    CHECK_RETHROW_VERBOSE(generic_test_shl_flags(1ULL << 62, 2, true, false, true, false));
-
     // make sure that no flags are affected with a zero shift count
     CHECK_RETHROW_VERBOSE(generic_test_shl_flags(UINT64_MAX, 0, false, false, false, false));
     CHECK_RETHROW_VERBOSE(generic_test_shl_flags(UINT64_MAX, 0, true, true, true, true));
@@ -1626,6 +1620,25 @@ DEFINE_TEST(test_shl_flags) {
     // make sure that no flags are affected with a shift count that results in zero after masking it
     CHECK_RETHROW_VERBOSE(generic_test_shl_flags(UINT64_MAX, 1 << 7, false, false, false, false));
     CHECK_RETHROW_VERBOSE(generic_test_shl_flags(UINT64_MAX, 1 << 7, true, true, true, true));
+
+    // make sure that the carry flag is overwritten by last shifted bit
+    CHECK_RETHROW_VERBOSE(generic_test_shl_flags(~(1ULL << 62), 2, true, false, false, false));
+    CHECK_RETHROW_VERBOSE(generic_test_shl_flags(~(1ULL << 62), 2, false, false, false, false));
+    CHECK_RETHROW_VERBOSE(generic_test_shl_flags(1ULL << 62, 2, false, false, true, false));
+    CHECK_RETHROW_VERBOSE(generic_test_shl_flags(1ULL << 62, 2, true, false, true, false));
+    CHECK_RETHROW_VERBOSE(generic_test_shl_flags(1ULL << 1, 63, true, false, true, false));
+
+    // make sure that the overflow flag is set accordingly
+    CHECK_RETHROW_VERBOSE(
+        generic_test_shl_flags((1ULL << 63) | (1ULL << 62), 1, false, true, true, false)
+    );
+    CHECK_RETHROW_VERBOSE(generic_test_shl_flags(1ULL << 62, 1, true, false, false, true));
+
+    // make sure that the overflow flag is only set if the shift count is 1
+    CHECK_RETHROW_VERBOSE(
+        generic_test_shl_flags((1ULL << 62) | (1ULL << 61), 2, false, true, true, true)
+    );
+    CHECK_RETHROW_VERBOSE(generic_test_shl_flags(1ULL << 61, 2, true, false, false, false));
 
 cleanup:
     return err;
