@@ -29,6 +29,10 @@ static pis_operand_t get_sp_operand(pis_x86_cpumode_t cpumode) {
     return PIS_OPERAND_REG(0b100 * 8, get_effective_stack_addr_size(cpumode));
 }
 
+static pis_operand_t get_ax_operand_of_size(pis_operand_size_t size) {
+    return PIS_OPERAND_REG(0, size);
+}
+
 static pis_operand_size_t get_effective_operand_size(
     pis_x86_cpumode_t cpumode, const prefixes_t* prefixes, bool default_to_64_bit
 ) {
@@ -1184,6 +1188,19 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
                 modrm_operands.reg_operand.reg,
                 rm_value,
                 PIS_OPERAND_CONST(imm, operand_size)
+            )
+        );
+    } else if (first_opcode_byte == 0x98) {
+        // cbw/cwde/cdqe
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+        pis_operand_size_t half_operand_size = operand_size / 2;
+
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(
+                PIS_OPCODE_SIGN_EXTEND,
+                get_ax_operand_of_size(operand_size),
+                get_ax_operand_of_size(half_operand_size)
             )
         );
     } else if (first_opcode_byte == 0xc1) {
