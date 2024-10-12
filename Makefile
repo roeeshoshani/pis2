@@ -27,7 +27,7 @@ all: $(EXAMPLE_BIN) $(TESTS_BIN) $(OBJS)
 
 .phony: example
 example: $(EXAMPLE_BIN)
-	$(EXAMPLE_BIN)
+	$(EXAMPLE_BIN) build/lib/pis.o
 
 .phony: test
 test: $(TESTS_BIN)

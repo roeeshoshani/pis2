@@ -6,6 +6,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -29,18 +30,27 @@ void trace(const char* format, ...) {
     va_end(args);
 }
 
-int main() {
+int main(int argc, char** argv) {
     err_t err = SUCCESS;
     int fd = -1;
     struct stat stat_buf = {};
     void* mapping = NULL;
 
+    if (argc != 2) {
+        printf("usage: %s <elf file>\n", argv[0]);
+        return -1;
+    }
+
+    static char cmd[4096];
+    memset(cmd, 0, sizeof(cmd));
+    sprintf(cmd, "objcopy -j .text -O binary %s build/lib/example.text.bin", argv[1]);
+
     errno = 0;
-    int objcopy_res = system("objcopy -j .text -O binary build/lib/pis.o build/lib/pis.text.bin");
+    int objcopy_res = system(cmd);
     CHECK_ERRNO(errno == 0);
     CHECK(objcopy_res == 0);
 
-    fd = open("build/lib/pis.text.bin", O_RDONLY);
+    fd = open("build/lib/example.text.bin", O_RDONLY);
     CHECK_ERRNO(fd != -1);
 
     CHECK_ERRNO(fstat(fd, &stat_buf) == 0);
