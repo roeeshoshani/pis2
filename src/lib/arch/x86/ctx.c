@@ -483,8 +483,13 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
     } else if (second_opcode_byte == 0x85) {
         // jne rel
         pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-
         CHECK_RETHROW(cond_negate(ctx, &res_tmp, &FLAGS_ZF));
+
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp));
+    } else if (second_opcode_byte == 0x86) {
+        // jbe rel
+        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, res_tmp, FLAGS_CF, FLAGS_ZF));
 
         CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp));
     } else if (second_opcode_byte == 0x94) {
