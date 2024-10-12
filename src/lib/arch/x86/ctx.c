@@ -1285,6 +1285,9 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
 
         CHECK_RETHROW(lift_second_opcode_byte(ctx, second_opcode_byte));
+    } else if (first_opcode_byte == 0xf4) {
+        // hlt
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN0(PIS_OPCODE_HALT));
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,

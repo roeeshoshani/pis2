@@ -9,6 +9,13 @@
 
 #define PIS_LIFT_MAX_INSNS_AMOUNT (64)
 
+#define PIS_INSN0(OPCODE)                                                               \
+    ((pis_insn_t) {                                                                                \
+        .opcode = (OPCODE),                                                                        \
+        .operands = {},                                                                 \
+        .operands_amount = 0,                                                                      \
+    })
+
 #define PIS_INSN1(OPCODE, OPERAND_1)                                                               \
     ((pis_insn_t) {                                                                                \
         .opcode = (OPCODE),                                                                        \
@@ -121,6 +128,7 @@
     _(PIS_OPCODE_OR, )                                                                             \
     _(PIS_OPCODE_STORE, )                                                                          \
     _(PIS_OPCODE_LOAD, )                                                                           \
+    _(PIS_OPCODE_HALT, )                                                                           \
     _(PIS_OPCODE_UNSIGNED_CARRY, )                                                                 \
     _(PIS_OPCODE_SIGNED_CARRY, )                                                                   \
     _(PIS_OPCODE_GET_LOW_BITS, )                                                                   \
@@ -128,7 +136,7 @@
     _(PIS_OPCODE_EQUALS, )                                                                         \
     _(PIS_OPCODE_NOT, )                                                                            \
     _(PIS_OPCODE_SHIFT_RIGHT, )                                                                    \
-    _(PIS_OPCODE_SHIFT_LEFT, )                                                                    \
+    _(PIS_OPCODE_SHIFT_LEFT, )                                                                     \
     _(PIS_OPCODE_UNSIGNED_LESS_THAN, )                                                             \
     _(PIS_OPCODE_SIGNED_BORROW, )                                                                  \
     _(PIS_OPCODE_JMP_COND, )                                                                       \

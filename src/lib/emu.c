@@ -616,6 +616,9 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
     case PIS_OPCODE_UNSIGNED_MUL:
         CHECK_RETHROW(run_binary_operator(emu, insn, binary_operator_mul));
         break;
+    case PIS_OPCODE_HALT:
+        CHECK_FAIL();
+        break;
     }
 cleanup:
     return err;
