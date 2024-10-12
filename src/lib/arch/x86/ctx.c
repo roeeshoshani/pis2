@@ -819,6 +819,15 @@ cleanup:
     return err;
 }
 
+static err_t push_rip(const post_prefixes_ctx_t* ctx) {
+    err_t err = SUCCESS;
+    u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
+    u64 push_value = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr);
+    CHECK_RETHROW(do_push(ctx, &PIS_OPERAND_CONST(push_value, rel_jmp_operand_size(ctx))));
+cleanup:
+    return err;
+}
+
 static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opcode_byte) {
     err_t err = SUCCESS;
     modrm_operands_t modrm_operands = {};
@@ -1014,6 +1023,24 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             CHECK_RETHROW(modrm_rm_read(ctx, &rm_tmp, &rm_operand));
 
             LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, rm_tmp));
+        } else if (modrm.reg == 2) {
+            // call r/m
+
+            // decide the operand size
+            pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+            if (ctx->lift_ctx->pis_x86_ctx->cpumode == PIS_X86_CPUMODE_64_BIT) {
+                operand_size = PIS_OPERAND_SIZE_8;
+            }
+
+            modrm_rm_operand_t rm_operand = {};
+            CHECK_RETHROW(modrm_decode_rm_operand(ctx, &modrm, operand_size, &rm_operand));
+
+            pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+            CHECK_RETHROW(modrm_rm_read(ctx, &rm_tmp, &rm_operand));
+
+            CHECK_RETHROW(push_rip(ctx));
+
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, rm_tmp));
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
@@ -1078,9 +1105,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t target = {};
         CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target(ctx, &target));
 
-        u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
-        u64 push_value = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr);
-        CHECK_RETHROW(do_push(ctx, &PIS_OPERAND_CONST(push_value, rel_jmp_operand_size(ctx))));
+        CHECK_RETHROW(push_rip(ctx));
 
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, target));
     } else if (first_opcode_byte == 0xc3) {
