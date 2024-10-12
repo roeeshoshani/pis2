@@ -365,7 +365,7 @@ cleanup:
 }
 
 
-static pis_operand_size_t rel_jmp_operand_size(const post_prefixes_ctx_t* ctx) {
+static pis_operand_size_t rel_jmp_operand_size_16_32(const post_prefixes_ctx_t* ctx) {
     if (ctx->lift_ctx->pis_x86_ctx->cpumode == PIS_X86_CPUMODE_64_BIT) {
         // from the intel ia-32 spec:
         // "In 64-bit mode the target operand will always be 64-bits because the operand size is
@@ -376,9 +376,9 @@ static pis_operand_size_t rel_jmp_operand_size(const post_prefixes_ctx_t* ctx) {
     }
 }
 
-static err_t rel_jmp_fetch_disp(const post_prefixes_ctx_t* ctx, u64* disp) {
+static err_t
+    rel_jmp_fetch_disp(const post_prefixes_ctx_t* ctx, u64* disp, pis_operand_size_t operand_size) {
     err_t err = SUCCESS;
-    pis_operand_size_t operand_size = rel_jmp_operand_size(ctx);
     switch (operand_size) {
     case PIS_OPERAND_SIZE_8: {
         i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
@@ -395,15 +395,18 @@ static err_t rel_jmp_fetch_disp(const post_prefixes_ctx_t* ctx, u64* disp) {
         *disp = (i64) disp16;
         break;
     }
-    case PIS_OPERAND_SIZE_1:
-        UNREACHABLE();
+    case PIS_OPERAND_SIZE_1: {
+        i8 disp8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        *disp = (i64) disp8;
+        break;
+    }
     }
 cleanup:
     return err;
 }
 
 static pis_operand_size_t rel_jmp_ip_operand_size(const post_prefixes_ctx_t* ctx) {
-    return rel_jmp_operand_size(ctx);
+    return rel_jmp_operand_size_16_32(ctx);
 }
 
 static u64 rel_jmp_mask_ip_value(const post_prefixes_ctx_t* ctx, u64 ip_value) {
@@ -412,11 +415,13 @@ static u64 rel_jmp_mask_ip_value(const post_prefixes_ctx_t* ctx, u64 ip_value) {
     return ip_value & mask;
 }
 
-static err_t rel_jmp_fetch_disp_and_calc_target_addr(const post_prefixes_ctx_t* ctx, u64* target) {
+static err_t rel_jmp_fetch_disp_and_calc_target_addr(
+    const post_prefixes_ctx_t* ctx, u64* target, pis_operand_size_t operand_size
+) {
     err_t err = SUCCESS;
 
     u64 disp = 0;
-    CHECK_RETHROW(rel_jmp_fetch_disp(ctx, &disp));
+    CHECK_RETHROW(rel_jmp_fetch_disp(ctx, &disp, operand_size));
 
     u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
     *target = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr + disp);
@@ -425,12 +430,13 @@ cleanup:
     return err;
 }
 
-static err_t
-    rel_jmp_fetch_disp_and_calc_target(const post_prefixes_ctx_t* ctx, pis_operand_t* target) {
+static err_t rel_jmp_fetch_disp_and_calc_target(
+    const post_prefixes_ctx_t* ctx, pis_operand_t* target, pis_operand_size_t operand_size
+) {
     err_t err = SUCCESS;
 
     u64 target_addr = 0;
-    CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target_addr(ctx, &target_addr));
+    CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target_addr(ctx, &target_addr, operand_size));
 
     *target = PIS_OPERAND_RAM(target_addr, PIS_OPERAND_SIZE_1);
 
@@ -438,11 +444,13 @@ cleanup:
     return err;
 }
 
-static err_t do_cond_rel_jmp(const post_prefixes_ctx_t* ctx, const pis_operand_t* cond) {
+static err_t do_cond_rel_jmp(
+    const post_prefixes_ctx_t* ctx, const pis_operand_t* cond, pis_operand_size_t operand_size
+) {
     err_t err = SUCCESS;
 
     u64 target = 0;
-    CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target_addr(ctx, &target));
+    CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target_addr(ctx, &target, operand_size));
 
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
@@ -467,31 +475,31 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         CHECK_RETHROW(cond_negate(ctx, &b_tmp, &FLAGS_ZF));
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, res_tmp, a_tmp, b_tmp));
 
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp));
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, rel_jmp_operand_size_16_32(ctx)));
     } else if (second_opcode_byte == 0x83) {
         // jae rel
         pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
         CHECK_RETHROW(cond_negate(ctx, &res_tmp, &FLAGS_CF));
 
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp));
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, rel_jmp_operand_size_16_32(ctx)));
     } else if (second_opcode_byte == 0x82) {
         // jb rel
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &FLAGS_CF));
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &FLAGS_CF, rel_jmp_operand_size_16_32(ctx)));
     } else if (second_opcode_byte == 0x84) {
         // je rel
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &FLAGS_ZF));
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &FLAGS_ZF, rel_jmp_operand_size_16_32(ctx)));
     } else if (second_opcode_byte == 0x85) {
         // jne rel
         pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
         CHECK_RETHROW(cond_negate(ctx, &res_tmp, &FLAGS_ZF));
 
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp));
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, rel_jmp_operand_size_16_32(ctx)));
     } else if (second_opcode_byte == 0x86) {
         // jbe rel
         pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, res_tmp, FLAGS_CF, FLAGS_ZF));
 
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp));
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, rel_jmp_operand_size_16_32(ctx)));
     } else if (second_opcode_byte == 0x94) {
         // sete r/m8
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
@@ -823,7 +831,7 @@ static err_t push_rip(const post_prefixes_ctx_t* ctx) {
     err_t err = SUCCESS;
     u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
     u64 push_value = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr);
-    CHECK_RETHROW(do_push(ctx, &PIS_OPERAND_CONST(push_value, rel_jmp_operand_size(ctx))));
+    CHECK_RETHROW(do_push(ctx, &PIS_OPERAND_CONST(push_value, rel_jmp_operand_size_16_32(ctx))));
 cleanup:
     return err;
 }
@@ -1097,13 +1105,20 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
     } else if (first_opcode_byte == 0xe9) {
         // jmp rel
         pis_operand_t target = {};
-        CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target(ctx, &target));
+        CHECK_RETHROW(
+            rel_jmp_fetch_disp_and_calc_target(ctx, &target, rel_jmp_operand_size_16_32(ctx))
+        );
 
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, target));
+    } else if (first_opcode_byte == 0x74) {
+        // je rel8
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &FLAGS_ZF, PIS_OPERAND_SIZE_1));
     } else if (first_opcode_byte == 0xe8) {
         // call rel
         pis_operand_t target = {};
-        CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target(ctx, &target));
+        CHECK_RETHROW(
+            rel_jmp_fetch_disp_and_calc_target(ctx, &target, rel_jmp_operand_size_16_32(ctx))
+        );
 
         CHECK_RETHROW(push_rip(ctx));
 
