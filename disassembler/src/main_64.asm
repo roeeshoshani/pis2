@@ -2,6 +2,6 @@ BITS 64
 
 global main
 main:
-movsx rax, ax
+CDQE
 shit:
 nop

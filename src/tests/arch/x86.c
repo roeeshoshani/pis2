@@ -1808,3 +1808,52 @@ DEFINE_TEST(test_movsx_r_rm16) {
 cleanup:
     return err;
 }
+
+static err_t generic_test_cbw_cwde_cdqe(
+    code_t code,
+    u64 value,
+    u64 sign_extended_value,
+    const pis_operand_t* src_reg,
+    const pis_operand_t* dst_reg
+) {
+    err_t err = SUCCESS;
+
+    pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, src_reg, value));
+
+    CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, code, PIS_X86_CPUMODE_64_BIT, 0));
+
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, dst_reg, sign_extended_value));
+
+cleanup:
+    return err;
+}
+
+DEFINE_TEST(test_cbw_cwde_cdqe) {
+    err_t err = SUCCESS;
+
+    u64 value = 0;
+    u64 sign_extended_value = 0;
+
+    value = MAGIC64_1 & UINT8_MAX;
+    sign_extended_value = (u16) ((i16) ((i8) value));
+    CHECK_RETHROW_VERBOSE(
+        generic_test_cbw_cwde_cdqe(CODE(0x66, 0x98), value, sign_extended_value, &AL, &AX)
+    );
+
+    value = MAGIC64_1 & UINT16_MAX;
+    sign_extended_value = (u32) ((i32) ((i16) value));
+    CHECK_RETHROW_VERBOSE(
+        generic_test_cbw_cwde_cdqe(CODE(0x98), value, sign_extended_value, &AX, &EAX)
+    );
+
+    value = MAGIC64_1 & UINT32_MAX;
+    sign_extended_value = (u64) ((i64) ((i32) value));
+    CHECK_RETHROW_VERBOSE(
+        generic_test_cbw_cwde_cdqe(CODE(0x48, 0x98), value, sign_extended_value, &EAX, &RAX)
+    );
+
+cleanup:
+    return err;
+}
