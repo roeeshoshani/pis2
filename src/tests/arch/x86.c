@@ -1857,3 +1857,18 @@ DEFINE_TEST(test_cbw_cwde_cdqe) {
 cleanup:
     return err;
 }
+
+DEFINE_TEST(test_mov_32_bit_gpr) {
+    err_t err = SUCCESS;
+
+    pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RAX, UINT64_MAX));
+
+    CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, CODE(0x31, 0xc0), PIS_X86_CPUMODE_64_BIT, 0));
+
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, 0));
+
+cleanup:
+    return err;
+}

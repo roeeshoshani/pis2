@@ -2,6 +2,6 @@ BITS 64
 
 global main
 main:
-CDQE
+xor eax, eax
 shit:
 nop
