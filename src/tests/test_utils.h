@@ -49,8 +49,8 @@ typedef struct {
     };                                                                                             \
     static err_t NAME()
 
-#define MAGIC64_1 (0x1122334455667788)
-#define MAGIC64_2 (0xaabbccddaabbccdd)
-#define MAGIC64_3 (0x1a2b3c4d1a2b3c4d)
+#define MAGIC64_1 (0x1122334455667788ULL)
+#define MAGIC64_2 (0xaabbccddaabbccddULL)
+#define MAGIC64_3 (0x1a2b3c4d1a2b3c4dULL)
 
 extern pis_emu_t g_emu;
