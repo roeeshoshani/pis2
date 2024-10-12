@@ -1205,6 +1205,18 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         pis_operand_t res = {};
         CHECK_RETHROW(do_and(ctx, &AL, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1), &res));
+    } else if (first_opcode_byte == 0x85) {
+        // test r/m, r
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+
+        pis_operand_t res = {};
+        CHECK_RETHROW(calc_binop_modrm(
+            ctx,
+            do_add,
+            &modrm_operands.rm_operand,
+            &modrm_operands.reg_operand,
+            &res
+        ));
     } else if (first_opcode_byte == 0x6b) {
         // imul r, r/m, imm8
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
