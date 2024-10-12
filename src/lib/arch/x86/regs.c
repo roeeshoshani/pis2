@@ -136,6 +136,12 @@ err_t write_gpr(
 ) {
     err_t err = SUCCESS;
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *gpr, *value));
+
+    // writes to 32 bit gprs zero out the upper half of the 64 bit gpr.
+    if (gpr->size == PIS_OPERAND_SIZE_4) {
+        pis_operand_t gpr64 = PIS_OPERAND(gpr->addr, PIS_OPERAND_SIZE_8);
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, gpr64, *gpr));
+    }
 cleanup:
     return err;
 }
