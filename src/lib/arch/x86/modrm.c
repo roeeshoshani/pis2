@@ -379,14 +379,14 @@ err_t modrm_rm_write(
 ) {
     err_t err = SUCCESS;
 
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN2(
-            rm_operand->is_memory ? PIS_OPCODE_STORE : PIS_OPCODE_MOVE,
-            rm_operand->addr_or_reg,
-            *to_write
-        )
-    );
+    if (rm_operand->is_memory) {
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_STORE, rm_operand->addr_or_reg, *to_write)
+        );
+    } else {
+        CHECK_RETHROW(write_gpr(ctx, &rm_operand->addr_or_reg, to_write));
+    }
 
 cleanup:
     return err;
@@ -439,7 +439,7 @@ err_t modrm_operand_write(
 
     switch (operand->type) {
     case MODRM_OPERAND_TYPE_REG:
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, operand->reg, *to_write));
+        CHECK_RETHROW(write_gpr(ctx, &operand->reg, to_write));
         break;
     case MODRM_OPERAND_TYPE_RM:
         CHECK_RETHROW(modrm_rm_write(ctx, &operand->rm, to_write));

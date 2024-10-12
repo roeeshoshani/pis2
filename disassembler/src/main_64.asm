@@ -2,6 +2,6 @@ BITS 64
 
 global main
 main:
-xor eax, eax
+movsx eax, byte [rbp]
 shit:
 nop

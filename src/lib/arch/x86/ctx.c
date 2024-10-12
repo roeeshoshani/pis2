@@ -516,34 +516,36 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         }
     } else if (second_opcode_byte == 0xb6) {
         // movzx r, r/m8
+        pis_operand_size_t dst_size = ctx->operand_sizes.insn_default_not_64_bit;
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
             ctx,
             &modrm_operands,
             PIS_OPERAND_SIZE_1,
-            ctx->operand_sizes.insn_default_not_64_bit
+            dst_size
         ));
 
         pis_operand_t tmp8 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
         CHECK_RETHROW(modrm_rm_read(ctx, &tmp8, &modrm_operands.rm_operand.rm));
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, modrm_operands.reg_operand.reg, tmp8)
-        );
+
+        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, dst_size);
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, tmp, tmp8));
+        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp));
     } else if (second_opcode_byte == 0xbe) {
         // movsx r, r/m8
+        pis_operand_size_t dst_size = ctx->operand_sizes.insn_default_not_64_bit;
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
             ctx,
             &modrm_operands,
             PIS_OPERAND_SIZE_1,
-            ctx->operand_sizes.insn_default_not_64_bit
+            dst_size
         ));
 
         pis_operand_t tmp8 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
         CHECK_RETHROW(modrm_rm_read(ctx, &tmp8, &modrm_operands.rm_operand.rm));
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, modrm_operands.reg_operand.reg, tmp8)
-        );
+
+        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, dst_size);
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, tmp, tmp8));
+        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp));
     } else if (second_opcode_byte == 0xbf) {
         // movsx r, r/m16
         pis_operand_size_t reg_size;
@@ -559,12 +561,12 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
             reg_size
         ));
 
-        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_2);
-        CHECK_RETHROW(modrm_rm_read(ctx, &tmp, &modrm_operands.rm_operand.rm));
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, modrm_operands.reg_operand.reg, tmp)
-        );
+        pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_2);
+        CHECK_RETHROW(modrm_rm_read(ctx, &rm_tmp, &modrm_operands.rm_operand.rm));
+
+        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, reg_size);
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, res_tmp, rm_tmp));
+        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &res_tmp));
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
@@ -835,14 +837,8 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             PIS_INSN_ADD2(sp, PIS_OPERAND_CONST(operand_size_bytes, sp.size))
         );
 
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(
-                PIS_OPCODE_MOVE,
-                reg_get_operand(reg_encoding, operand_size, ctx->prefixes),
-                tmp
-            )
-        );
+        pis_operand_t reg_operand = reg_get_operand(reg_encoding, operand_size, ctx->prefixes);
+        CHECK_RETHROW(write_gpr(ctx, &reg_operand, &tmp));
     } else if (opcode_reg_opcode_only(first_opcode_byte) == 0x90) {
         // xchg [e/r]ax, r
         u8 reg_encoding = opcode_reg_extract(ctx, first_opcode_byte);
@@ -859,8 +855,8 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
 
             LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, ax_operand));
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, ax_operand, reg_operand));
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, reg_operand, tmp));
+            CHECK_RETHROW(write_gpr(ctx, &ax_operand, &reg_operand));
+            CHECK_RETHROW(write_gpr(ctx, &reg_operand, &tmp));
         }
     } else if (first_opcode_byte == 0x89) {
         // move r/m, r
@@ -871,9 +867,11 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
     } else if (first_opcode_byte == 0x8b) {
         // move r, r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-        CHECK_RETHROW(
-            modrm_rm_read(ctx, &modrm_operands.reg_operand.reg, &modrm_operands.rm_operand.rm)
-        );
+
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+        CHECK_RETHROW(modrm_rm_read(ctx, &tmp, &modrm_operands.rm_operand.rm));
+        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp));
     } else if (first_opcode_byte == 0x63) {
         // movsxd r, r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
@@ -881,16 +879,16 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         if (operand_size == PIS_OPERAND_SIZE_8) {
             pis_operand_t tmp32 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_4);
             CHECK_RETHROW(modrm_rm_read(ctx, &tmp32, &modrm_operands.rm_operand.rm));
-            LIFT_CTX_EMIT(
-                ctx->lift_ctx,
-                PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, modrm_operands.reg_operand.reg, tmp32)
-            );
 
+            pis_operand_t tmp64 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_8);
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, tmp64, tmp32));
+
+            CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp64));
         } else {
             // regular mov
-            CHECK_RETHROW(
-                modrm_rm_read(ctx, &modrm_operands.reg_operand.reg, &modrm_operands.rm_operand.rm)
-            );
+            pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+            CHECK_RETHROW(modrm_rm_read(ctx, &tmp, &modrm_operands.rm_operand.rm));
+            CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp));
         }
     } else if (first_opcode_byte == 0x01) {
         // add r/m, r
@@ -980,14 +978,11 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         // the rm operand must be a memory operand in case of `lea`.
         CHECK(modrm_operands.rm_operand.rm.is_memory);
 
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(
-                PIS_OPCODE_MOVE,
-                modrm_operands.reg_operand.reg,
-                modrm_operands.rm_operand.rm.addr_or_reg
-            )
-        );
+        CHECK_RETHROW(write_gpr(
+            ctx,
+            &modrm_operands.reg_operand.reg,
+            &modrm_operands.rm_operand.rm.addr_or_reg
+        ));
     } else if (first_opcode_byte == 0xff) {
         // xxx r/m
         modrm_t modrm = modrm_decode_byte(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx));
@@ -1093,10 +1088,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         u8 reg_encoding = opcode_reg_extract(ctx, first_opcode_byte);
         pis_operand_t reg_operand =
             reg_get_operand(reg_encoding, PIS_OPERAND_SIZE_1, ctx->prefixes);
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_MOVE, reg_operand, PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1))
-        );
+        CHECK_RETHROW(write_gpr(ctx, &reg_operand, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1)));
     } else if (first_opcode_byte == 0x88) {
         // mov r/m8, r8
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
@@ -1116,16 +1108,13 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             PIS_OPERAND_SIZE_1,
             PIS_OPERAND_SIZE_1
         ));
-        CHECK_RETHROW(
-            modrm_rm_read(ctx, &modrm_operands.reg_operand.reg, &modrm_operands.rm_operand.rm)
-        );
+        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        CHECK_RETHROW(modrm_rm_read(ctx, &tmp, &modrm_operands.rm_operand.rm));
+        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp));
     } else if (first_opcode_byte == 0x24) {
         // mov al, imm8
         u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_MOVE, AL, PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1))
-        );
+        CHECK_RETHROW(write_gpr(ctx, &AL, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1)));
     } else if (opcode_reg_opcode_only(first_opcode_byte) == 0xb8) {
         // mov <reg>, imm
         u8 reg_encoding = opcode_reg_extract(ctx, first_opcode_byte);
@@ -1135,7 +1124,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t imm = {};
         CHECK_RETHROW(fetch_imm_operand(ctx, operand_size, &imm));
 
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, dst_reg, imm));
+        CHECK_RETHROW(write_gpr(ctx, &dst_reg, &imm));
     } else if (first_opcode_byte == 0xc7) {
         // xxx r/m, imm
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
@@ -1186,28 +1175,30 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, FLAGS_CF));
 
         // perform the actual multiplication
+        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN3(
-                PIS_OPCODE_SIGNED_MUL,
-                modrm_operands.reg_operand.reg,
-                rm_value,
-                PIS_OPERAND_CONST(imm, operand_size)
-            )
+            PIS_INSN3(PIS_OPCODE_SIGNED_MUL, tmp, rm_value, PIS_OPERAND_CONST(imm, operand_size))
         );
+        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp));
     } else if (first_opcode_byte == 0x98) {
         // cbw/cwde/cdqe
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
         pis_operand_size_t half_operand_size = operand_size / 2;
 
+        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
             PIS_INSN2(
                 PIS_OPCODE_SIGN_EXTEND,
-                get_ax_operand_of_size(operand_size),
+                // ,
+                tmp,
                 get_ax_operand_of_size(half_operand_size)
             )
         );
+
+        pis_operand_t dst = get_ax_operand_of_size(operand_size);
+        CHECK_RETHROW(write_gpr(ctx, &dst, &tmp));
     } else if (first_opcode_byte == 0xc1) {
         // xxx r/m, imm8
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
