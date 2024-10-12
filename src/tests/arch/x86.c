@@ -1766,7 +1766,7 @@ cleanup:
     return err;
 }
 
-DEFINE_TEST(test_movsx) {
+DEFINE_TEST(test_movsx_r_rm8) {
     err_t err = SUCCESS;
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
@@ -1784,6 +1784,26 @@ DEFINE_TEST(test_movsx) {
     u64 sign_extended_mem_value = (u64) ((i64) ((i8) mem_value));
 
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, sign_extended_mem_value));
+
+cleanup:
+    return err;
+}
+
+DEFINE_TEST(test_movsx_r_rm16) {
+    err_t err = SUCCESS;
+
+    pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+
+    u16 value = MAGIC64_1 & UINT16_MAX;
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &AX, value));
+
+    CHECK_RETHROW_VERBOSE(
+        emulate_insn(&g_emu, CODE(0x48, 0x0f, 0xbf, 0xc0), PIS_X86_CPUMODE_64_BIT, 0)
+    );
+
+    u64 sign_extended_value = (u64) ((i64) ((i16) value));
+
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, sign_extended_value));
 
 cleanup:
     return err;

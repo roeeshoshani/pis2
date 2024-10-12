@@ -535,6 +535,27 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
             ctx->lift_ctx,
             PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, modrm_operands.reg_operand.reg, tmp8)
         );
+    } else if (second_opcode_byte == 0xbf) {
+        // movsx r, r/m16
+        pis_operand_size_t reg_size;
+        if (ctx->prefixes->rex.w) {
+            reg_size = PIS_OPERAND_SIZE_8;
+        } else {
+            reg_size = PIS_OPERAND_SIZE_4;
+        }
+        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
+            ctx,
+            &modrm_operands,
+            PIS_OPERAND_SIZE_2,
+            reg_size
+        ));
+
+        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_2);
+        CHECK_RETHROW(modrm_rm_read(ctx, &tmp, &modrm_operands.rm_operand.rm));
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, modrm_operands.reg_operand.reg, tmp)
+        );
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
