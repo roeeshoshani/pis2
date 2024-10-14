@@ -599,17 +599,6 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, reg_size);
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, res_tmp, rm_tmp));
         CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &res_tmp));
-    } else if (second_opcode_byte == 0x1e) {
-        // endbr32/64
-
-        // endbr must use a REP prefix
-        CHECK(prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_REPZ_OR_REP));
-
-        // endbr must be followed by a 0xfa or 0xfb byte
-        u8 next_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-        CHECK(next_byte == 0xfa || next_byte == 0xfb);
-
-        // endbr is a nop, so emit nothing.
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
@@ -1366,6 +1355,50 @@ cleanup:
     return err;
 }
 
+static err_t rep_lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_opcode_byte) {
+    err_t err = SUCCESS;
+
+    if (second_opcode_byte == 0x1e) {
+        // endbr32/64
+
+        // endbr must use a REP prefix
+        CHECK(prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_REPZ_OR_REP));
+
+        // endbr must be followed by a 0xfa or 0xfb byte
+        u8 next_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        CHECK(next_byte == 0xfa || next_byte == 0xfb);
+
+        // endbr is a nop, so emit nothing.
+    } else {
+        CHECK_FAIL_TRACE_CODE(
+            PIS_ERR_UNSUPPORTED_INSN,
+            "unsupported second opcode byte with rep prefix: 0x%x",
+            second_opcode_byte
+        );
+    }
+cleanup:
+    return err;
+}
+
+static err_t rep_lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opcode_byte) {
+    err_t err = SUCCESS;
+
+    if (first_opcode_byte == 0x0f) {
+        // opcode is longer than 1 byte
+        u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+
+        CHECK_RETHROW(rep_lift_second_opcode_byte(ctx, second_opcode_byte));
+    } else {
+        CHECK_FAIL_TRACE_CODE(
+            PIS_ERR_UNSUPPORTED_INSN,
+            "unsupported first opcode byte with rep prefix: 0x%x",
+            first_opcode_byte
+        );
+    }
+cleanup:
+    return err;
+}
+
 static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
     err_t err = SUCCESS;
 
@@ -1377,9 +1410,10 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
     case LEGACY_PREFIX_REPNZ_OR_BND:
         UNREACHABLE();
     case LEGACY_PREFIX_REPZ_OR_REP:
-        UNREACHABLE();
+        CHECK_RETHROW(rep_lift_first_opcode_byte(ctx, first_opcode_byte));
+        break;
     case LEGACY_PREFIX_INVALID:
-        // no group-1 prefix
+        // no group-1 prefix, regular opcode
         CHECK_RETHROW(lift_first_opcode_byte(ctx, first_opcode_byte));
         break;
     default:
