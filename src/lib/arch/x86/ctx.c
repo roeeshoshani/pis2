@@ -320,11 +320,12 @@ cleanup:
     return err;
 }
 
-typedef err_t (*modrm_binop_fn_t
-)(const post_prefixes_ctx_t* ctx,
-  const pis_operand_t* a,
-  const pis_operand_t* b,
-  pis_operand_t* result);
+typedef err_t (*modrm_binop_fn_t)(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* a,
+    const pis_operand_t* b,
+    pis_operand_t* result
+);
 
 static err_t calc_binop_modrm(
     const post_prefixes_ctx_t* ctx,
@@ -1332,7 +1333,20 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
 
     u8 first_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
 
-    CHECK_RETHROW(lift_first_opcode_byte(ctx, first_opcode_byte));
+    switch (ctx->prefixes->legacy.by_group[LEGACY_PREFIX_GROUP_1]) {
+    case LEGACY_PREFIX_LOCK:
+        UNREACHABLE();
+    case LEGACY_PREFIX_REPNZ_OR_BND:
+        UNREACHABLE();
+    case LEGACY_PREFIX_REPZ_OR_REP:
+        UNREACHABLE();
+    case LEGACY_PREFIX_INVALID:
+        // no group-1 prefix
+        CHECK_RETHROW(lift_first_opcode_byte(ctx, first_opcode_byte));
+        break;
+    default:
+        UNREACHABLE();
+    }
 
 cleanup:
     return err;
