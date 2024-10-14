@@ -1,8 +1,8 @@
 #pragma once
 
-#include "types.h"
-#include "pis.h"
 #include "emu.h"
+#include "pis.h"
+#include "types.h"
 
 typedef err_t (*test_fn_t)();
 

@@ -22,14 +22,9 @@ err_t pis_emu_mem_storage_allocate_slot(
 pis_emu_mem_storage_slot_t*
     pis_emu_mem_storage_find_slot_by_addr(pis_emu_mem_storage_t* storage, u64 addr);
 
-const pis_emu_mem_storage_slot_t* pis_emu_mem_storage_find_slot_by_addr_const(
-    const pis_emu_mem_storage_t* storage, u64 addr
-);
+const pis_emu_mem_storage_slot_t*
+    pis_emu_mem_storage_find_slot_by_addr_const(const pis_emu_mem_storage_t* storage, u64 addr);
 
-err_t pis_emu_mem_storage_write_byte(
-    pis_emu_mem_storage_t* storage, u64 addr, u8 byte_value
-);
+err_t pis_emu_mem_storage_write_byte(pis_emu_mem_storage_t* storage, u64 addr, u8 byte_value);
 
-err_t pis_emu_mem_storage_read_byte(
-    const pis_emu_mem_storage_t* storage, u64 addr, u8* byte_value
-);
+err_t pis_emu_mem_storage_read_byte(const pis_emu_mem_storage_t* storage, u64 addr, u8* byte_value);

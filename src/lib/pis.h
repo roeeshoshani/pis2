@@ -9,10 +9,10 @@
 
 #define PIS_LIFT_MAX_INSNS_AMOUNT (64)
 
-#define PIS_INSN0(OPCODE)                                                               \
+#define PIS_INSN0(OPCODE)                                                                          \
     ((pis_insn_t) {                                                                                \
         .opcode = (OPCODE),                                                                        \
-        .operands = {},                                                                 \
+        .operands = {},                                                                            \
         .operands_amount = 0,                                                                      \
     })
 
