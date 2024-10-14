@@ -1417,6 +1417,19 @@ static bool calc_parity_bit(u64 value) {
     return !__builtin_parity(value & UINT8_MAX);
 }
 
+static err_t verify_parity_sign_zero_flags(u64 calculation_result) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_ZF, calculation_result == 0));
+    CHECK_RETHROW_VERBOSE(
+        emu_assert_operand_equals(&g_emu, &FLAGS_SF, ((i64) calculation_result < 0))
+    );
+    CHECK_RETHROW_VERBOSE(
+        emu_assert_operand_equals(&g_emu, &FLAGS_PF, calc_parity_bit(calculation_result))
+    );
+cleanup:
+    return err;
+}
+
 static err_t generic_test_add_flags(u64 lhs, u64 rhs, bool carry_flag, bool overflow_flag) {
     err_t err = SUCCESS;
 
@@ -1435,9 +1448,7 @@ static err_t generic_test_add_flags(u64 lhs, u64 rhs, bool carry_flag, bool over
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RBX, rhs));
 
     // verify flags
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_ZF, sum == 0));
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_SF, ((i64) sum < 0)));
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_PF, calc_parity_bit(sum)));
+    CHECK_RETHROW_VERBOSE(verify_parity_sign_zero_flags(sum));
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_CF, carry_flag));
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_OF, overflow_flag));
 
@@ -1491,9 +1502,7 @@ static err_t generic_test_sub_flags(u64 lhs, u64 rhs, bool carry_flag, bool over
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RBX, rhs));
 
     // verify flags
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_ZF, res == 0));
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_SF, ((i64) res < 0)));
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_PF, calc_parity_bit(res)));
+    CHECK_RETHROW_VERBOSE(verify_parity_sign_zero_flags(res));
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_CF, carry_flag));
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_OF, overflow_flag));
 
@@ -1558,9 +1567,7 @@ static err_t generic_check_shl_result(
 
     // verify flags
     if (masked_shift_amount != 0) {
-        CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_ZF, res == 0));
-        CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_SF, ((i64) res < 0)));
-        CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_PF, calc_parity_bit(res)));
+        CHECK_RETHROW(verify_parity_sign_zero_flags(res));
     } else {
         CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_ZF, orig_zero_flag));
         CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_SF, orig_sign_flag));
@@ -1868,6 +1875,34 @@ DEFINE_TEST(test_mov_32_bit_gpr) {
     CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, CODE(0x31, 0xc0), PIS_X86_CPUMODE_64_BIT, 0));
 
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, 0));
+
+cleanup:
+    return err;
+}
+
+static err_t generic_test_dec(u64 value, bool is_overflow) {
+    err_t err = SUCCESS;
+
+    pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RAX, value));
+
+    CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, CODE(0x48, 0xff, 0xc8), PIS_X86_CPUMODE_64_BIT, 0));
+
+    u64 res = value - 1;
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, res));
+    CHECK_RETHROW_VERBOSE(verify_parity_sign_zero_flags(res));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_OF, is_overflow));
+
+cleanup:
+    return err;
+}
+
+DEFINE_TEST(test_dec) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW(generic_test_dec(0, false));
+    CHECK_RETHROW(generic_test_dec(INT64_MIN, true));
 
 cleanup:
     return err;
