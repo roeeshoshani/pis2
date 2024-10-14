@@ -167,6 +167,26 @@ cleanup:
     return err;
 }
 
+static err_t extract_least_significant_bit(
+    const post_prefixes_ctx_t* ctx, const pis_operand_t* value, const pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    // make sure that the output operand is a 1 byte conditional expression
+    CHECK(result->size == PIS_OPERAND_SIZE_1);
+
+    pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, value->size);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_AND, tmp, *value, PIS_OPERAND_CONST(1, value->size))
+    );
+
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, *result, tmp));
+
+cleanup:
+    return err;
+}
+
 static err_t
     calc_sign_flag(const post_prefixes_ctx_t* ctx, const pis_operand_t* calculation_result) {
     err_t err = SUCCESS;
@@ -757,14 +777,7 @@ static err_t shr_calc_carry_flag(
         PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, shifted_by_count_minus_1, *to_shift, count_minus_1)
     );
     pis_operand_t last_extracted_bit = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN3(
-            PIS_OPCODE_AND,
-            last_extracted_bit,
-            shifted_by_count_minus_1,
-            PIS_OPERAND_CONST(1, operand_size)
-        )
+    CHECK_RETHROW(extract_least_significant_bit(ctx, &shifted_by_count_minus_1, &last_extracted_bit)
     );
 
     // now, we only want to set the carry flag if the count is non-zero, otherwise we want to use
@@ -902,6 +915,34 @@ cleanup:
     return err;
 }
 
+static err_t shr_calc_overflow_flag(
+    const post_prefixes_ctx_t* ctx, const pis_operand_t* to_shift, const pis_operand_t* count
+) {
+    err_t err = SUCCESS;
+
+    CHECK(count->size == to_shift->size);
+
+    pis_operand_size_t operand_size = to_shift->size;
+
+    // the overflow flag is set to the msb of the original operand
+    pis_operand_t new_overflow_flag_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    CHECK_RETHROW(extract_most_significant_bit(ctx, to_shift, &new_overflow_flag_value));
+
+    // we only want to set the overflow flag if the count is 1, otherwise we want to use
+    // the original OF value.
+    pis_operand_t is_count_1 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_CONST(1, operand_size))
+    );
+
+    CHECK_RETHROW(
+        cond_expr_ternary(ctx, &is_count_1, &new_overflow_flag_value, &FLAGS_OF, &FLAGS_OF)
+    );
+
+cleanup:
+    return err;
+}
 static err_t do_shr(
     const post_prefixes_ctx_t* ctx,
     const pis_operand_t* a,
@@ -922,7 +963,7 @@ static err_t do_shr(
     CHECK_RETHROW(shr_calc_carry_flag(ctx, a, &count));
 
     // overflow flag
-    CHECK_RETHROW(extract_most_significant_bit(ctx, a, &FLAGS_OF));
+    CHECK_RETHROW(shr_calc_overflow_flag(ctx, a, &count));
 
     // perform the actual shift
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, res_tmp, *a, count));
@@ -1431,6 +1472,12 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             // shl/sal r/m, cl
             pis_operand_t res_tmp = {};
             CHECK_RETHROW(do_shl(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
+
+            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+        } else if (modrm_operands.modrm.reg == 5) {
+            // shr r/m, cl
+            pis_operand_t res_tmp = {};
+            CHECK_RETHROW(do_shr(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else {

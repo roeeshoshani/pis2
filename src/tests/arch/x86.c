@@ -1567,7 +1567,7 @@ static err_t generic_check_shl_result(
 
     // verify flags
     if (masked_shift_amount != 0) {
-        CHECK_RETHROW(verify_parity_sign_zero_flags(res));
+        CHECK_RETHROW_VERBOSE(verify_parity_sign_zero_flags(res));
     } else {
         CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_ZF, orig_zero_flag));
         CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_SF, orig_sign_flag));
@@ -1714,7 +1714,7 @@ static err_t generic_test_shl(
     err_t err = SUCCESS;
 
     // test with both possible initial values for the easily calculatable flags
-    CHECK_RETHROW(generic_test_shl_full(
+    CHECK_RETHROW_VERBOSE(generic_test_shl_full(
         lhs,
         shift_amount,
         orig_carry_flag,
@@ -1725,7 +1725,7 @@ static err_t generic_test_shl(
         new_carry_flag,
         new_overflow_flag
     ));
-    CHECK_RETHROW(generic_test_shl_full(
+    CHECK_RETHROW_VERBOSE(generic_test_shl_full(
         lhs,
         shift_amount,
         orig_carry_flag,
@@ -1901,8 +1901,255 @@ cleanup:
 DEFINE_TEST(test_dec) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(generic_test_dec(0, false));
-    CHECK_RETHROW(generic_test_dec(INT64_MIN, true));
+    CHECK_RETHROW_VERBOSE(generic_test_dec(0, false));
+    CHECK_RETHROW_VERBOSE(generic_test_dec(INT64_MIN, true));
+
+cleanup:
+    return err;
+}
+
+
+static err_t generic_prepare_shr_rax(
+    u64 lhs,
+    bool orig_carry_flag,
+    bool orig_overflow_flag,
+    bool orig_parity_flag,
+    bool orig_sign_flag,
+    bool orig_zero_flag
+) {
+    err_t err = SUCCESS;
+
+    pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RAX, lhs));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &FLAGS_CF, orig_carry_flag));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &FLAGS_OF, orig_overflow_flag));
+
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &FLAGS_PF, orig_parity_flag));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &FLAGS_SF, orig_sign_flag));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &FLAGS_ZF, orig_zero_flag));
+
+cleanup:
+    return err;
+}
+
+static err_t generic_check_shr_result(
+    u64 lhs,
+    u8 shift_amount,
+    bool orig_parity_flag,
+    bool orig_sign_flag,
+    bool orig_zero_flag,
+    bool new_carry_flag,
+    bool new_overflow_flag
+) {
+    err_t err = SUCCESS;
+
+    // make sure that rax now contains the result
+    u64 masked_shift_amount = shift_amount & 0b111111;
+    u64 res = lhs >> masked_shift_amount;
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, res));
+
+    // verify flags
+    if (masked_shift_amount != 0) {
+        CHECK_RETHROW_VERBOSE(verify_parity_sign_zero_flags(res));
+    } else {
+        CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_ZF, orig_zero_flag));
+        CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_SF, orig_sign_flag));
+        CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_PF, orig_parity_flag));
+    }
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_CF, new_carry_flag));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_OF, new_overflow_flag));
+
+cleanup:
+    return err;
+}
+
+static err_t generic_test_shr_imm(
+    u64 lhs,
+    u8 shift_amount,
+    bool orig_carry_flag,
+    bool orig_overflow_flag,
+    bool orig_parity_flag,
+    bool orig_sign_flag,
+    bool orig_zero_flag,
+    bool new_carry_flag,
+    bool new_overflow_flag
+) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(generic_prepare_shr_rax(
+        lhs,
+        orig_carry_flag,
+        orig_overflow_flag,
+        orig_parity_flag,
+        orig_sign_flag,
+        orig_zero_flag
+    ));
+
+    u8 code[] = {0x48, 0xc1, 0xe8, shift_amount};
+    CHECK_RETHROW_VERBOSE(emulate_insn(
+        &g_emu,
+        (code_t) {
+            .code = code,
+            .len = ARRAY_SIZE(code),
+        },
+        PIS_X86_CPUMODE_64_BIT,
+        0
+    ));
+
+    CHECK_RETHROW_VERBOSE(generic_check_shr_result(
+        lhs,
+        shift_amount,
+        orig_parity_flag,
+        orig_sign_flag,
+        orig_zero_flag,
+        new_carry_flag,
+        new_overflow_flag
+    ));
+
+cleanup:
+    return err;
+}
+
+static err_t generic_test_shr_cl(
+    u64 lhs,
+    u8 shift_amount,
+    bool orig_carry_flag,
+    bool orig_overflow_flag,
+    bool orig_parity_flag,
+    bool orig_sign_flag,
+    bool orig_zero_flag,
+    bool new_carry_flag,
+    bool new_overflow_flag
+) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(generic_prepare_shr_rax(
+        lhs,
+        orig_carry_flag,
+        orig_overflow_flag,
+        orig_parity_flag,
+        orig_sign_flag,
+        orig_zero_flag
+    ));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &CL, shift_amount));
+
+    CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, CODE(0x48, 0xd3, 0xe8), PIS_X86_CPUMODE_64_BIT, 0));
+
+    CHECK_RETHROW_VERBOSE(generic_check_shr_result(
+        lhs,
+        shift_amount,
+        orig_parity_flag,
+        orig_sign_flag,
+        orig_zero_flag,
+        new_carry_flag,
+        new_overflow_flag
+    ));
+
+cleanup:
+    return err;
+}
+static err_t generic_test_shr_full(
+    u64 lhs,
+    u8 shift_amount,
+    bool orig_carry_flag,
+    bool orig_overflow_flag,
+    bool orig_parity_flag,
+    bool orig_sign_flag,
+    bool orig_zero_flag,
+    bool new_carry_flag,
+    bool new_overflow_flag
+) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW_VERBOSE(generic_test_shr_imm(
+        lhs,
+        shift_amount,
+        orig_carry_flag,
+        orig_overflow_flag,
+        orig_parity_flag,
+        orig_sign_flag,
+        orig_zero_flag,
+        new_carry_flag,
+        new_overflow_flag
+    ));
+    CHECK_RETHROW_VERBOSE(generic_test_shr_cl(
+        lhs,
+        shift_amount,
+        orig_carry_flag,
+        orig_overflow_flag,
+        orig_parity_flag,
+        orig_sign_flag,
+        orig_zero_flag,
+        new_carry_flag,
+        new_overflow_flag
+    ));
+cleanup:
+    return err;
+}
+
+static err_t generic_test_shr(
+    u64 lhs,
+    u8 shift_amount,
+    bool orig_carry_flag,
+    bool orig_overflow_flag,
+    bool new_carry_flag,
+    bool new_overflow_flag
+) {
+    err_t err = SUCCESS;
+
+    // test with both possible initial values for the easily calculatable flags
+    CHECK_RETHROW_VERBOSE(generic_test_shr_full(
+        lhs,
+        shift_amount,
+        orig_carry_flag,
+        orig_overflow_flag,
+        false,
+        false,
+        false,
+        new_carry_flag,
+        new_overflow_flag
+    ));
+    CHECK_RETHROW_VERBOSE(generic_test_shr_full(
+        lhs,
+        shift_amount,
+        orig_carry_flag,
+        orig_overflow_flag,
+        true,
+        true,
+        true,
+        new_carry_flag,
+        new_overflow_flag
+    ));
+
+cleanup:
+    return err;
+}
+
+DEFINE_TEST(test_shr) {
+    err_t err = SUCCESS;
+
+    // make sure that no flags are affected with a zero shift count
+    CHECK_RETHROW_VERBOSE(generic_test_shr(UINT64_MAX, 0, false, false, false, false));
+    CHECK_RETHROW_VERBOSE(generic_test_shr(UINT64_MAX, 0, true, true, true, true));
+
+    // make sure that no flags are affected with a shift count that results in zero after masking it
+    CHECK_RETHROW_VERBOSE(generic_test_shr(UINT64_MAX, 1 << 7, false, false, false, false));
+    CHECK_RETHROW_VERBOSE(generic_test_shr(UINT64_MAX, 1 << 7, true, true, true, true));
+
+    // make sure that the carry flag is overwritten by last shifted bit
+    CHECK_RETHROW_VERBOSE(generic_test_shr(~(1ULL << 1), 2, true, false, false, false));
+    CHECK_RETHROW_VERBOSE(generic_test_shr(~(1ULL << 1), 2, false, false, false, false));
+    CHECK_RETHROW_VERBOSE(generic_test_shr(1ULL << 1, 2, false, false, true, false));
+    CHECK_RETHROW_VERBOSE(generic_test_shr(1ULL << 1, 2, true, false, true, false));
+    CHECK_RETHROW_VERBOSE(generic_test_shr(1ULL << 62, 63, true, false, true, false));
+
+    // make sure that the overflow flag is set accordingly
+    CHECK_RETHROW_VERBOSE(generic_test_shr(1ULL << 63, 1, true, false, false, true));
+    CHECK_RETHROW_VERBOSE(generic_test_shr(~(1ULL << 63), 1, false, true, true, false));
+
+    // make sure that the overflow flag is only set if the shift count is 1
+    CHECK_RETHROW_VERBOSE(generic_test_shr(1ULL << 63, 2, true, false, false, false));
+    CHECK_RETHROW_VERBOSE(generic_test_shr(~(1ULL << 63), 2, false, true, true, true));
 
 cleanup:
     return err;
