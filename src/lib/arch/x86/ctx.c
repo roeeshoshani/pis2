@@ -1584,6 +1584,11 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             CHECK_RETHROW(
                 calc_and_store_binop_modrm_imm(ctx, do_add, &modrm_operands.rm_operand, &imm)
             );
+        } else if (modrm_operands.modrm.reg == 5) {
+            // sub r/m, imm
+            CHECK_RETHROW(
+                calc_and_store_binop_modrm_imm(ctx, do_sub, &modrm_operands.rm_operand, &imm)
+            );
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
