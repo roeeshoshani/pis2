@@ -1360,6 +1360,12 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             CHECK_RETHROW(do_add(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp));
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+        } else if (modrm_operands.modrm.reg == 6) {
+            // xor r/m, imm8
+            pis_operand_t res_tmp = {};
+            CHECK_RETHROW(do_xor(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp));
+
+            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else if (modrm_operands.modrm.reg == 4) {
             // and r/m, imm8
             pis_operand_t res_tmp = {};
