@@ -697,6 +697,12 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, res_tmp, FLAGS_CF, FLAGS_ZF));
 
         CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, rel_jmp_operand_size_16_32(ctx)));
+    } else if (second_opcode_byte == 0x8c) {
+        // jl rel
+        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_XOR, res_tmp, FLAGS_SF, FLAGS_OF));
+
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, rel_jmp_operand_size_16_32(ctx)));
     } else if (second_opcode_byte == 0x94) {
         // sete r/m8
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
