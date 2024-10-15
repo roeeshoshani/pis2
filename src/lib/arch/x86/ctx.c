@@ -352,8 +352,44 @@ static err_t do_xor(
         PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
     );
 
-    // perform the actual subtraction
+    // perform the actual xor operation
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_XOR, res_tmp, *a, *b));
+
+    CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &res_tmp));
+
+    *result = res_tmp;
+
+cleanup:
+    return err;
+}
+
+static err_t do_or(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* a,
+    const pis_operand_t* b,
+    pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    CHECK(a->size == b->size);
+    pis_operand_size_t operand_size = a->size;
+
+    pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+
+    // carry flag
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_CF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+    );
+
+    // overflow flag
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+    );
+
+    // perform the actual or operation
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, res_tmp, *a, *b));
 
     CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &res_tmp));
 
@@ -1202,6 +1238,15 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
             do_add,
+            &modrm_operands.reg_operand,
+            &modrm_operands.rm_operand
+        ));
+    } else if (first_opcode_byte == 0x0b) {
+        // or r, r/m
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+        CHECK_RETHROW(calc_and_store_binop_modrm(
+            ctx,
+            do_or,
             &modrm_operands.reg_operand,
             &modrm_operands.rm_operand
         ));
