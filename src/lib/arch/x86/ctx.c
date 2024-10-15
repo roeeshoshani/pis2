@@ -1465,13 +1465,19 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
 
-        pis_operand_size_t imm_operand_size = operand_size;
-        if (imm_operand_size == PIS_OPERAND_SIZE_8) {
-            imm_operand_size = PIS_OPERAND_SIZE_4;
-        }
+        pis_operand_size_t imm_operand_size =
+            operand_size == PIS_OPERAND_SIZE_8 ? PIS_OPERAND_SIZE_4 : operand_size;
 
         pis_operand_t imm = {};
         CHECK_RETHROW(fetch_imm_operand(ctx, imm_operand_size, &imm));
+
+        pis_operand_t sign_extended_imm;
+        if (operand_size == PIS_OPERAND_SIZE_8) {
+            sign_extended_imm = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, sign_extended_imm, imm));
+        } else {
+            sign_extended_imm = imm;
+        }
 
         if (modrm_operands.modrm.reg == 7) {
             // cmp r/m, imm
@@ -1480,7 +1486,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
             // perform subtraction but ignore the result
             pis_operand_t res = {};
-            CHECK_RETHROW(do_sub(ctx, &rm_tmp, &imm, &res));
+            CHECK_RETHROW(do_sub(ctx, &rm_tmp, &sign_extended_imm, &res));
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
