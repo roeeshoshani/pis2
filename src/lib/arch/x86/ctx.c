@@ -10,14 +10,14 @@
 static pis_operand_size_t cpumode_get_operand_size(pis_x86_cpumode_t cpumode) {
     switch (cpumode) {
     case PIS_X86_CPUMODE_64_BIT:
-        return PIS_OPERAND_SIZE_8;
+        return PIS_OPERAND_SIZE(8);
     case PIS_X86_CPUMODE_32_BIT:
-        return PIS_OPERAND_SIZE_4;
+        return PIS_OPERAND_SIZE(4);
     case PIS_X86_CPUMODE_16_BIT:
-        return PIS_OPERAND_SIZE_2;
+        return PIS_OPERAND_SIZE(2);
     default:
         // unreachable
-        return PIS_OPERAND_SIZE_1;
+        return PIS_OPERAND_SIZE(1);
     }
 }
 
@@ -45,22 +45,22 @@ static pis_operand_size_t get_effective_operand_size(
 
     switch (cpumode) {
     case PIS_X86_CPUMODE_16_BIT:
-        return has_size_override ? PIS_OPERAND_SIZE_4 : PIS_OPERAND_SIZE_2;
+        return has_size_override ? PIS_OPERAND_SIZE(4) : PIS_OPERAND_SIZE(2);
     case PIS_X86_CPUMODE_32_BIT:
-        return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
+        return has_size_override ? PIS_OPERAND_SIZE(2) : PIS_OPERAND_SIZE(4);
     case PIS_X86_CPUMODE_64_BIT:
         if (prefixes->rex.w) {
-            return PIS_OPERAND_SIZE_8;
+            return PIS_OPERAND_SIZE(8);
         } else {
             if (default_to_64_bit) {
-                return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_8;
+                return has_size_override ? PIS_OPERAND_SIZE(2) : PIS_OPERAND_SIZE(8);
             } else {
-                return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
+                return has_size_override ? PIS_OPERAND_SIZE(2) : PIS_OPERAND_SIZE(4);
             }
         }
     default:
         // unreachable
-        return PIS_OPERAND_SIZE_1;
+        return PIS_OPERAND_SIZE(1);
     }
 }
 
@@ -71,14 +71,14 @@ static pis_operand_size_t
 
     switch (cpumode) {
     case PIS_X86_CPUMODE_16_BIT:
-        return has_size_override ? PIS_OPERAND_SIZE_4 : PIS_OPERAND_SIZE_2;
+        return has_size_override ? PIS_OPERAND_SIZE(4) : PIS_OPERAND_SIZE(2);
     case PIS_X86_CPUMODE_32_BIT:
-        return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
+        return has_size_override ? PIS_OPERAND_SIZE(2) : PIS_OPERAND_SIZE(4);
     case PIS_X86_CPUMODE_64_BIT:
-        return has_size_override ? PIS_OPERAND_SIZE_4 : PIS_OPERAND_SIZE_8;
+        return has_size_override ? PIS_OPERAND_SIZE(4) : PIS_OPERAND_SIZE(8);
     default:
         // unreachable
-        return PIS_OPERAND_SIZE_1;
+        return PIS_OPERAND_SIZE(1);
     }
 }
 
@@ -88,7 +88,7 @@ static err_t calc_parity_flag_into(
 ) {
     err_t err = SUCCESS;
 
-    pis_operand_t low_byte_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t low_byte_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, low_byte_tmp, *value));
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_PARITY, *result, low_byte_tmp));
 
@@ -113,7 +113,7 @@ static err_t calc_zero_flag_into(
 
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_EQUALS, *result, *value, PIS_OPERAND_CONST(0, value->size_in_bytes))
+        PIS_INSN3(PIS_OPCODE_EQUALS, *result, *value, PIS_OPERAND_CONST(0, value->size))
     );
 
 cleanup:
@@ -135,14 +135,14 @@ static err_t cond_negate(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(cond->size_in_bytes == PIS_OPERAND_SIZE_1);
-    CHECK(result->size_in_bytes == PIS_OPERAND_SIZE_1);
+    CHECK(cond->size.bytes == 1);
+    CHECK(result->size.bytes == 1);
 
     // condition negation is done by `XOR`ing with 1.
     // we can't use `NOT` because it flips all bits, not only the lowest bit.
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_XOR, *result, *cond, PIS_OPERAND_CONST(1, PIS_OPERAND_SIZE_1))
+        PIS_INSN3(PIS_OPCODE_XOR, *result, *cond, PIS_OPERAND_CONST(1, PIS_OPERAND_SIZE(1)))
     );
 
 cleanup:
@@ -155,19 +155,14 @@ static err_t extract_most_significant_bit(
     err_t err = SUCCESS;
 
     // make sure that the output operand is a 1 byte conditional expression
-    CHECK(result->size_in_bytes == PIS_OPERAND_SIZE_1);
+    CHECK(result->size.bytes == 1);
 
-    u64 shift_amount = pis_operand_size_to_bits(value->size_in_bytes) - 1;
+    u64 shift_amount = pis_operand_size_to_bits(value->size) - 1;
 
-    pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, value->size_in_bytes);
+    pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, value->size);
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN3(
-            PIS_OPCODE_SHIFT_RIGHT,
-            tmp,
-            *value,
-            PIS_OPERAND_CONST(shift_amount, value->size_in_bytes)
-        )
+        PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, tmp, *value, PIS_OPERAND_CONST(shift_amount, value->size))
     );
 
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, *result, tmp));
@@ -182,12 +177,12 @@ static err_t extract_least_significant_bit(
     err_t err = SUCCESS;
 
     // make sure that the output operand is a 1 byte conditional expression
-    CHECK(result->size_in_bytes == PIS_OPERAND_SIZE_1);
+    CHECK(result->size.bytes == 1);
 
-    pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, value->size_in_bytes);
+    pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, value->size);
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_AND, tmp, *value, PIS_OPERAND_CONST(1, value->size_in_bytes))
+        PIS_INSN3(PIS_OPCODE_AND, tmp, *value, PIS_OPERAND_CONST(1, value->size))
     );
 
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, *result, tmp));
@@ -227,8 +222,8 @@ static err_t do_add(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(a->size_in_bytes == b->size_in_bytes);
-    pis_operand_size_t operand_size = a->size_in_bytes;
+    CHECK(a->size.bytes == b->size.bytes);
+    pis_operand_size_t operand_size = a->size;
 
     pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
 
@@ -257,8 +252,8 @@ static err_t do_sub(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(a->size_in_bytes == b->size_in_bytes);
-    pis_operand_size_t operand_size = a->size_in_bytes;
+    CHECK(a->size.bytes == b->size.bytes);
+    pis_operand_size_t operand_size = a->size;
 
     pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
 
@@ -283,7 +278,7 @@ static err_t
     do_dec(const post_prefixes_ctx_t* ctx, const pis_operand_t* operand, pis_operand_t* result) {
     err_t err = SUCCESS;
 
-    pis_operand_size_t operand_size = operand->size_in_bytes;
+    pis_operand_size_t operand_size = operand->size;
 
     pis_operand_t one = PIS_OPERAND_CONST(1, operand_size);
 
@@ -310,19 +305,19 @@ static err_t do_and(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(a->size_in_bytes == b->size_in_bytes);
-    pis_operand_size_t operand_size = a->size_in_bytes;
+    CHECK(a->size.bytes == b->size.bytes);
+    pis_operand_size_t operand_size = a->size;
 
     pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
 
     // set CF and OF to zero
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_CF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_CF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE(1)))
     );
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE(1)))
     );
 
     // perform the actual bitwide and operation
@@ -344,8 +339,8 @@ static err_t do_imul(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(a->size_in_bytes == b->size_in_bytes);
-    pis_operand_size_t operand_size = a->size_in_bytes;
+    CHECK(a->size.bytes == b->size.bytes);
+    pis_operand_size_t operand_size = a->size;
 
     pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
 
@@ -373,21 +368,21 @@ static err_t do_xor(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(a->size_in_bytes == b->size_in_bytes);
-    pis_operand_size_t operand_size = a->size_in_bytes;
+    CHECK(a->size.bytes == b->size.bytes);
+    pis_operand_size_t operand_size = a->size;
 
     pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
 
     // carry flag
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_CF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_CF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE(1)))
     );
 
     // overflow flag
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE(1)))
     );
 
     // perform the actual xor operation
@@ -409,21 +404,21 @@ static err_t do_or(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(a->size_in_bytes == b->size_in_bytes);
-    pis_operand_size_t operand_size = a->size_in_bytes;
+    CHECK(a->size.bytes == b->size.bytes);
+    pis_operand_size_t operand_size = a->size;
 
     pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
 
     // carry flag
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_CF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_CF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE(1)))
     );
 
     // overflow flag
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE(1)))
     );
 
     // perform the actual or operation
@@ -522,7 +517,7 @@ static pis_operand_size_t rel_jmp_operand_size_16_32(const post_prefixes_ctx_t* 
         // from the intel ia-32 spec:
         // "In 64-bit mode the target operand will always be 64-bits because the operand size is
         // forced to 64-bits for near branches"
-        return PIS_OPERAND_SIZE_8;
+        return PIS_OPERAND_SIZE(8);
     } else {
         return ctx->operand_sizes.insn_default_not_64_bit;
     }
@@ -531,27 +526,29 @@ static pis_operand_size_t rel_jmp_operand_size_16_32(const post_prefixes_ctx_t* 
 static err_t
     rel_jmp_fetch_disp(const post_prefixes_ctx_t* ctx, u64* disp, pis_operand_size_t operand_size) {
     err_t err = SUCCESS;
-    switch (operand_size) {
-    case PIS_OPERAND_SIZE_8: {
+    switch (operand_size.bytes) {
+    case 8: {
         i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
         *disp = (i64) disp32;
         break;
     }
-    case PIS_OPERAND_SIZE_4: {
+    case 4: {
         i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
         *disp = (i64) disp32;
         break;
     }
-    case PIS_OPERAND_SIZE_2: {
+    case 2: {
         i16 disp16 = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
         *disp = (i64) disp16;
         break;
     }
-    case PIS_OPERAND_SIZE_1: {
+    case 1: {
         i8 disp8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
         *disp = (i64) disp8;
         break;
     }
+    default:
+        UNREACHABLE();
     }
 cleanup:
     return err;
@@ -590,7 +587,7 @@ static err_t rel_jmp_fetch_disp_and_calc_target(
     u64 target_addr = 0;
     CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target_addr(ctx, &target_addr, operand_size));
 
-    *target = PIS_OPERAND_RAM(target_addr, PIS_OPERAND_SIZE_1);
+    *target = PIS_OPERAND_RAM(target_addr, PIS_OPERAND_SIZE(1));
 
 cleanup:
     return err;
@@ -606,7 +603,7 @@ static err_t do_cond_rel_jmp(
 
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN2(PIS_OPCODE_JMP_COND, *cond, PIS_OPERAND_RAM(target, PIS_OPERAND_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_JMP_COND, *cond, PIS_OPERAND_RAM(target, PIS_OPERAND_SIZE(1)))
     );
 
 cleanup:
@@ -619,9 +616,9 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
 
     if (second_opcode_byte == 0x87) {
         // ja rel
-        pis_operand_t a_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        pis_operand_t b_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        pis_operand_t a_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
+        pis_operand_t b_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
+        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
 
         CHECK_RETHROW(cond_negate(ctx, &a_tmp, &FLAGS_CF));
         CHECK_RETHROW(cond_negate(ctx, &b_tmp, &FLAGS_ZF));
@@ -630,7 +627,7 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, rel_jmp_operand_size_16_32(ctx)));
     } else if (second_opcode_byte == 0x83) {
         // jae rel
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
         CHECK_RETHROW(cond_negate(ctx, &res_tmp, &FLAGS_CF));
 
         CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, rel_jmp_operand_size_16_32(ctx)));
@@ -642,13 +639,13 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         CHECK_RETHROW(do_cond_rel_jmp(ctx, &FLAGS_ZF, rel_jmp_operand_size_16_32(ctx)));
     } else if (second_opcode_byte == 0x85) {
         // jne rel
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
         CHECK_RETHROW(cond_negate(ctx, &res_tmp, &FLAGS_ZF));
 
         CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, rel_jmp_operand_size_16_32(ctx)));
     } else if (second_opcode_byte == 0x86) {
         // jbe rel
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, res_tmp, FLAGS_CF, FLAGS_ZF));
 
         CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, rel_jmp_operand_size_16_32(ctx)));
@@ -657,9 +654,9 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
             ctx,
             &modrm_operands,
-            PIS_OPERAND_SIZE_1,
+            PIS_OPERAND_SIZE(1),
             // don't care
-            PIS_OPERAND_SIZE_1
+            PIS_OPERAND_SIZE(1)
         ));
 
         CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &FLAGS_ZF));
@@ -668,14 +665,14 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
             ctx,
             &modrm_operands,
-            PIS_OPERAND_SIZE_1,
+            PIS_OPERAND_SIZE(1),
             // don't care
-            PIS_OPERAND_SIZE_1
+            PIS_OPERAND_SIZE(1)
         ));
 
-        pis_operand_t a_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        pis_operand_t b_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        pis_operand_t a_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
+        pis_operand_t b_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
+        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
 
         CHECK_RETHROW(cond_negate(ctx, &a_tmp, &FLAGS_CF));
         CHECK_RETHROW(cond_negate(ctx, &b_tmp, &FLAGS_ZF));
@@ -687,12 +684,12 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
             ctx,
             &modrm_operands,
-            PIS_OPERAND_SIZE_1,
+            PIS_OPERAND_SIZE(1),
             // don't care
-            PIS_OPERAND_SIZE_1
+            PIS_OPERAND_SIZE(1)
         ));
 
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
         CHECK_RETHROW(cond_negate(ctx, &res_tmp, &FLAGS_ZF));
 
         CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
@@ -701,9 +698,9 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
             ctx,
             &modrm_operands,
-            PIS_OPERAND_SIZE_1,
+            PIS_OPERAND_SIZE(1),
             // don't care
-            PIS_OPERAND_SIZE_1
+            PIS_OPERAND_SIZE(1)
         ));
 
         CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &FLAGS_CF));
@@ -733,11 +730,11 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
             ctx,
             &modrm_operands,
-            PIS_OPERAND_SIZE_1,
+            PIS_OPERAND_SIZE(1),
             dst_size
         ));
 
-        pis_operand_t tmp8 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        pis_operand_t tmp8 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
         CHECK_RETHROW(modrm_rm_read(ctx, &tmp8, &modrm_operands.rm_operand.rm));
 
         pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, dst_size);
@@ -749,11 +746,11 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
             ctx,
             &modrm_operands,
-            PIS_OPERAND_SIZE_1,
+            PIS_OPERAND_SIZE(1),
             dst_size
         ));
 
-        pis_operand_t tmp8 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        pis_operand_t tmp8 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
         CHECK_RETHROW(modrm_rm_read(ctx, &tmp8, &modrm_operands.rm_operand.rm));
 
         pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, dst_size);
@@ -763,18 +760,18 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         // movsx r, r/m16
         pis_operand_size_t reg_size;
         if (ctx->prefixes->rex.w) {
-            reg_size = PIS_OPERAND_SIZE_8;
+            reg_size = PIS_OPERAND_SIZE(8);
         } else {
-            reg_size = PIS_OPERAND_SIZE_4;
+            reg_size = PIS_OPERAND_SIZE(4);
         }
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
             ctx,
             &modrm_operands,
-            PIS_OPERAND_SIZE_2,
+            PIS_OPERAND_SIZE(2),
             reg_size
         ));
 
-        pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_2);
+        pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(2));
         CHECK_RETHROW(modrm_rm_read(ctx, &rm_tmp, &modrm_operands.rm_operand.rm));
 
         pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, reg_size);
@@ -804,17 +801,17 @@ static err_t do_push(const post_prefixes_ctx_t* ctx, const pis_operand_t* operan
     err_t err = SUCCESS;
 
     pis_operand_t sp = ctx->lift_ctx->sp;
-    u64 operand_size_bytes = pis_operand_size_to_bytes(operand_to_push->size_in_bytes);
+    u64 operand_size_bytes = pis_operand_size_to_bytes(operand_to_push->size);
 
     // read the pushed operand into a tmp before subtracting sp. this makes sure that instructions
     // like `push rsp` behave properly, by pushing the original value, before the subtraction.
-    pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_to_push->size_in_bytes);
+    pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_to_push->size);
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, *operand_to_push));
 
     // subtract sp
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN_ADD2(sp, PIS_OPERAND_CONST_NEG(operand_size_bytes, sp.size_in_bytes))
+        PIS_INSN_ADD2(sp, PIS_OPERAND_CONST_NEG(operand_size_bytes, sp.size))
     );
 
     // write the memory
@@ -827,18 +824,18 @@ static err_t fetch_imm_operand(
     const post_prefixes_ctx_t* ctx, pis_operand_size_t size, pis_operand_t* operand
 ) {
     err_t err = SUCCESS;
-    switch (size) {
-    case PIS_OPERAND_SIZE_1:
-        *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_1);
+    switch (size.bytes) {
+    case 1:
+        *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE(1));
         break;
-    case PIS_OPERAND_SIZE_2:
-        *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_2);
+    case 2:
+        *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE(2));
         break;
-    case PIS_OPERAND_SIZE_4:
-        *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_4);
+    case 4:
+        *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE(4));
         break;
-    case PIS_OPERAND_SIZE_8:
-        *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_8);
+    case 8:
+        *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE(8));
         break;
     default:
         UNREACHABLE();
@@ -853,13 +850,13 @@ static err_t
     pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
 
     pis_operand_size_t imm_operand_size =
-        operand_size == PIS_OPERAND_SIZE_8 ? PIS_OPERAND_SIZE_4 : operand_size;
+        operand_size.bytes == 8 ? PIS_OPERAND_SIZE(4) : operand_size;
 
     pis_operand_t imm = {};
     CHECK_RETHROW(fetch_imm_operand(ctx, imm_operand_size, &imm));
 
     pis_operand_t sign_extended_imm;
-    if (operand_size == PIS_OPERAND_SIZE_8) {
+    if (operand_size.bytes == 8) {
         sign_extended_imm = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, sign_extended_imm, imm));
     } else {
@@ -882,17 +879,17 @@ static err_t cond_expr_ternary(
     err_t err = SUCCESS;
 
     // make sure that all operands are one byte conditional expressions.
-    CHECK(cond->size_in_bytes == PIS_OPERAND_SIZE_1);
-    CHECK(then_value->size_in_bytes == PIS_OPERAND_SIZE_1);
-    CHECK(else_value->size_in_bytes == PIS_OPERAND_SIZE_1);
+    CHECK(cond->size.bytes == 1);
+    CHECK(then_value->size.bytes == 1);
+    CHECK(else_value->size.bytes == 1);
 
-    pis_operand_t not_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t not_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     CHECK_RETHROW(cond_negate(ctx, cond, &not_cond));
 
-    pis_operand_t true_case = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t true_case = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, true_case, *cond, *then_value));
 
-    pis_operand_t false_case = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t false_case = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, false_case, not_cond, *else_value));
 
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, *result, true_case, false_case));
@@ -906,9 +903,9 @@ static err_t shl_calc_carry_flag(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(count->size_in_bytes == to_shift->size_in_bytes);
+    CHECK(count->size.bytes == to_shift->size.bytes);
 
-    pis_operand_size_t operand_size = to_shift->size_in_bytes;
+    pis_operand_size_t operand_size = to_shift->size;
 
     // to get the last shifted out but, shift the original value `count - 1` bits, and then extract
     // its most significant bit.
@@ -922,13 +919,13 @@ static err_t shl_calc_carry_flag(
         ctx->lift_ctx,
         PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, shifted_by_count_minus_1, *to_shift, count_minus_1)
     );
-    pis_operand_t last_extracted_bit = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t last_extracted_bit = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     CHECK_RETHROW(extract_most_significant_bit(ctx, &shifted_by_count_minus_1, &last_extracted_bit)
     );
 
     // now, we only want to set the carry flag if the count is non-zero, otherwise we want to use
     // the original CF value.
-    pis_operand_t is_count_0 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t is_count_0 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
         PIS_INSN3(PIS_OPCODE_EQUALS, is_count_0, *count, PIS_OPERAND_CONST(0, operand_size))
@@ -945,9 +942,9 @@ static err_t shr_calc_carry_flag(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(count->size_in_bytes == to_shift->size_in_bytes);
+    CHECK(count->size.bytes == to_shift->size.bytes);
 
-    pis_operand_size_t operand_size = to_shift->size_in_bytes;
+    pis_operand_size_t operand_size = to_shift->size;
 
     // to get the last shifted out but, shift the original value `count - 1` bits, and then extract
     // its least significant bit.
@@ -961,13 +958,13 @@ static err_t shr_calc_carry_flag(
         ctx->lift_ctx,
         PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, shifted_by_count_minus_1, *to_shift, count_minus_1)
     );
-    pis_operand_t last_extracted_bit = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t last_extracted_bit = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     CHECK_RETHROW(extract_least_significant_bit(ctx, &shifted_by_count_minus_1, &last_extracted_bit)
     );
 
     // now, we only want to set the carry flag if the count is non-zero, otherwise we want to use
     // the original CF value.
-    pis_operand_t is_count_0 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t is_count_0 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
         PIS_INSN3(PIS_OPCODE_EQUALS, is_count_0, *count, PIS_OPERAND_CONST(0, operand_size))
@@ -984,23 +981,23 @@ static err_t shl_calc_overflow_flag(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(count->size_in_bytes == to_shift->size_in_bytes);
+    CHECK(count->size.bytes == to_shift->size.bytes);
 
-    pis_operand_size_t operand_size = to_shift->size_in_bytes;
+    pis_operand_size_t operand_size = to_shift->size;
 
     // the overflow flag is set to `MSB(A << B) ^ CF`
     pis_operand_t shifted = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, shifted, *to_shift, *count));
 
-    pis_operand_t msb = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t msb = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     CHECK_RETHROW(extract_most_significant_bit(ctx, &shifted, &msb));
 
-    pis_operand_t new_overflow_flag_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t new_overflow_flag_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_XOR, new_overflow_flag_value, msb, FLAGS_CF));
 
     // we only want to set the overflow flag if the count is 1, otherwise we want to use
     // the original OF value.
-    pis_operand_t is_count_1 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t is_count_1 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
         PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_CONST(1, operand_size))
@@ -1019,25 +1016,25 @@ static err_t shl_calc_parity_zero_sign_flags(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(count->size_in_bytes == shift_result->size_in_bytes);
-    pis_operand_size_t operand_size = shift_result->size_in_bytes;
+    CHECK(count->size.bytes == shift_result->size.bytes);
+    pis_operand_size_t operand_size = shift_result->size;
 
     // only modify the flags if the count is non-zero
-    pis_operand_t is_count_0 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t is_count_0 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
         PIS_INSN3(PIS_OPCODE_EQUALS, is_count_0, *count, PIS_OPERAND_CONST(0, operand_size))
     );
 
-    pis_operand_t new_pf = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t new_pf = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     CHECK_RETHROW(calc_parity_flag_into(ctx, shift_result, &new_pf));
     CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_0, &FLAGS_PF, &new_pf, &FLAGS_PF));
 
-    pis_operand_t new_zf = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t new_zf = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     CHECK_RETHROW(calc_zero_flag_into(ctx, shift_result, &new_zf));
     CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_0, &FLAGS_ZF, &new_zf, &FLAGS_ZF));
 
-    pis_operand_t new_sf = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t new_sf = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     CHECK_RETHROW(extract_most_significant_bit(ctx, shift_result, &new_sf));
     CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_0, &FLAGS_SF, &new_sf, &FLAGS_SF));
 
@@ -1053,7 +1050,7 @@ static err_t mask_shift_count(
 ) {
     err_t err = SUCCESS;
 
-    u64 count_mask = operand_size == PIS_OPERAND_SIZE_8 ? 0b111111 : 0b11111;
+    u64 count_mask = operand_size.bytes == 8 ? 0b111111 : 0b11111;
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
         PIS_INSN3(
@@ -1075,8 +1072,8 @@ static err_t do_shl(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(a->size_in_bytes == b->size_in_bytes);
-    pis_operand_size_t operand_size = a->size_in_bytes;
+    CHECK(a->size.bytes == b->size.bytes);
+    pis_operand_size_t operand_size = a->size;
 
     pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
 
@@ -1105,17 +1102,17 @@ static err_t shr_calc_overflow_flag(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(count->size_in_bytes == to_shift->size_in_bytes);
+    CHECK(count->size.bytes == to_shift->size.bytes);
 
-    pis_operand_size_t operand_size = to_shift->size_in_bytes;
+    pis_operand_size_t operand_size = to_shift->size;
 
     // the overflow flag is set to the msb of the original operand
-    pis_operand_t new_overflow_flag_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t new_overflow_flag_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     CHECK_RETHROW(extract_most_significant_bit(ctx, to_shift, &new_overflow_flag_value));
 
     // we only want to set the overflow flag if the count is 1, otherwise we want to use
     // the original OF value.
-    pis_operand_t is_count_1 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t is_count_1 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
         PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_CONST(1, operand_size))
@@ -1134,16 +1131,16 @@ static err_t sar_calc_overflow_flag(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(count->size_in_bytes == to_shift->size_in_bytes);
+    CHECK(count->size.bytes == to_shift->size.bytes);
 
-    pis_operand_size_t operand_size = to_shift->size_in_bytes;
+    pis_operand_size_t operand_size = to_shift->size;
 
     // the overflow flag is set to 0 if the count is 1
-    pis_operand_t new_overflow_flag_value = PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1);
+    pis_operand_t new_overflow_flag_value = PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE(1));
 
     // we only want to set the overflow flag if the count is 1, otherwise we want to use
     // the original OF value.
-    pis_operand_t is_count_1 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    pis_operand_t is_count_1 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
         PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_CONST(1, operand_size))
@@ -1165,8 +1162,8 @@ static err_t do_shr(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(a->size_in_bytes == b->size_in_bytes);
-    pis_operand_size_t operand_size = a->size_in_bytes;
+    CHECK(a->size.bytes == b->size.bytes);
+    pis_operand_size_t operand_size = a->size;
 
     pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
 
@@ -1198,8 +1195,8 @@ static err_t do_sar(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(a->size_in_bytes == b->size_in_bytes);
-    pis_operand_size_t operand_size = a->size_in_bytes;
+    CHECK(a->size.bytes == b->size.bytes);
+    pis_operand_size_t operand_size = a->size;
 
     pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
 
@@ -1258,7 +1255,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN_ADD2(sp, PIS_OPERAND_CONST(operand_size_bytes, sp.size_in_bytes))
+            PIS_INSN_ADD2(sp, PIS_OPERAND_CONST(operand_size_bytes, sp.size))
         );
 
         pis_operand_t reg_operand = reg_get_operand(reg_encoding, operand_size, ctx->prefixes);
@@ -1296,7 +1293,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         if (modrm_operands.modrm.reg == 6) {
             // div r/m
-            if (operand_size == PIS_OPERAND_SIZE_8) {
+            if (operand_size.bytes == 8) {
                 // need to divide `RDX:RAX`, but we don't have 16 byte operands, so we need to use a
                 // special opcode which accepts 2 source operand which together represent a single
                 // 16 byte source operand. this is currently not supported
@@ -1305,7 +1302,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
                 // divide `dx:ax` or `edx:eax`.
 
                 // first, combine the 2 registers into a single operand.
-                pis_operand_size_t double_operand_size = operand_size * 2;
+                pis_operand_size_t double_operand_size = PIS_OPERAND_SIZE(operand_size.bytes * 2);
                 pis_operand_t divide_lhs = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
                 LIFT_CTX_EMIT(
                     ctx->lift_ctx,
@@ -1406,11 +1403,11 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         // movsxd r, r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
-        if (operand_size == PIS_OPERAND_SIZE_8) {
-            pis_operand_t tmp32 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_4);
+        if (operand_size.bytes == 8) {
+            pis_operand_t tmp32 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(4));
             CHECK_RETHROW(modrm_rm_read(ctx, &tmp32, &modrm_operands.rm_operand.rm));
 
-            pis_operand_t tmp64 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_8);
+            pis_operand_t tmp64 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(8));
             LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, tmp64, tmp32));
 
             CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp64));
@@ -1532,7 +1529,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             // decide the operand size
             pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
             if (ctx->lift_ctx->pis_x86_ctx->cpumode == PIS_X86_CPUMODE_64_BIT) {
-                operand_size = PIS_OPERAND_SIZE_8;
+                operand_size = PIS_OPERAND_SIZE(8);
             }
 
             modrm_rm_operand_t rm_operand = {};
@@ -1548,7 +1545,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             // decide the operand size
             pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
             if (ctx->lift_ctx->pis_x86_ctx->cpumode == PIS_X86_CPUMODE_64_BIT) {
-                operand_size = PIS_OPERAND_SIZE_8;
+                operand_size = PIS_OPERAND_SIZE(8);
             }
 
             modrm_rm_operand_t rm_operand = {};
@@ -1588,7 +1585,8 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_operand_read(ctx, &rm_tmp, &modrm_operands.rm_operand));
 
         i8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-        u64 imm64 = pis_sign_extend_byte(imm8, operand_size);
+        u64 imm64 = 0;
+        CHECK_RETHROW(pis_sign_extend_byte(imm8, operand_size, &imm64));
 
         if (modrm_operands.modrm.reg == 5) {
             // sub r/m, imm8
@@ -1626,12 +1624,12 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
             ctx,
             &modrm_operands,
-            PIS_OPERAND_SIZE_1,
-            PIS_OPERAND_SIZE_1
+            PIS_OPERAND_SIZE(1),
+            PIS_OPERAND_SIZE(1)
         ));
 
         u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-        pis_operand_t imm_operand = PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1);
+        pis_operand_t imm_operand = PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE(1));
 
         if (modrm_operands.modrm.reg == 0) {
             // mov r/m8, imm8
@@ -1644,17 +1642,17 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
             ctx,
             &modrm_operands,
-            PIS_OPERAND_SIZE_1,
-            PIS_OPERAND_SIZE_1
+            PIS_OPERAND_SIZE(1),
+            PIS_OPERAND_SIZE(1)
         ));
 
         u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-        pis_operand_t imm_operand = PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1);
+        pis_operand_t imm_operand = PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE(1));
 
         if (modrm_operands.modrm.reg == 7) {
             // cmp r/m8, imm8
 
-            pis_operand_t dst_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+            pis_operand_t dst_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
             CHECK_RETHROW(modrm_rm_read(ctx, &dst_tmp, &modrm_operands.rm_operand.rm));
 
             // perform subtraction but ignore the result
@@ -1673,13 +1671,13 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, target));
     } else if (first_opcode_byte == 0x74) {
         // je rel8
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &FLAGS_ZF, PIS_OPERAND_SIZE_1));
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &FLAGS_ZF, PIS_OPERAND_SIZE(1)));
     } else if (first_opcode_byte == 0x75) {
         // jne rel8
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
         CHECK_RETHROW(cond_negate(ctx, &res_tmp, &FLAGS_ZF));
 
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, PIS_OPERAND_SIZE_1));
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, PIS_OPERAND_SIZE(1)));
     } else if (first_opcode_byte == 0xe8) {
         // call rel
         pis_operand_t target = {};
@@ -1702,7 +1700,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN_ADD2(sp, PIS_OPERAND_CONST(operand_size_bytes, sp.size_in_bytes))
+            PIS_INSN_ADD2(sp, PIS_OPERAND_CONST(operand_size_bytes, sp.size))
         );
 
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, tmp));
@@ -1711,15 +1709,15 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
         u8 reg_encoding = opcode_reg_extract(ctx, first_opcode_byte);
         pis_operand_t reg_operand =
-            reg_get_operand(reg_encoding, PIS_OPERAND_SIZE_1, ctx->prefixes);
-        CHECK_RETHROW(write_gpr(ctx, &reg_operand, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1)));
+            reg_get_operand(reg_encoding, PIS_OPERAND_SIZE(1), ctx->prefixes);
+        CHECK_RETHROW(write_gpr(ctx, &reg_operand, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE(1))));
     } else if (first_opcode_byte == 0x88) {
         // mov r/m8, r8
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
             ctx,
             &modrm_operands,
-            PIS_OPERAND_SIZE_1,
-            PIS_OPERAND_SIZE_1
+            PIS_OPERAND_SIZE(1),
+            PIS_OPERAND_SIZE(1)
         ));
         CHECK_RETHROW(
             modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &modrm_operands.reg_operand.reg)
@@ -1729,16 +1727,16 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
             ctx,
             &modrm_operands,
-            PIS_OPERAND_SIZE_1,
-            PIS_OPERAND_SIZE_1
+            PIS_OPERAND_SIZE(1),
+            PIS_OPERAND_SIZE(1)
         ));
-        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE(1));
         CHECK_RETHROW(modrm_rm_read(ctx, &tmp, &modrm_operands.rm_operand.rm));
         CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp));
     } else if (first_opcode_byte == 0x24) {
         // mov al, imm8
         u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-        CHECK_RETHROW(write_gpr(ctx, &AL, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1)));
+        CHECK_RETHROW(write_gpr(ctx, &AL, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE(1))));
     } else if (opcode_reg_opcode_only(first_opcode_byte) == 0xb8) {
         // mov <reg>, imm
         u8 reg_encoding = opcode_reg_extract(ctx, first_opcode_byte);
@@ -1794,7 +1792,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
 
         pis_operand_t res = {};
-        CHECK_RETHROW(do_and(ctx, &AL, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1), &res));
+        CHECK_RETHROW(do_and(ctx, &AL, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE(1)), &res));
     } else if (first_opcode_byte == 0x85) {
         // test r/m, r
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
@@ -1814,7 +1812,8 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
 
         i8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-        u64 imm = pis_sign_extend_byte(imm8, operand_size);
+        u64 imm = 0;
+        CHECK_RETHROW(pis_sign_extend_byte(imm8, operand_size, &imm));
         pis_operand_t imm_operand = PIS_OPERAND_CONST(imm, operand_size);
 
         pis_operand_t rm_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
@@ -1827,7 +1826,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
     } else if (first_opcode_byte == 0x98) {
         // cbw/cwde/cdqe
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
-        pis_operand_size_t half_operand_size = operand_size / 2;
+        pis_operand_size_t half_operand_size = PIS_OPERAND_SIZE(operand_size.bytes / 2);
 
         pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
         LIFT_CTX_EMIT(

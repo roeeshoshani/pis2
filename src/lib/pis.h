@@ -45,7 +45,7 @@
 
 #define PIS_ADDR(SPACE, OFFSET) ((pis_addr_t) {.space = (SPACE), .offset = (OFFSET)})
 
-#define PIS_OPERAND(ADDR, SIZE) ((pis_operand_t) {.addr = (ADDR), .size_in_bytes = (SIZE)})
+#define PIS_OPERAND(ADDR, SIZE) ((pis_operand_t) {.addr = (ADDR), .size = (SIZE)})
 
 #define PIS_OPERAND_REG(OFFSET, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_REG, OFFSET), SIZE))
 
@@ -159,20 +159,15 @@ STR_ENUM(pis_opcode, PIS_OPCODE);
     _(PIS_SPACE_TMP, )
 STR_ENUM(pis_space, PIS_SPACE);
 
+#define PIS_OPERAND_SIZE(SIZE_IN_BYTES) ((pis_operand_size_t) { .bytes = SIZE_IN_BYTES })
+
 typedef enum {
     PIS_ENDIANNESS_LITTLE,
     PIS_ENDIANNESS_BIG,
 } pis_endianness_t;
 
-typedef enum {
-    /// 1 byte
-    PIS_OPERAND_SIZE_1 = 1,
-    /// 2 bytes
-    PIS_OPERAND_SIZE_2 = 2,
-    /// 4 bytes
-    PIS_OPERAND_SIZE_4 = 4,
-    /// 8 bytes
-    PIS_OPERAND_SIZE_8 = 8,
+typedef struct {
+    u32 bytes;
 } pis_operand_size_t;
 
 typedef struct {
@@ -182,7 +177,7 @@ typedef struct {
 
 typedef struct {
     pis_addr_t addr;
-    pis_operand_size_t size_in_bytes;
+    pis_operand_size_t size;
 } pis_operand_t;
 
 typedef struct {
@@ -218,9 +213,9 @@ u32 pis_operand_size_to_bits(pis_operand_size_t operand_size);
 
 u64 pis_operand_size_max_unsigned_value(pis_operand_size_t operand_size);
 
-u64 pis_const_negate(u64 const_value, u32 operand_size);
+u64 pis_const_negate(u64 const_value, pis_operand_size_t operand_size);
 
-u64 pis_sign_extend_byte(i8 byte, pis_operand_size_t desired_size);
+err_t pis_sign_extend_byte(i8 byte, pis_operand_size_t desired_size, u64* result);
 
 err_t pis_addr_add(const pis_addr_t* addr, u64 amount, pis_addr_t* new_addr);
 

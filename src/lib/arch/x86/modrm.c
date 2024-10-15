@@ -274,17 +274,17 @@ static err_t build_modrm_rm_addr_into(
     // make sure that the addressing mode of the r/m field is not a register, but a memory address.
     CHECK(modrm->mod != 0b11);
 
-    switch (ctx->addr_size) {
-    case PIS_OPERAND_SIZE_8:
+    switch (ctx->addr_size.bytes) {
+    case 8:
         CHECK_RETHROW(build_modrm_rm_addr_64_into(ctx, modrm, into));
         break;
-    case PIS_OPERAND_SIZE_4:
+    case 4:
         CHECK_RETHROW(build_modrm_rm_addr_32_into(ctx, modrm, into));
         break;
-    case PIS_OPERAND_SIZE_2:
+    case 2:
         CHECK_RETHROW(build_modrm_rm_addr_16_into(ctx, modrm, into));
         break;
-    case PIS_OPERAND_SIZE_1:
+    case 1:
         UNREACHABLE();
     }
 cleanup:

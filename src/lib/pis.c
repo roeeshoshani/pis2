@@ -17,11 +17,11 @@ bool pis_addr_equals(const pis_addr_t* a, const pis_addr_t* b) {
 
 void pis_operand_dump(const pis_operand_t* operand) {
     pis_addr_dump(&operand->addr);
-    TRACE_NO_NEWLINE(":0x%x", (unsigned) pis_operand_size_to_bytes(operand->size_in_bytes));
+    TRACE_NO_NEWLINE(":0x%x", (unsigned) pis_operand_size_to_bytes(operand->size));
 }
 
 bool pis_operand_equals(const pis_operand_t* a, const pis_operand_t* b) {
-    return a->size_in_bytes == b->size_in_bytes && pis_addr_equals(&a->addr, &b->addr);
+    return a->size.bytes == b->size.bytes && pis_addr_equals(&a->addr, &b->addr);
 }
 
 void pis_insn_dump(const pis_insn_t* insn) {
@@ -80,7 +80,7 @@ void pis_lift_result_reset(pis_lift_result_t* result) {
 }
 
 u32 pis_operand_size_to_bytes(pis_operand_size_t operand_size) {
-    return (u32) operand_size;
+    return operand_size.bytes;
 }
 
 u32 pis_operand_size_to_bits(pis_operand_size_t operand_size) {
@@ -105,20 +105,26 @@ u64 pis_const_negate(u64 const_value, pis_operand_size_t operand_size) {
     }
 }
 
-u64 pis_sign_extend_byte(i8 byte, pis_operand_size_t desired_size) {
-    switch (desired_size) {
-    case PIS_OPERAND_SIZE_1:
-        return (u8) byte;
-    case PIS_OPERAND_SIZE_2:
-        return (i16) byte;
-    case PIS_OPERAND_SIZE_4:
-        return (i32) byte;
-    case PIS_OPERAND_SIZE_8:
-        return (i64) byte;
+err_t pis_sign_extend_byte(i8 byte, pis_operand_size_t desired_size, u64* result) {
+    err_t err = SUCCESS;
+    switch (desired_size.bytes) {
+    case 1:
+        *result = (u8) byte;
+        break;
+    case 2:
+        *result = (i16) byte;
+        break;
+    case 4:
+        *result = (i32) byte;
+        break;
+    case 8:
+        *result = (i64) byte;
+        break;
     default:
-        // unreachable
-        return 0;
+        UNREACHABLE();
     }
+cleanup:
+    return err;
 }
 
 err_t pis_addr_add(const pis_addr_t* addr, u64 amount, pis_addr_t* new_addr) {
