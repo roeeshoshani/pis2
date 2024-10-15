@@ -608,6 +608,56 @@ cleanup:
     return err;
 }
 
+
+/// generates a ternary expression.
+static err_t ternary(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* cond,
+    const pis_operand_t* then_value,
+    const pis_operand_t* else_value,
+    const pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    CHECK(cond->size == PIS_OPERAND_SIZE_1);
+    CHECK(then_value->size == else_value->size);
+    CHECK(then_value->size == result->size);
+
+    pis_operand_size_t operand_size = then_value->size;
+    CHECK(operand_size > PIS_OPERAND_SIZE_1);
+
+    // calculate the negative condition
+    pis_operand_t not_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    CHECK_RETHROW(cond_negate(ctx, cond, &not_cond));
+
+    // zero extend the condition and its negative
+    pis_operand_t cond_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, cond_zero_extended, *cond));
+
+    pis_operand_t not_cond_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, not_cond_zero_extended, not_cond)
+    );
+
+    pis_operand_t true_case = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_AND, true_case, cond_zero_extended, *then_value)
+    );
+
+    pis_operand_t false_case = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_AND, false_case, not_cond_zero_extended, *else_value)
+    );
+
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, *result, true_case, false_case));
+
+cleanup:
+    return err;
+}
+
 static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_opcode_byte) {
     err_t err = SUCCESS;
     modrm_operands_t modrm_operands = {};
@@ -794,6 +844,20 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, reg_size);
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, res_tmp, rm_tmp));
         CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &res_tmp));
+    } else if (second_opcode_byte == 0x45) {
+        // cmovne r, r/m
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+        pis_operand_t rm_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+        CHECK_RETHROW(modrm_rm_read(ctx, &rm_value, &modrm_operands.rm_operand.rm));
+
+        pis_operand_t final_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+        CHECK_RETHROW(
+            ternary(ctx, &FLAGS_ZF, &modrm_operands.reg_operand.reg, &rm_value, &final_value)
+        );
+
+        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &final_value));
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
