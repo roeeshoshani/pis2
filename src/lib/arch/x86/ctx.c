@@ -327,6 +327,35 @@ cleanup:
     return err;
 }
 
+static err_t do_imul(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* a,
+    const pis_operand_t* b,
+    pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    CHECK(a->size == b->size);
+    pis_operand_size_t operand_size = a->size;
+
+    pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+
+    // update CF
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SIGNED_MUL_OVERFLOW, FLAGS_CF, *a, *b));
+
+    // update OF
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, FLAGS_CF));
+
+    // perform the actual multiplication
+    pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SIGNED_MUL, tmp, *a, *b));
+
+    *result = res_tmp;
+
+cleanup:
+    return err;
+}
+
 static err_t do_xor(
     const post_prefixes_ctx_t* ctx,
     const pis_operand_t* a,
@@ -669,6 +698,15 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         ));
 
         CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &FLAGS_CF));
+    } else if (second_opcode_byte == 0xaf) {
+        // imul r, r/m
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+        CHECK_RETHROW(calc_and_store_binop_modrm(
+            ctx,
+            do_imul,
+            &modrm_operands.reg_operand,
+            &modrm_operands.rm_operand
+        ));
     } else if (second_opcode_byte == 0x1f) {
         // xxx r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
@@ -1662,31 +1700,15 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         i8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
         u64 imm = pis_sign_extend_byte(imm8, operand_size);
+        pis_operand_t imm_operand = PIS_OPERAND_CONST(imm, operand_size);
 
         pis_operand_t rm_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
         CHECK_RETHROW(modrm_rm_read(ctx, &rm_value, &modrm_operands.rm_operand.rm));
 
-        // update CF
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN3(
-                PIS_OPCODE_SIGNED_MUL_OVERFLOW,
-                FLAGS_CF,
-                rm_value,
-                PIS_OPERAND_CONST(imm, operand_size)
-            )
-        );
+        pis_operand_t res = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+        CHECK_RETHROW(do_imul(ctx, &rm_value, &imm_operand, &res));
 
-        // update OF
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, FLAGS_CF));
-
-        // perform the actual multiplication
-        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN3(PIS_OPCODE_SIGNED_MUL, tmp, rm_value, PIS_OPERAND_CONST(imm, operand_size))
-        );
-        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp));
+        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &res));
     } else if (first_opcode_byte == 0x98) {
         // cbw/cwde/cdqe
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
