@@ -1934,6 +1934,17 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
+    } else if (first_opcode_byte == 0x25) {
+        // and [R/E]AX, imm
+        pis_operand_t imm = {};
+        CHECK_RETHROW(fetch_sign_extended_imm_operand(ctx, &imm));
+
+        pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
+
+        pis_operand_t res = {};
+        CHECK_RETHROW(do_and(ctx, &ax, &imm, &res));
+
+        CHECK_RETHROW(write_gpr(ctx, &ax, &res));
     } else if (first_opcode_byte == 0x81) {
         // xxx r/m, imm
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
