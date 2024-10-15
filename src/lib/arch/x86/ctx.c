@@ -1406,11 +1406,12 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         if (modrm_operands.modrm.reg == 7) {
             // cmp r/m8, imm8
 
+            pis_operand_t dst_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+            CHECK_RETHROW(modrm_rm_read(ctx, &dst_tmp, &modrm_operands.rm_operand.rm));
+
             // perform subtraction but ignore the result
             pis_operand_t res = {};
-            CHECK_RETHROW(
-                calc_binop_modrm_imm(ctx, do_sub, &modrm_operands.rm_operand, &imm_operand, &res)
-            );
+            CHECK_RETHROW(do_sub(ctx, &dst_tmp, &imm_operand, &res));
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
