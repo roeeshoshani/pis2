@@ -1904,6 +1904,13 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         // mov al, imm8
         u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
         CHECK_RETHROW(write_gpr(ctx, &AL, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1)));
+    } else if (first_opcode_byte == 0x34) {
+        // xor al, imm8
+        u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+
+        pis_operand_t res = {};
+        CHECK_RETHROW(do_xor(ctx, &AL, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1), &res));
+        CHECK_RETHROW(write_gpr(ctx, &AL, &res));
     } else if (opcode_reg_opcode_only(first_opcode_byte) == 0xb8) {
         // mov <reg>, imm
         u8 reg_encoding = opcode_reg_extract(ctx, first_opcode_byte);
