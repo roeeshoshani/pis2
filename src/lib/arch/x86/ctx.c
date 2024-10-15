@@ -943,6 +943,35 @@ static err_t shr_calc_overflow_flag(
 cleanup:
     return err;
 }
+
+static err_t sar_calc_overflow_flag(
+    const post_prefixes_ctx_t* ctx, const pis_operand_t* to_shift, const pis_operand_t* count
+) {
+    err_t err = SUCCESS;
+
+    CHECK(count->size == to_shift->size);
+
+    pis_operand_size_t operand_size = to_shift->size;
+
+    // the overflow flag is set to 0 if the count is 1
+    pis_operand_t new_overflow_flag_value = PIS_OPERAND_CONST(1, operand_size);
+
+    // we only want to set the overflow flag if the count is 1, otherwise we want to use
+    // the original OF value.
+    pis_operand_t is_count_1 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_CONST(1, operand_size))
+    );
+
+    CHECK_RETHROW(
+        cond_expr_ternary(ctx, &is_count_1, &new_overflow_flag_value, &FLAGS_OF, &FLAGS_OF)
+    );
+
+cleanup:
+    return err;
+}
+
 static err_t do_shr(
     const post_prefixes_ctx_t* ctx,
     const pis_operand_t* a,
@@ -967,6 +996,39 @@ static err_t do_shr(
 
     // perform the actual shift
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, res_tmp, *a, count));
+
+    CHECK_RETHROW(shl_calc_parity_zero_sign_flags(ctx, &count, &res_tmp));
+
+    *result = res_tmp;
+
+cleanup:
+    return err;
+}
+
+static err_t do_sar(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* a,
+    const pis_operand_t* b,
+    pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    CHECK(a->size == b->size);
+    pis_operand_size_t operand_size = a->size;
+
+    pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+
+    pis_operand_t count = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    CHECK_RETHROW(mask_shift_count(ctx, b, &count, operand_size));
+
+    // carry flag
+    CHECK_RETHROW(shr_calc_carry_flag(ctx, a, &count));
+
+    // overflow flag
+    CHECK_RETHROW(sar_calc_overflow_flag(ctx, a, &count));
+
+    // perform the actual shift
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT_SIGNED, res_tmp, *a, count));
 
     CHECK_RETHROW(shl_calc_parity_zero_sign_flags(ctx, &count, &res_tmp));
 
@@ -1454,6 +1516,12 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             CHECK_RETHROW(do_shr(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm8, operand_size), &res_tmp));
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+        } else if (modrm_operands.modrm.reg == 7) {
+            // sar r/m, imm8
+            pis_operand_t res_tmp = {};
+            CHECK_RETHROW(do_sar(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm8, operand_size), &res_tmp));
+
+            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
@@ -1478,6 +1546,18 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             // shr r/m, cl
             pis_operand_t res_tmp = {};
             CHECK_RETHROW(do_shr(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
+
+            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+        } else if (modrm_operands.modrm.reg == 5) {
+            // shr r/m, cl
+            pis_operand_t res_tmp = {};
+            CHECK_RETHROW(do_shr(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
+
+            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+        } else if (modrm_operands.modrm.reg == 7) {
+            // sar r/m, cl
+            pis_operand_t res_tmp = {};
+            CHECK_RETHROW(do_sar(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else {

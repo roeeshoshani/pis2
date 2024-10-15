@@ -136,6 +136,7 @@
     _(PIS_OPCODE_EQUALS, )                                                                         \
     _(PIS_OPCODE_NOT, )                                                                            \
     _(PIS_OPCODE_SHIFT_RIGHT, )                                                                    \
+    _(PIS_OPCODE_SHIFT_RIGHT_SIGNED, )                                                             \
     _(PIS_OPCODE_SHIFT_LEFT, )                                                                     \
     _(PIS_OPCODE_UNSIGNED_LESS_THAN, )                                                             \
     _(PIS_OPCODE_SIGNED_BORROW, )                                                                  \
