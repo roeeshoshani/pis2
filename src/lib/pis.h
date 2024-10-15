@@ -45,7 +45,7 @@
 
 #define PIS_ADDR(SPACE, OFFSET) ((pis_addr_t) {.space = (SPACE), .offset = (OFFSET)})
 
-#define PIS_OPERAND(ADDR, SIZE) ((pis_operand_t) {.addr = (ADDR), .size = (SIZE)})
+#define PIS_OPERAND(ADDR, SIZE) ((pis_operand_t) {.addr = (ADDR), .size_in_bytes = (SIZE)})
 
 #define PIS_OPERAND_REG(OFFSET, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_REG, OFFSET), SIZE))
 
@@ -182,7 +182,7 @@ typedef struct {
 
 typedef struct {
     pis_addr_t addr;
-    pis_operand_size_t size;
+    pis_operand_size_t size_in_bytes;
 } pis_operand_t;
 
 typedef struct {

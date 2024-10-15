@@ -79,8 +79,8 @@ static err_t generic_test_mov_reg_reg(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(dst_reg->size == src_reg->size);
-    pis_operand_size_t operand_size = dst_reg->size;
+    CHECK(dst_reg->size_in_bytes == src_reg->size_in_bytes);
+    pis_operand_size_t operand_size = dst_reg->size_in_bytes;
 
     u64 src_reg_val = MAGIC64_1 & pis_operand_size_max_unsigned_value(operand_size);
 
@@ -112,23 +112,25 @@ static err_t generic_test_mov_modrm_reg_at_addr(
     err_t err = SUCCESS;
 
     if (addr_base_reg != NULL) {
-        CHECK(addr_base_reg->size == addr_size);
+        CHECK(addr_base_reg->size_in_bytes == addr_size);
     }
     if (addr_index_reg != NULL) {
-        CHECK(addr_index_reg->size == addr_size);
+        CHECK(addr_index_reg->size_in_bytes == addr_size);
     }
 
     u64 addr_max = pis_operand_size_max_unsigned_value(addr_size);
     CHECK(addr_imm <= addr_max);
 
-    u64 src_reg_val = MAGIC64_1 & pis_operand_size_max_unsigned_value(src_reg->size);
+    u64 src_reg_val = MAGIC64_1 & pis_operand_size_max_unsigned_value(src_reg->size_in_bytes);
     u64 base_reg_val = 0;
     if (addr_base_reg != NULL) {
-        base_reg_val = MAGIC64_2 & pis_operand_size_max_unsigned_value(addr_base_reg->size);
+        base_reg_val =
+            MAGIC64_2 & pis_operand_size_max_unsigned_value(addr_base_reg->size_in_bytes);
     }
     u64 index_reg_val = 0;
     if (addr_index_reg != NULL) {
-        index_reg_val = MAGIC64_2 & pis_operand_size_max_unsigned_value(addr_index_reg->size);
+        index_reg_val =
+            MAGIC64_2 & pis_operand_size_max_unsigned_value(addr_index_reg->size_in_bytes);
     }
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
@@ -164,7 +166,7 @@ static err_t generic_test_mov_modrm_reg_at_addr(
 
     // check the written value
     CHECK_RETHROW_VERBOSE(
-        emu_assert_mem_value_equals(&g_emu, written_addr, src_reg->size, src_reg_val)
+        emu_assert_mem_value_equals(&g_emu, written_addr, src_reg->size_in_bytes, src_reg_val)
     );
 
     // make sure the original regs weren't modified
@@ -856,7 +858,7 @@ static err_t generic_test_call(
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
 
-    u64 sp_value = MAGIC64_1 & pis_operand_size_max_unsigned_value(sp->size);
+    u64 sp_value = MAGIC64_1 & pis_operand_size_max_unsigned_value(sp->size_in_bytes);
 
     CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, sp, sp_value));
 
@@ -1092,11 +1094,11 @@ static err_t generic_test_mov_sign_extend_reg_modrm(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(dst_reg->size >= mem_value_size);
+    CHECK(dst_reg->size_in_bytes >= mem_value_size);
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
 
-    u64 addr = MAGIC64_1 & pis_operand_size_max_unsigned_value(addr_reg->size);
+    u64 addr = MAGIC64_1 & pis_operand_size_max_unsigned_value(addr_reg->size_in_bytes);
     CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, addr_reg, addr));
 
     CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(&g_emu, addr, mem_value, mem_value_size));
@@ -1110,7 +1112,7 @@ static err_t generic_test_mov_sign_extend_reg_modrm(
     if (sign_bit) {
         // value is signed, sign extend it
         u64 sign_extension_bits =
-            ((pis_operand_size_max_unsigned_value(dst_reg->size) >> mem_value_size_in_bits)
+            ((pis_operand_size_max_unsigned_value(dst_reg->size_in_bytes) >> mem_value_size_in_bits)
              << mem_value_size_in_bits);
         sign_extended_mem_value |= sign_extension_bits;
     }
@@ -1188,11 +1190,11 @@ static err_t generic_test_mov_zero_extend_reg_modrm(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(dst_reg->size >= mem_value_size);
+    CHECK(dst_reg->size_in_bytes >= mem_value_size);
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
 
-    u64 addr = MAGIC64_1 & pis_operand_size_max_unsigned_value(addr_reg->size);
+    u64 addr = MAGIC64_1 & pis_operand_size_max_unsigned_value(addr_reg->size_in_bytes);
     CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, addr_reg, addr));
 
     u64 mem_value = MAGIC64_2 & pis_operand_size_max_unsigned_value(mem_value_size);
@@ -1323,14 +1325,14 @@ static err_t generic_test_push_reg(
 ) {
     err_t err = SUCCESS;
 
-    u64 sp_addr = MAGIC64_1 & pis_operand_size_max_unsigned_value(sp->size);
-    u64 pushed_value = MAGIC64_2 & pis_operand_size_max_unsigned_value(pushed_reg->size);
+    u64 sp_addr = MAGIC64_1 & pis_operand_size_max_unsigned_value(sp->size_in_bytes);
+    u64 pushed_value = MAGIC64_2 & pis_operand_size_max_unsigned_value(pushed_reg->size_in_bytes);
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
     CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, sp, sp_addr));
     CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, pushed_reg, pushed_value));
     CHECK_RETHROW_VERBOSE(
-        generic_test_push(&g_emu, code, cpumode, sp, pushed_value, pushed_reg->size)
+        generic_test_push(&g_emu, code, cpumode, sp, pushed_value, pushed_reg->size_in_bytes)
     );
 
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(emu, pushed_reg, pushed_value));

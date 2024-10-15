@@ -110,11 +110,11 @@ err_t pis_emu_read_operand(const pis_emu_t* emu, const pis_operand_t* operand, u
 
     if (operand->addr.space == PIS_SPACE_CONST) {
         u64 const_value = operand->addr.offset;
-        u64 max_value = pis_operand_size_max_unsigned_value(operand->size);
+        u64 max_value = pis_operand_size_max_unsigned_value(operand->size_in_bytes);
         CHECK(const_value <= max_value);
         *operand_value = const_value;
     } else {
-        size_t operand_size_in_bytes = pis_operand_size_to_bytes(operand->size);
+        size_t operand_size_in_bytes = pis_operand_size_to_bytes(operand->size_in_bytes);
 
         u64_bytes_t converter = {.u64 = 0};
         CHECK(operand_size_in_bytes <= ARRAY_SIZE(converter.bytes));
@@ -132,7 +132,7 @@ cleanup:
 err_t pis_emu_write_operand(pis_emu_t* emu, const pis_operand_t* operand, u64 value) {
     err_t err = SUCCESS;
 
-    size_t operand_size_in_bytes = pis_operand_size_to_bytes(operand->size);
+    size_t operand_size_in_bytes = pis_operand_size_to_bytes(operand->size_in_bytes);
 
     u64_bytes_t converter = {.u64 = value};
     CHECK(operand_size_in_bytes <= ARRAY_SIZE(converter.bytes));
@@ -200,7 +200,7 @@ err_t pis_emu_read_operand_signed(
     u64 unsigned_value = 0;
     CHECK_RETHROW(pis_emu_read_operand(emu, operand, &unsigned_value));
 
-    *operand_value = sign_extend_value(unsigned_value, operand->size);
+    *operand_value = sign_extend_value(unsigned_value, operand->size_in_bytes);
 
 cleanup:
     return err;
@@ -212,14 +212,14 @@ static err_t run_binary_operator(pis_emu_t* emu, const pis_insn_t* insn, binary_
 
     // make sure that all operands are of the same size
     CHECK_TRACE_CODE(
-        insn->operands[0].size == insn->operands[1].size &&
-            insn->operands[1].size == insn->operands[2].size,
+        insn->operands[0].size_in_bytes == insn->operands[1].size_in_bytes &&
+            insn->operands[1].size_in_bytes == insn->operands[2].size_in_bytes,
         PIS_ERR_EMU_OPERAND_SIZE_MISMATCH,
         "operand size mismatch in binary operator %s, operand sizes: %u %u %u",
         pis_opcode_to_str(insn->opcode),
-        insn->operands[0].size,
-        insn->operands[1].size,
-        insn->operands[2].size
+        insn->operands[0].size_in_bytes,
+        insn->operands[1].size_in_bytes,
+        insn->operands[2].size_in_bytes
     );
 
     u64 lhs = 0;
@@ -241,8 +241,8 @@ static err_t run_signed_binary_operator(
 
     // make sure that all operands are of the same size
     CHECK_CODE(
-        insn->operands[0].size == insn->operands[1].size &&
-            insn->operands[1].size == insn->operands[2].size,
+        insn->operands[0].size_in_bytes == insn->operands[1].size_in_bytes &&
+            insn->operands[1].size_in_bytes == insn->operands[2].size_in_bytes,
         PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
     );
 
@@ -288,7 +288,7 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         // check operand sizes
         CHECK_CODE(
-            insn->operands[0].size == insn->operands[1].size,
+            insn->operands[0].size_in_bytes == insn->operands[1].size_in_bytes,
             PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
         );
 
@@ -324,7 +324,7 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         u64 addr = 0;
         CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[0], &addr));
 
-        CHECK_RETHROW(pis_emu_write_mem_value(emu, addr, value, insn->operands[1].size));
+        CHECK_RETHROW(pis_emu_write_mem_value(emu, addr, value, insn->operands[1].size_in_bytes));
 
         break;
     }
@@ -333,7 +333,7 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &addr));
 
         u64 value = 0;
-        CHECK_RETHROW(pis_emu_read_mem_value(emu, addr, insn->operands[0].size, &value));
+        CHECK_RETHROW(pis_emu_read_mem_value(emu, addr, insn->operands[0].size_in_bytes, &value));
 
         CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], value));
 
@@ -344,17 +344,20 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         // check operand sizes
         CHECK_CODE(
-            insn->operands[1].size == insn->operands[2].size,
+            insn->operands[1].size_in_bytes == insn->operands[2].size_in_bytes,
             PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
         );
-        CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
+        CHECK_CODE(
+            insn->operands[0].size_in_bytes == PIS_OPERAND_SIZE_1,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        );
 
         u64 lhs = 0;
         CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &lhs));
         u64 rhs = 0;
         CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[2], &rhs));
 
-        pis_operand_size_t src_operand_size = insn->operands[1].size;
+        pis_operand_size_t src_operand_size = insn->operands[1].size_in_bytes;
         u64 max_value = pis_operand_size_max_unsigned_value(src_operand_size);
         bool is_overflow = lhs > max_value - rhs;
 
@@ -367,10 +370,13 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         // check operand sizes
         CHECK_CODE(
-            insn->operands[1].size == insn->operands[2].size,
+            insn->operands[1].size_in_bytes == insn->operands[2].size_in_bytes,
             PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
         );
-        CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
+        CHECK_CODE(
+            insn->operands[0].size_in_bytes == PIS_OPERAND_SIZE_1,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        );
 
         u64 lhs = 0;
         CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &lhs));
@@ -380,7 +386,7 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         u64 result = lhs + rhs;
 
-        pis_operand_size_t src_operand_size = insn->operands[1].size;
+        pis_operand_size_t src_operand_size = insn->operands[1].size_in_bytes;
         u32 src_operand_size_in_bits = pis_operand_size_to_bits(src_operand_size);
         u32 sign_bit_shift_amount = src_operand_size_in_bits - 1;
 
@@ -401,7 +407,7 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         // check operand sizes
         CHECK_CODE(
-            insn->operands[0].size < insn->operands[1].size,
+            insn->operands[0].size_in_bytes < insn->operands[1].size_in_bytes,
             PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
         );
 
@@ -416,13 +422,16 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
         CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
 
         // check operand sizes
-        CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
+        CHECK_CODE(
+            insn->operands[0].size_in_bytes == PIS_OPERAND_SIZE_1,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        );
 
         u64 value = 0;
         CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &value));
 
         // naive calculation of parity. we don't care about performance here.
-        u32 value_size_in_bits = pis_operand_size_to_bits(insn->operands[1].size);
+        u32 value_size_in_bits = pis_operand_size_to_bits(insn->operands[1].size_in_bytes);
         u32 bits_amount = 0;
         for (size_t i = 0; i < value_size_in_bits; i++) {
             if (((value >> i) & 1) != 0) {
@@ -440,10 +449,13 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         // check operand sizes
         CHECK_CODE(
-            insn->operands[1].size == insn->operands[2].size,
+            insn->operands[1].size_in_bytes == insn->operands[2].size_in_bytes,
             PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
         );
-        CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
+        CHECK_CODE(
+            insn->operands[0].size_in_bytes == PIS_OPERAND_SIZE_1,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        );
 
         u64 lhs = 0;
         CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &lhs));
@@ -462,7 +474,7 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         // check operand sizes
         CHECK_CODE(
-            insn->operands[0].size == insn->operands[1].size,
+            insn->operands[0].size_in_bytes == insn->operands[1].size_in_bytes,
             PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
         );
 
@@ -486,10 +498,13 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         // check operand sizes
         CHECK_CODE(
-            insn->operands[1].size == insn->operands[2].size,
+            insn->operands[1].size_in_bytes == insn->operands[2].size_in_bytes,
             PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
         );
-        CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
+        CHECK_CODE(
+            insn->operands[0].size_in_bytes == PIS_OPERAND_SIZE_1,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        );
 
         u64 lhs = 0;
         CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &lhs));
@@ -508,10 +523,13 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         // check operand sizes
         CHECK_CODE(
-            insn->operands[1].size == insn->operands[2].size,
+            insn->operands[1].size_in_bytes == insn->operands[2].size_in_bytes,
             PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
         );
-        CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
+        CHECK_CODE(
+            insn->operands[0].size_in_bytes == PIS_OPERAND_SIZE_1,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        );
 
         u64 lhs = 0;
         CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &lhs));
@@ -521,7 +539,7 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         u64 result = lhs - rhs;
 
-        pis_operand_size_t src_operand_size = insn->operands[1].size;
+        pis_operand_size_t src_operand_size = insn->operands[1].size_in_bytes;
         u32 src_operand_size_in_bits = pis_operand_size_to_bits(src_operand_size);
         u32 sign_bit_shift_amount = src_operand_size_in_bits - 1;
 
@@ -565,7 +583,7 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         // check operand sizes
         CHECK_CODE(
-            insn->operands[0].size > insn->operands[1].size,
+            insn->operands[0].size_in_bytes > insn->operands[1].size_in_bytes,
             PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
         );
 
@@ -581,7 +599,7 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         // check operand sizes
         CHECK_CODE(
-            insn->operands[0].size > insn->operands[1].size,
+            insn->operands[0].size_in_bytes > insn->operands[1].size_in_bytes,
             PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
         );
 
@@ -600,10 +618,13 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         // check operand sizes
         CHECK_CODE(
-            insn->operands[1].size == insn->operands[2].size,
+            insn->operands[1].size_in_bytes == insn->operands[2].size_in_bytes,
             PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
         );
-        CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
+        CHECK_CODE(
+            insn->operands[0].size_in_bytes == PIS_OPERAND_SIZE_1,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
+        );
 
         u64 lhs = 0;
         CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &lhs));

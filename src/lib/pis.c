@@ -17,11 +17,11 @@ bool pis_addr_equals(const pis_addr_t* a, const pis_addr_t* b) {
 
 void pis_operand_dump(const pis_operand_t* operand) {
     pis_addr_dump(&operand->addr);
-    TRACE_NO_NEWLINE(":0x%x", (unsigned) pis_operand_size_to_bytes(operand->size));
+    TRACE_NO_NEWLINE(":0x%x", (unsigned) pis_operand_size_to_bytes(operand->size_in_bytes));
 }
 
 bool pis_operand_equals(const pis_operand_t* a, const pis_operand_t* b) {
-    return a->size == b->size && pis_addr_equals(&a->addr, &b->addr);
+    return a->size_in_bytes == b->size_in_bytes && pis_addr_equals(&a->addr, &b->addr);
 }
 
 void pis_insn_dump(const pis_insn_t* insn) {
