@@ -1293,101 +1293,78 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         if (modrm_operands.modrm.reg == 6) {
             // div r/m
-            if (operand_size.bytes == 8) {
-                // need to divide `RDX:RAX`, but we don't have 16 byte operands, so we need to use a
-                // special opcode which accepts 2 source operand which together represent a single
-                // 16 byte source operand. this is currently not supported
-                CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
-            } else {
-                // divide `dx:ax` or `edx:eax`.
 
-                // first, combine the 2 registers into a single operand.
-                pis_operand_size_t double_operand_size = PIS_OPERAND_SIZE(operand_size.bytes * 2);
-                pis_operand_t divide_lhs = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN2(
-                        PIS_OPCODE_ZERO_EXTEND,
-                        divide_lhs,
-                        get_ax_operand_of_size(operand_size)
-                    )
-                );
+            // we want to divide `dx:ax` or `edx:eax` or `rdx:rax`. first, combine the 2 registers
+            // into a single operand.
+            pis_operand_size_t double_operand_size = PIS_OPERAND_SIZE(operand_size.bytes * 2);
+            pis_operand_t divide_lhs = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, divide_lhs, get_ax_operand_of_size(operand_size))
+            );
 
-                // zero extend the dx part and shift it left
-                pis_operand_t zero_extended_dx =
-                    LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN2(
-                        PIS_OPCODE_ZERO_EXTEND,
-                        zero_extended_dx,
-                        get_dx_operand_of_size(operand_size)
-                    )
-                );
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN3(
-                        PIS_OPCODE_SHIFT_LEFT,
-                        zero_extended_dx,
-                        zero_extended_dx,
-                        PIS_OPERAND_CONST(
-                            pis_operand_size_to_bits(operand_size),
-                            double_operand_size
-                        )
-                    )
-                );
+            // zero extend the dx part and shift it left
+            pis_operand_t zero_extended_dx = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN2(
+                    PIS_OPCODE_ZERO_EXTEND,
+                    zero_extended_dx,
+                    get_dx_operand_of_size(operand_size)
+                )
+            );
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN3(
+                    PIS_OPCODE_SHIFT_LEFT,
+                    zero_extended_dx,
+                    zero_extended_dx,
+                    PIS_OPERAND_CONST(pis_operand_size_to_bits(operand_size), double_operand_size)
+                )
+            );
 
-                // or the shifted dx value into the result operand
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN3(PIS_OPCODE_OR, divide_lhs, divide_lhs, zero_extended_dx)
-                );
+            // or the shifted dx value into the result operand
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN3(PIS_OPCODE_OR, divide_lhs, divide_lhs, zero_extended_dx)
+            );
 
-                // read and zero extend the divisor
-                pis_operand_t divisor = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-                CHECK_RETHROW(modrm_rm_read(ctx, &divisor, &modrm_operands.rm_operand.rm));
+            // read and zero extend the divisor
+            pis_operand_t divisor = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+            CHECK_RETHROW(modrm_rm_read(ctx, &divisor, &modrm_operands.rm_operand.rm));
 
-                pis_operand_t zero_extended_divisor =
-                    LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, zero_extended_divisor, divisor)
-                );
+            pis_operand_t zero_extended_divisor =
+                LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, zero_extended_divisor, divisor)
+            );
 
-                // perform the division
-                pis_operand_t div_result = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN3(PIS_OPCODE_UNSIGNED_DIV, div_result, divide_lhs, divisor)
-                );
+            // perform the division
+            pis_operand_t div_result = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN3(PIS_OPCODE_UNSIGNED_DIV, div_result, divide_lhs, divisor)
+            );
 
-                // store the division result in ax
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN2(
-                        PIS_OPCODE_GET_LOW_BITS,
-                        get_ax_operand_of_size(operand_size),
-                        div_result
-                    )
-                );
+            // store the division result in ax
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, get_ax_operand_of_size(operand_size), div_result)
+            );
 
-                // perform the remainder calculation
-                pis_operand_t rem_result = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN3(PIS_OPCODE_UNSIGNED_REM, rem_result, divide_lhs, divisor)
-                );
+            // perform the remainder calculation
+            pis_operand_t rem_result = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN3(PIS_OPCODE_UNSIGNED_REM, rem_result, divide_lhs, divisor)
+            );
 
-                // store the division result in dx
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN2(
-                        PIS_OPCODE_GET_LOW_BITS,
-                        get_dx_operand_of_size(operand_size),
-                        rem_result
-                    )
-                );
-            }
+            // store the division result in dx
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, get_dx_operand_of_size(operand_size), rem_result)
+            );
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
@@ -1575,7 +1552,6 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
-
     } else if (first_opcode_byte == 0x83) {
         // xxx r/m, imm8
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
