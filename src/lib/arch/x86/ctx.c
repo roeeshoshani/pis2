@@ -738,6 +738,25 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, dst_size);
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, tmp, tmp8));
         CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp));
+    } else if (second_opcode_byte == 0xb7) {
+        // movzx r, r/m16
+        pis_operand_size_t dst_size = ctx->operand_sizes.insn_default_not_64_bit;
+        if (dst_size == PIS_OPERAND_SIZE_2) {
+            dst_size = PIS_OPERAND_SIZE_4;
+        }
+        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
+            ctx,
+            &modrm_operands,
+            PIS_OPERAND_SIZE_2,
+            dst_size
+        ));
+
+        pis_operand_t tmp16 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_2);
+        CHECK_RETHROW(modrm_rm_read(ctx, &tmp16, &modrm_operands.rm_operand.rm));
+
+        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, dst_size);
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, tmp, tmp16));
+        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp));
     } else if (second_opcode_byte == 0xbe) {
         // movsx r, r/m8
         pis_operand_size_t dst_size = ctx->operand_sizes.insn_default_not_64_bit;
