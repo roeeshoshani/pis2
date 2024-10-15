@@ -26,6 +26,8 @@
 
 #define UNREACHABLE() CHECK_FAIL_TRACE("uncreachable code was reached")
 
+#define TODO() CHECK_FAIL_TRACE("unimplemented code was reached")
+
 #define CHECK_RETHROW(EXPR)                                                                        \
     do {                                                                                           \
         err_t ___res = (EXPR);                                                                     \

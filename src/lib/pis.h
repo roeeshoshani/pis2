@@ -146,7 +146,9 @@
     _(PIS_OPCODE_ZERO_EXTEND, )                                                                    \
     _(PIS_OPCODE_SIGNED_MUL, )                                                                     \
     _(PIS_OPCODE_SIGNED_MUL_OVERFLOW, )                                                            \
-    _(PIS_OPCODE_UNSIGNED_MUL, )
+    _(PIS_OPCODE_UNSIGNED_MUL, )                                                                   \
+    _(PIS_OPCODE_UNSIGNED_REM, )                                                                   \
+    _(PIS_OPCODE_UNSIGNED_DIV, )
 STR_ENUM(pis_opcode, PIS_OPCODE);
 
 #define PIS_SPACE(_)                                                                               \
