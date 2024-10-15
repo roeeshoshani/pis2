@@ -21,6 +21,7 @@ CFLAGS ?=
 CFLAGS += -Isrc/lib
 CFLAGS += -Wall -Wextra
 CFLAGS += -Werror
+CFLAGS += -mno-sse -mno-avx
 
 .phony: all
 all: $(EXAMPLE_BIN) $(TESTS_BIN) $(OBJS)
