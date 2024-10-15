@@ -872,6 +872,20 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         );
 
         CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &final_value));
+    } else if (second_opcode_byte == 0x44) {
+        // cmove r, r/m
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+        pis_operand_t rm_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+        CHECK_RETHROW(modrm_rm_read(ctx, &rm_value, &modrm_operands.rm_operand.rm));
+
+        pis_operand_t final_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+        CHECK_RETHROW(
+            ternary(ctx, &FLAGS_ZF, &rm_value, &modrm_operands.reg_operand.reg, &final_value)
+        );
+
+        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &final_value));
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
