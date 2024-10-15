@@ -954,7 +954,7 @@ static err_t sar_calc_overflow_flag(
     pis_operand_size_t operand_size = to_shift->size;
 
     // the overflow flag is set to 0 if the count is 1
-    pis_operand_t new_overflow_flag_value = PIS_OPERAND_CONST(1, operand_size);
+    pis_operand_t new_overflow_flag_value = PIS_OPERAND_CONST(1, PIS_OPERAND_SIZE_1);
 
     // we only want to set the overflow flag if the count is 1, otherwise we want to use
     // the original OF value.
