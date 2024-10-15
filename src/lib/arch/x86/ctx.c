@@ -1956,6 +1956,17 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(do_sub(ctx, &ax, &imm, &res));
 
         CHECK_RETHROW(write_gpr(ctx, &ax, &res));
+    } else if (first_opcode_byte == 0x05) {
+        // add [R/E]AX, imm
+        pis_operand_t imm = {};
+        CHECK_RETHROW(fetch_sign_extended_imm_operand(ctx, &imm));
+
+        pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
+
+        pis_operand_t res = {};
+        CHECK_RETHROW(do_add(ctx, &ax, &imm, &res));
+
+        CHECK_RETHROW(write_gpr(ctx, &ax, &res));
     } else if (first_opcode_byte == 0x81) {
         // xxx r/m, imm
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
