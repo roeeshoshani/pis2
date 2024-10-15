@@ -276,6 +276,7 @@ DEFINE_BINARY_OPERATOR(shl, <<);
 DEFINE_BINARY_OPERATOR(shr, >>);
 DEFINE_BINARY_OPERATOR(mul, *);
 DEFINE_SIGNED_BINARY_OPERATOR(mul, *);
+DEFINE_SIGNED_BINARY_OPERATOR(sar, >>);
 
 err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
     err_t err = SUCCESS;
@@ -474,6 +475,9 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
     }
     case PIS_OPCODE_SHIFT_RIGHT:
         CHECK_RETHROW(run_binary_operator(emu, insn, binary_operator_shr));
+        break;
+    case PIS_OPCODE_SHIFT_RIGHT_SIGNED:
+        CHECK_RETHROW(run_signed_binary_operator(emu, insn, signed_binary_operator_sar));
         break;
     case PIS_OPCODE_UNSIGNED_LESS_THAN: {
         CHECK_CODE(insn->operands_amount == 3, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
