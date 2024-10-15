@@ -1367,6 +1367,12 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
     } else if (first_opcode_byte == 0x74) {
         // je rel8
         CHECK_RETHROW(do_cond_rel_jmp(ctx, &FLAGS_ZF, PIS_OPERAND_SIZE_1));
+    } else if (first_opcode_byte == 0x75) {
+        // jne rel8
+        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        CHECK_RETHROW(cond_negate(ctx, &res_tmp, &FLAGS_ZF));
+
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, PIS_OPERAND_SIZE_1));
     } else if (first_opcode_byte == 0xe8) {
         // call rel
         pis_operand_t target = {};
