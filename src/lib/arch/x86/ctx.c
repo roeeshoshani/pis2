@@ -391,6 +391,26 @@ cleanup:
     return err;
 }
 
+static err_t calc_binop_modrm_imm(
+    const post_prefixes_ctx_t* ctx,
+    modrm_binop_fn_t fn,
+    const modrm_operand_t* dst,
+    const pis_operand_t* src_imm,
+    pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+    pis_operand_t dst_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+
+    CHECK_RETHROW(modrm_operand_read(ctx, &dst_tmp, dst));
+
+    CHECK_RETHROW(fn(ctx, &dst_tmp, src_imm, result));
+
+cleanup:
+    return err;
+}
+
 static err_t calc_and_store_binop_modrm(
     const post_prefixes_ctx_t* ctx,
     modrm_binop_fn_t fn,
@@ -407,6 +427,21 @@ cleanup:
     return err;
 }
 
+static err_t calc_and_store_binop_modrm_imm(
+    const post_prefixes_ctx_t* ctx,
+    modrm_binop_fn_t fn,
+    const modrm_operand_t* dst,
+    const pis_operand_t* src_imm
+) {
+    err_t err = SUCCESS;
+
+    pis_operand_t res_tmp = {};
+    CHECK_RETHROW(calc_binop_modrm_imm(ctx, fn, dst, src_imm, &res_tmp));
+    CHECK_RETHROW(modrm_operand_write(ctx, dst, &res_tmp));
+
+cleanup:
+    return err;
+}
 
 static pis_operand_size_t rel_jmp_operand_size_16_32(const post_prefixes_ctx_t* ctx) {
     if (ctx->lift_ctx->pis_x86_ctx->cpumode == PIS_X86_CPUMODE_64_BIT) {
@@ -1371,12 +1406,11 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         if (modrm_operands.modrm.reg == 7) {
             // cmp r/m8, imm8
 
-            pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-            CHECK_RETHROW(modrm_rm_read(ctx, &rm_tmp, &modrm_operands.rm_operand.rm));
-
             // perform subtraction but ignore the result
             pis_operand_t res = {};
-            CHECK_RETHROW(do_sub(ctx, &rm_tmp, &imm_operand, &res));
+            CHECK_RETHROW(
+                calc_binop_modrm_imm(ctx, do_sub, &modrm_operands.rm_operand, &imm_operand, &res)
+            );
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
@@ -1483,19 +1517,21 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         // xxx r/m, imm
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
-        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
-
         pis_operand_t imm = {};
         CHECK_RETHROW(fetch_sign_extended_imm_operand(ctx, &imm));
 
         if (modrm_operands.modrm.reg == 7) {
             // cmp r/m, imm
-            pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-            CHECK_RETHROW(modrm_rm_read(ctx, &rm_tmp, &modrm_operands.rm_operand.rm));
 
             // perform subtraction but ignore the result
             pis_operand_t res = {};
-            CHECK_RETHROW(do_sub(ctx, &rm_tmp, &imm, &res));
+            CHECK_RETHROW(calc_binop_modrm_imm(ctx, do_sub, &modrm_operands.rm_operand, &imm, &res)
+            );
+        } else if (modrm_operands.modrm.reg == 0) {
+            // add r/m, imm
+            CHECK_RETHROW(
+                calc_and_store_binop_modrm_imm(ctx, do_add, &modrm_operands.rm_operand, &imm)
+            );
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
