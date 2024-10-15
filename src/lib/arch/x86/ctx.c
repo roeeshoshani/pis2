@@ -1289,13 +1289,25 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
 
+        pis_operand_t divisor = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+        CHECK_RETHROW(modrm_rm_read(ctx, &divisor, &modrm_operands.rm_operand.rm));
+
         if (modrm_operands.modrm.reg == 6) {
             // div r/m
             if (operand_size == PIS_OPERAND_SIZE_8) {
-                // need to divide `RDX:RAX`, but we don't have 16 byte operands, so we need to use a
-                // special opcode which accepts 2 source operand which together represent a single
-                // 16 byte source operand. this is currently not supported
-                CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
+                // divide `rdx:rax`.
+
+                // perform the division
+                LIFT_CTX_EMIT(
+                    ctx->lift_ctx,
+                    PIS_INSN4(PIS_OPCODE_UNSIGNED_DIV_16, RAX, RDX, RAX, divisor)
+                );
+
+                // perform the remainder calculation
+                LIFT_CTX_EMIT(
+                    ctx->lift_ctx,
+                    PIS_INSN4(PIS_OPCODE_UNSIGNED_REM_16, RDX, RDX, RAX, divisor)
+                );
             } else {
                 // divide `dx:ax` or `edx:eax`.
 
@@ -1341,10 +1353,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
                     PIS_INSN3(PIS_OPCODE_OR, divide_lhs, divide_lhs, zero_extended_dx)
                 );
 
-                // read and zero extend the divisor
-                pis_operand_t divisor = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-                CHECK_RETHROW(modrm_rm_read(ctx, &divisor, &modrm_operands.rm_operand.rm));
-
+                // zero extend the divisor
                 pis_operand_t zero_extended_divisor =
                     LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
                 LIFT_CTX_EMIT(

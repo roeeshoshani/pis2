@@ -280,6 +280,25 @@ DEFINE_BINARY_OPERATOR(rem, %);
 DEFINE_SIGNED_BINARY_OPERATOR(mul, *);
 DEFINE_SIGNED_BINARY_OPERATOR(sar, >>);
 
+void div128(u64 dividend_high, u64 dividend_low, u64 divisor, u64* quotient, u64* rem) {
+    // compute initial quotient and remainder
+    u64 initial_quot_high = dividend_high / divisor;
+    u64 initial_rem_high = dividend_high % divisor;
+
+    // combine remainder from high part with the upper 32 bits of the low part of the dividend
+    u64 upper_dividend_low = (initial_rem_high << 32) | (dividend_low >> 32);
+    u64 quot_mid = upper_dividend_low / divisor;
+    u64 rem_mid = upper_dividend_low % divisor;
+
+    // combine remainder with the lower 32 bits of the low part of the dividend
+    u64 lower_dividend_low = (rem_mid << 32) | (dividend_low & 0xFFFFFFFF);
+    u64 final_quot_low = lower_dividend_low / divisor;
+    *rem = lower_dividend_low % divisor;
+
+    // combine the three parts of the quotient
+    *quotient = (initial_quot_high << 32) | (quot_mid << 32) | final_quot_low;
+}
+
 err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
     err_t err = SUCCESS;
     switch (insn->opcode) {
@@ -625,6 +644,68 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
     case PIS_OPCODE_UNSIGNED_DIV:
         CHECK_RETHROW(run_binary_operator(emu, insn, binary_operator_div));
         break;
+    case PIS_OPCODE_UNSIGNED_DIV_16: {
+        CHECK_CODE(insn->operands_amount == 4, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+        // make sure that all operands are of the same size
+        CHECK_TRACE_CODE(
+            insn->operands[0].size == insn->operands[1].size &&
+                insn->operands[1].size == insn->operands[2].size &&
+                insn->operands[2].size == insn->operands[3].size,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH,
+            "operand size mismatch in binary operator %s, operand sizes: %u %u %u %u",
+            pis_opcode_to_str(insn->opcode),
+            insn->operands[0].size,
+            insn->operands[1].size,
+            insn->operands[2].size,
+            insn->operands[3].size
+        );
+
+        u64 lhs_high = 0;
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &lhs_high));
+        u64 lhs_low = 0;
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[2], &lhs_low));
+        u64 rhs = 0;
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[3], &rhs));
+
+        u64 quotient = 0;
+        u64 rem = 0;
+        div128(lhs_high, lhs_low, rhs, &quotient, &rem);
+
+        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], quotient));
+        break;
+    }
+    case PIS_OPCODE_UNSIGNED_REM_16: {
+        CHECK_CODE(insn->operands_amount == 4, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+        // make sure that all operands are of the same size
+        CHECK_TRACE_CODE(
+            insn->operands[0].size == insn->operands[1].size &&
+                insn->operands[1].size == insn->operands[2].size &&
+                insn->operands[2].size == insn->operands[3].size,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH,
+            "operand size mismatch in binary operator %s, operand sizes: %u %u %u %u",
+            pis_opcode_to_str(insn->opcode),
+            insn->operands[0].size,
+            insn->operands[1].size,
+            insn->operands[2].size,
+            insn->operands[3].size
+        );
+
+        u64 lhs_high = 0;
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &lhs_high));
+        u64 lhs_low = 0;
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[2], &lhs_low));
+        u64 rhs = 0;
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[3], &rhs));
+
+        u64 quotient = 0;
+        u64 rem = 0;
+        div128(lhs_high, lhs_low, rhs, &quotient, &rem);
+
+        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], rem));
+        break;
+    }
     case PIS_OPCODE_UNSIGNED_REM:
         CHECK_RETHROW(run_binary_operator(emu, insn, binary_operator_rem));
         break;

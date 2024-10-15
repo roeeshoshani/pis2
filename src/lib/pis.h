@@ -5,7 +5,7 @@
 #include "str_enum.h"
 #include "types.h"
 
-#define PIS_INSN_MAX_OPERANDS_AMOUNT (3)
+#define PIS_INSN_MAX_OPERANDS_AMOUNT (4)
 
 #define PIS_LIFT_MAX_INSNS_AMOUNT (64)
 
@@ -35,6 +35,13 @@
         .opcode = (OPCODE),                                                                        \
         .operands = {(OPERAND_1), (OPERAND_2), (OPERAND_3)},                                       \
         .operands_amount = 3,                                                                      \
+    })
+
+#define PIS_INSN4(OPCODE, OPERAND_1, OPERAND_2, OPERAND_3, OPERAND_4)                              \
+    ((pis_insn_t) {                                                                                \
+        .opcode = (OPCODE),                                                                        \
+        .operands = {(OPERAND_1), (OPERAND_2), (OPERAND_3), (OPERAND_4)},                          \
+        .operands_amount = 4,                                                                      \
     })
 
 #define PIS_INSN_ADD2(OPERAND_1, OPERAND_2)                                                        \
@@ -147,6 +154,8 @@
     _(PIS_OPCODE_SIGNED_MUL, )                                                                     \
     _(PIS_OPCODE_SIGNED_MUL_OVERFLOW, )                                                            \
     _(PIS_OPCODE_UNSIGNED_MUL, )                                                                   \
+    _(PIS_OPCODE_UNSIGNED_DIV_16, )                                                                \
+    _(PIS_OPCODE_UNSIGNED_REM_16, )                                                                \
     _(PIS_OPCODE_UNSIGNED_REM, )                                                                   \
     _(PIS_OPCODE_UNSIGNED_DIV, )
 STR_ENUM(pis_opcode, PIS_OPCODE);
