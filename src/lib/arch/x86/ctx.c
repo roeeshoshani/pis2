@@ -1643,6 +1643,30 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
+    } else if (first_opcode_byte == 0xc0) {
+        // xxx r/m8, imm8
+        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
+            ctx,
+            &modrm_operands,
+            PIS_OPERAND_SIZE_1,
+            PIS_OPERAND_SIZE_1
+        ));
+
+        u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        pis_operand_t imm_operand = PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1);
+
+        if (modrm_operands.modrm.reg == 5) {
+            // shr r/m8, imm8
+            pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+            CHECK_RETHROW(modrm_operand_read(ctx, &rm_tmp, &modrm_operands.rm_operand));
+
+            pis_operand_t res_tmp = {};
+            CHECK_RETHROW(do_shr(ctx, &rm_tmp, &imm_operand, &res_tmp));
+
+            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+        } else {
+            CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
+        }
     } else if (first_opcode_byte == 0xc6) {
         // xxx r/m8, imm8
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
