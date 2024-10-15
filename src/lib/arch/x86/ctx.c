@@ -658,6 +658,17 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         CHECK_RETHROW(cond_negate(ctx, &res_tmp, &FLAGS_ZF));
 
         CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+    } else if (second_opcode_byte == 0x92) {
+        // setb r/m8
+        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
+            ctx,
+            &modrm_operands,
+            PIS_OPERAND_SIZE_1,
+            // don't care
+            PIS_OPERAND_SIZE_1
+        ));
+
+        CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &FLAGS_CF));
     } else if (second_opcode_byte == 0x1f) {
         // xxx r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
