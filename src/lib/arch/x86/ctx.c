@@ -7,6 +7,9 @@
 #include "prefixes.h"
 #include "regs.h"
 
+/// the maximum value of a condition encoding.
+#define X86_COND_ENCODING_MAX_VALUE (0xf)
+
 typedef enum {
     X86_COND_CLASS_OVERFLOW,
     X86_COND_CLASS_BELOW,
@@ -22,6 +25,18 @@ typedef struct {
     x86_cond_kind_t kind;
     bool is_negative;
 } x86_cond_t;
+
+static err_t cond_decode(u8 cond_encoding, x86_cond_t* cond) {
+    err_t err = SUCCESS;
+
+    CHECK(cond_encoding <= X86_COND_ENCODING_MAX_VALUE);
+
+    cond->is_negative = cond_encoding & 1;
+    cond->kind = cond_encoding >> 1;
+
+cleanup:
+    return err;
+}
 
 static err_t cond_negate(
     const post_prefixes_ctx_t* ctx, const pis_operand_t* cond, const pis_operand_t* result
@@ -87,6 +102,19 @@ static err_t
     } else {
         *result = tmp;
     }
+
+cleanup:
+    return err;
+}
+
+static err_t
+    cond_decode_and_calc(const post_prefixes_ctx_t* ctx, u8 cond_encoding, pis_operand_t* result) {
+    err_t err = SUCCESS;
+
+    x86_cond_t cond = {};
+    CHECK_RETHROW(cond_decode(cond_encoding, &cond));
+
+    CHECK_RETHROW(calc_cond(ctx, cond, result));
 
 cleanup:
     return err;
@@ -741,60 +769,15 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
     err_t err = SUCCESS;
     modrm_operands_t modrm_operands = {};
 
-    if (second_opcode_byte == 0x87) {
-        // ja rel
-        pis_operand_t a_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        pis_operand_t b_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    if (second_opcode_byte >= 0x80 && second_opcode_byte <= 0x80 + X86_COND_ENCODING_MAX_VALUE) {
+        // jcc rel
 
-        CHECK_RETHROW(cond_negate(ctx, &a_tmp, &FLAGS_CF));
-        CHECK_RETHROW(cond_negate(ctx, &b_tmp, &FLAGS_ZF));
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, res_tmp, a_tmp, b_tmp));
+        pis_operand_t cond = {};
+        CHECK_RETHROW(cond_decode_and_calc(ctx, second_opcode_byte - 0x80, &cond));
 
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, rel_jmp_operand_size_16_32(ctx)));
-    } else if (second_opcode_byte == 0x83) {
-        // jae rel
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        CHECK_RETHROW(cond_negate(ctx, &res_tmp, &FLAGS_CF));
-
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, rel_jmp_operand_size_16_32(ctx)));
-    } else if (second_opcode_byte == 0x82) {
-        // jb rel
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &FLAGS_CF, rel_jmp_operand_size_16_32(ctx)));
-    } else if (second_opcode_byte == 0x84) {
-        // je rel
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &FLAGS_ZF, rel_jmp_operand_size_16_32(ctx)));
-    } else if (second_opcode_byte == 0x85) {
-        // jne rel
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        CHECK_RETHROW(cond_negate(ctx, &res_tmp, &FLAGS_ZF));
-
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, rel_jmp_operand_size_16_32(ctx)));
-    } else if (second_opcode_byte == 0x86) {
-        // jbe rel
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, res_tmp, FLAGS_CF, FLAGS_ZF));
-
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, rel_jmp_operand_size_16_32(ctx)));
-    } else if (second_opcode_byte == 0x8c) {
-        // jl rel
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_XOR, res_tmp, FLAGS_SF, FLAGS_OF));
-
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, rel_jmp_operand_size_16_32(ctx)));
-    } else if (second_opcode_byte == 0x8f) {
-        // jg rel
-        pis_operand_t a_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        pis_operand_t b_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-
-        CHECK_RETHROW(cond_negate(ctx, &a_tmp, &FLAGS_ZF));
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_EQUALS, b_tmp, FLAGS_SF, FLAGS_OF));
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, res_tmp, a_tmp, b_tmp));
-
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, rel_jmp_operand_size_16_32(ctx)));
-    } else if (second_opcode_byte == 0x94) {
-        // sete r/m8
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &cond, rel_jmp_operand_size_16_32(ctx)));
+    } else if (second_opcode_byte >= 0x90 && second_opcode_byte <= 0x90 + X86_COND_ENCODING_MAX_VALUE) {
+        // setcc r/m8
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
             ctx,
             &modrm_operands,
@@ -803,65 +786,10 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
             PIS_OPERAND_SIZE_1
         ));
 
-        CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &FLAGS_ZF));
-    } else if (second_opcode_byte == 0x97) {
-        // seta r/m8
-        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
-            ctx,
-            &modrm_operands,
-            PIS_OPERAND_SIZE_1,
-            // don't care
-            PIS_OPERAND_SIZE_1
-        ));
+        pis_operand_t cond = {};
+        CHECK_RETHROW(cond_decode_and_calc(ctx, second_opcode_byte - 0x90, &cond));
 
-        pis_operand_t a_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        pis_operand_t b_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-
-        CHECK_RETHROW(cond_negate(ctx, &a_tmp, &FLAGS_CF));
-        CHECK_RETHROW(cond_negate(ctx, &b_tmp, &FLAGS_ZF));
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, res_tmp, a_tmp, b_tmp));
-
-        CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
-    } else if (second_opcode_byte == 0x95) {
-        // setne r/m8
-        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
-            ctx,
-            &modrm_operands,
-            PIS_OPERAND_SIZE_1,
-            // don't care
-            PIS_OPERAND_SIZE_1
-        ));
-
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        CHECK_RETHROW(cond_negate(ctx, &res_tmp, &FLAGS_ZF));
-
-        CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
-    } else if (second_opcode_byte == 0x93) {
-        // setae r/m8
-        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
-            ctx,
-            &modrm_operands,
-            PIS_OPERAND_SIZE_1,
-            // don't care
-            PIS_OPERAND_SIZE_1
-        ));
-
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        CHECK_RETHROW(cond_negate(ctx, &res_tmp, &FLAGS_CF));
-
-        CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
-    } else if (second_opcode_byte == 0x92) {
-        // setb r/m8
-        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
-            ctx,
-            &modrm_operands,
-            PIS_OPERAND_SIZE_1,
-            // don't care
-            PIS_OPERAND_SIZE_1
-        ));
-
-        CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &FLAGS_CF));
+        CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &cond));
     } else if (second_opcode_byte == 0xaf) {
         // imul r, r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
@@ -954,31 +882,19 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, reg_size);
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, res_tmp, rm_tmp));
         CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &res_tmp));
-    } else if (second_opcode_byte == 0x45) {
+    } else if (second_opcode_byte >= 0x40 && second_opcode_byte <= 0x40 + X86_COND_ENCODING_MAX_VALUE) {
         // cmovne r, r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
-        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
-        pis_operand_t rm_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-        CHECK_RETHROW(modrm_rm_read(ctx, &rm_value, &modrm_operands.rm_operand.rm));
-
-        pis_operand_t final_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-        CHECK_RETHROW(
-            ternary(ctx, &FLAGS_ZF, &modrm_operands.reg_operand.reg, &rm_value, &final_value)
-        );
-
-        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &final_value));
-    } else if (second_opcode_byte == 0x44) {
-        // cmove r, r/m
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+        pis_operand_t cond = {};
+        CHECK_RETHROW(cond_decode_and_calc(ctx, second_opcode_byte - 0x40, &cond));
 
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
         pis_operand_t rm_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
         CHECK_RETHROW(modrm_rm_read(ctx, &rm_value, &modrm_operands.rm_operand.rm));
 
         pis_operand_t final_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-        CHECK_RETHROW(
-            ternary(ctx, &FLAGS_ZF, &rm_value, &modrm_operands.reg_operand.reg, &final_value)
+        CHECK_RETHROW(ternary(ctx, &cond, &rm_value, &modrm_operands.reg_operand.reg, &final_value)
         );
 
         CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &final_value));
