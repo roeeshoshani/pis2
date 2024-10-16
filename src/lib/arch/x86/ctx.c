@@ -941,6 +941,7 @@ cleanup:
     return err;
 }
 
+/// fetches an immediate operand of the given size.
 static err_t fetch_imm_operand(
     const post_prefixes_ctx_t* ctx, pis_operand_size_t size, pis_operand_t* operand
 ) {
