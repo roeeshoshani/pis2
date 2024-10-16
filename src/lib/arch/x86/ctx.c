@@ -7,6 +7,91 @@
 #include "prefixes.h"
 #include "regs.h"
 
+typedef enum {
+    X86_COND_CLASS_OVERFLOW,
+    X86_COND_CLASS_BELOW,
+    X86_COND_CLASS_EQUALS,
+    X86_COND_CLASS_BELOW_EQUAL,
+    X86_COND_CLASS_SIGN,
+    X86_COND_CLASS_PARITY,
+    X86_COND_CLASS_LOWER,
+    X86_COND_CLASS_LOWER_EQUAL,
+} x86_cond_kind_t;
+
+typedef struct {
+    x86_cond_kind_t kind;
+    bool is_negative;
+} x86_cond_t;
+
+static err_t cond_negate(
+    const post_prefixes_ctx_t* ctx, const pis_operand_t* cond, const pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    CHECK(cond->size == PIS_OPERAND_SIZE_1);
+    CHECK(result->size == PIS_OPERAND_SIZE_1);
+
+    // condition negation is done by `XOR`ing with 1.
+    // we can't use `NOT` because it flips all bits, not only the lowest bit.
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_XOR, *result, *cond, PIS_OPERAND_CONST(1, PIS_OPERAND_SIZE_1))
+    );
+
+cleanup:
+    return err;
+}
+
+static err_t
+    calc_cond(const post_prefixes_ctx_t* ctx, const x86_cond_t cond, pis_operand_t* result) {
+    err_t err = SUCCESS;
+
+    pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+
+    switch (cond.kind) {
+    case X86_COND_CLASS_OVERFLOW:
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_OF));
+        break;
+    case X86_COND_CLASS_BELOW:
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_CF));
+        break;
+    case X86_COND_CLASS_EQUALS:
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_ZF));
+        break;
+    case X86_COND_CLASS_BELOW_EQUAL:
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, tmp, FLAGS_ZF, FLAGS_CF));
+        break;
+    case X86_COND_CLASS_SIGN:
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_SF));
+        break;
+    case X86_COND_CLASS_PARITY:
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_PF));
+        break;
+    case X86_COND_CLASS_LOWER:
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_XOR, tmp, FLAGS_SF, FLAGS_OF));
+        break;
+    case X86_COND_CLASS_LOWER_EQUAL: {
+        pis_operand_t inner_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_XOR, inner_tmp, FLAGS_SF, FLAGS_OF));
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, tmp, inner_tmp, FLAGS_ZF));
+        break;
+    }
+    default:
+        UNREACHABLE();
+    }
+
+    if (cond.is_negative) {
+        pis_operand_t negated = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        CHECK_RETHROW(cond_negate(ctx, &tmp, &negated));
+        *result = negated;
+    } else {
+        *result = tmp;
+    }
+
+cleanup:
+    return err;
+}
+
 static pis_operand_size_t cpumode_get_operand_size(pis_x86_cpumode_t cpumode) {
     switch (cpumode) {
     case PIS_X86_CPUMODE_64_BIT:
@@ -125,25 +210,6 @@ static err_t
     err_t err = SUCCESS;
 
     CHECK_RETHROW(calc_zero_flag_into(ctx, calculation_result, &FLAGS_ZF));
-
-cleanup:
-    return err;
-}
-
-static err_t cond_negate(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* cond, const pis_operand_t* result
-) {
-    err_t err = SUCCESS;
-
-    CHECK(cond->size == PIS_OPERAND_SIZE_1);
-    CHECK(result->size == PIS_OPERAND_SIZE_1);
-
-    // condition negation is done by `XOR`ing with 1.
-    // we can't use `NOT` because it flips all bits, not only the lowest bit.
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_XOR, *result, *cond, PIS_OPERAND_CONST(1, PIS_OPERAND_SIZE_1))
-    );
 
 cleanup:
     return err;
@@ -512,6 +578,9 @@ cleanup:
     return err;
 }
 
+/// the operand size for relative jumps which use 16/32 bit displacements.
+/// please not that the operand size is not the size of the displacement immediate. for example, for
+/// an operand size of 8, the displacement is 4 bytes.
 static pis_operand_size_t rel_jmp_operand_size_16_32(const post_prefixes_ctx_t* ctx) {
     if (ctx->lift_ctx->pis_x86_ctx->cpumode == PIS_X86_CPUMODE_64_BIT) {
         // from the intel ia-32 spec:
@@ -523,8 +592,10 @@ static pis_operand_size_t rel_jmp_operand_size_16_32(const post_prefixes_ctx_t* 
     }
 }
 
-static err_t
-    rel_jmp_fetch_disp(const post_prefixes_ctx_t* ctx, u64* disp, pis_operand_size_t operand_size) {
+/// fetches an immediate of the given operand size and sign extends it to 64 bits.
+static err_t fetch_and_sign_extend_imm(
+    const post_prefixes_ctx_t* ctx, pis_operand_size_t operand_size, u64* disp
+) {
     err_t err = SUCCESS;
     switch (operand_size) {
     case PIS_OPERAND_SIZE_8: {
@@ -552,23 +623,28 @@ cleanup:
     return err;
 }
 
+/// the instruction points size of a relative jump using a 16/32 bit displacement.
 static pis_operand_size_t rel_jmp_ip_operand_size(const post_prefixes_ctx_t* ctx) {
     return rel_jmp_operand_size_16_32(ctx);
 }
 
+/// masks the ip value which is the result of performing a relative jump with a 16/32 bit
+/// displacement.
 static u64 rel_jmp_mask_ip_value(const post_prefixes_ctx_t* ctx, u64 ip_value) {
     pis_operand_size_t ip_operand_size = rel_jmp_ip_operand_size(ctx);
     u64 mask = pis_operand_size_max_unsigned_value(ip_operand_size);
     return ip_value & mask;
 }
 
+/// fetches the displacement and calculates the target address of a relative jump with a 16/32 bit
+/// displacement.
 static err_t rel_jmp_fetch_disp_and_calc_target_addr(
-    const post_prefixes_ctx_t* ctx, u64* target, pis_operand_size_t operand_size
+    const post_prefixes_ctx_t* ctx, pis_operand_size_t operand_size, u64* target
 ) {
     err_t err = SUCCESS;
 
     u64 disp = 0;
-    CHECK_RETHROW(rel_jmp_fetch_disp(ctx, &disp, operand_size));
+    CHECK_RETHROW(fetch_and_sign_extend_imm(ctx, operand_size, &disp));
 
     u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
     *target = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr + disp);
@@ -577,13 +653,15 @@ cleanup:
     return err;
 }
 
+/// fetches the displacement and calculates the target of a relative jump with a 16/32 bit
+/// displacement.
 static err_t rel_jmp_fetch_disp_and_calc_target(
-    const post_prefixes_ctx_t* ctx, pis_operand_t* target, pis_operand_size_t operand_size
+    const post_prefixes_ctx_t* ctx, pis_operand_size_t operand_size, pis_operand_t* target
 ) {
     err_t err = SUCCESS;
 
     u64 target_addr = 0;
-    CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target_addr(ctx, &target_addr, operand_size));
+    CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target_addr(ctx, operand_size, &target_addr));
 
     *target = PIS_OPERAND_RAM(target_addr, PIS_OPERAND_SIZE_1);
 
@@ -591,13 +669,14 @@ cleanup:
     return err;
 }
 
+/// emits a conditional relative jump with a 16/32bit displacement, using the given condition.
 static err_t do_cond_rel_jmp(
     const post_prefixes_ctx_t* ctx, const pis_operand_t* cond, pis_operand_size_t operand_size
 ) {
     err_t err = SUCCESS;
 
     u64 target = 0;
-    CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target_addr(ctx, &target, operand_size));
+    CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target_addr(ctx, operand_size, &target));
 
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
@@ -1863,7 +1942,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         // jmp rel
         pis_operand_t target = {};
         CHECK_RETHROW(
-            rel_jmp_fetch_disp_and_calc_target(ctx, &target, rel_jmp_operand_size_16_32(ctx))
+            rel_jmp_fetch_disp_and_calc_target(ctx, rel_jmp_operand_size_16_32(ctx), &target)
         );
 
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, target));
@@ -1880,7 +1959,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         // call rel
         pis_operand_t target = {};
         CHECK_RETHROW(
-            rel_jmp_fetch_disp_and_calc_target(ctx, &target, rel_jmp_operand_size_16_32(ctx))
+            rel_jmp_fetch_disp_and_calc_target(ctx, rel_jmp_operand_size_16_32(ctx), &target)
         );
 
         CHECK_RETHROW(push_rip(ctx));
