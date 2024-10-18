@@ -1707,7 +1707,6 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp));
     } else if (first_opcode_byte == 0x63) {
         // movsxd r, r/m
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
         if (operand_size == PIS_OPERAND_SIZE_8) {
             // movsxd r64, r/m32
@@ -1719,6 +1718,8 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             ));
         } else {
             // regular mov
+            CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+
             pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
             CHECK_RETHROW(modrm_rm_read(ctx, &tmp, &modrm_operands.rm_operand.rm));
             CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp));
