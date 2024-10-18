@@ -50,26 +50,6 @@ cleanup:
     return err;
 }
 
-/// negates the given conditional expression into the given result operand.
-static err_t cond_negate(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* cond, const pis_operand_t* result
-) {
-    err_t err = SUCCESS;
-
-    CHECK(cond->size == PIS_OPERAND_SIZE_1);
-    CHECK(result->size == PIS_OPERAND_SIZE_1);
-
-    // condition negation is done by `XOR`ing with 1.
-    // we can't use `NOT` because it flips all bits, not only the lowest bit.
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_XOR, *result, *cond, PIS_OPERAND_CONST(1, PIS_OPERAND_SIZE_1))
-    );
-
-cleanup:
-    return err;
-}
-
 /// calculates the given x86 condition type into the given result operand.
 static err_t
     calc_cond(const post_prefixes_ctx_t* ctx, const x86_cond_t cond, pis_operand_t* result) {
@@ -111,7 +91,7 @@ static err_t
 
     if (cond.is_negative) {
         pis_operand_t negated = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        CHECK_RETHROW(cond_negate(ctx, &tmp, &negated));
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_COND_NEGATE, negated, tmp));
         *result = negated;
     } else {
         *result = tmp;
@@ -876,7 +856,7 @@ static err_t ternary(
 
     // calculate the negative condition
     pis_operand_t not_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    CHECK_RETHROW(cond_negate(ctx, cond, &not_cond));
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_COND_NEGATE, not_cond, *cond));
 
     // zero extend the condition and its negative
     pis_operand_t cond_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
@@ -1128,7 +1108,7 @@ static err_t cond_expr_ternary(
     CHECK(else_value->size == PIS_OPERAND_SIZE_1);
 
     pis_operand_t not_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    CHECK_RETHROW(cond_negate(ctx, cond, &not_cond));
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_COND_NEGATE, not_cond, *cond));
 
     pis_operand_t true_case = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, true_case, *cond, *then_value));

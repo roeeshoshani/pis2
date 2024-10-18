@@ -709,6 +709,34 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
     case PIS_OPCODE_UNSIGNED_REM:
         CHECK_RETHROW(run_binary_operator(emu, insn, binary_operator_rem));
         break;
+    case PIS_OPCODE_COND_NEGATE:
+        CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+        // check operand sizes
+        CHECK_TRACE_CODE(
+            insn->operands[0].size == PIS_OPERAND_SIZE_1 &&
+                insn->operands[1].size == PIS_OPERAND_SIZE_1,
+            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH,
+            "operand size mismatch in opcode %s, operand sizes: %u %u",
+            pis_opcode_to_str(insn->opcode),
+            insn->operands[0].size,
+            insn->operands[1].size
+        );
+
+        u64 input = 0;
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &input));
+
+        // the input should be a conditional expression and should have a value of 0 or 1.
+        CHECK_TRACE_CODE(
+            input == 0 || input == 1,
+            PIS_ERR_EMU_COND_EXPR_WRONG_VALUE,
+            "wrong value %lu for conditional expression",
+            input
+        );
+
+        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], !input));
+
+        break;
     case PIS_OPCODE_HALT:
         CHECK_FAIL();
         break;

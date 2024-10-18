@@ -143,6 +143,7 @@
     _(PIS_OPCODE_SIGNED_BORROW, )                                                                  \
     _(PIS_OPCODE_JMP_COND, )                                                                       \
     _(PIS_OPCODE_JMP, )                                                                            \
+    _(PIS_OPCODE_COND_NEGATE, )                                                                    \
     _(PIS_OPCODE_SIGN_EXTEND, )                                                                    \
     _(PIS_OPCODE_ZERO_EXTEND, )                                                                    \
     _(PIS_OPCODE_SIGNED_MUL, )                                                                     \
