@@ -347,6 +347,67 @@ cleanup:
     return err;
 }
 
+/// performs an `ADC` operation on the 2 input operands `a` and `b` and returns an operand
+/// containing the result of the operation in `result`.
+static err_t binop_adc(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* a,
+    const pis_operand_t* b,
+    pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    CHECK(a->size == b->size);
+    pis_operand_size_t operand_size = a->size;
+
+    pis_operand_t orig_cf = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, orig_cf, FLAGS_CF));
+
+    pis_operand_t a_plus_b = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, a_plus_b, *a, *b));
+
+    // carry flag
+    pis_operand_t carry_first_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_UNSIGNED_CARRY, carry_first_cond, *a, *b));
+
+    pis_operand_t carry_second_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_UNSIGNED_CARRY, carry_second_cond, a_plus_b, orig_cf)
+    );
+
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_OR, FLAGS_CF, carry_first_cond, carry_second_cond)
+    );
+
+    // overflow flag
+    pis_operand_t overflow_first_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SIGNED_CARRY, overflow_first_cond, *a, *b));
+
+    pis_operand_t overflow_second_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_SIGNED_CARRY, overflow_second_cond, a_plus_b, orig_cf)
+    );
+
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_OR, FLAGS_OF, overflow_first_cond, overflow_second_cond)
+    );
+
+    // perform the actual addition
+    pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, res_tmp, a_plus_b, orig_cf));
+
+    CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &res_tmp));
+
+    *result = res_tmp;
+
+cleanup:
+    return err;
+}
+
 /// performs an `SUB` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
 static err_t binop_sub(
@@ -2223,23 +2284,27 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         binop_fn_t binop = NULL;
         bool should_store_result = false;
         if (modrm_operands.modrm.reg == 5) {
-            // sub r/m, imm8
+            // sub
             binop = binop_sub;
             should_store_result = true;
         } else if (modrm_operands.modrm.reg == 0) {
-            // add r/m, imm8
+            // add
             binop = binop_add;
             should_store_result = true;
+        } else if (modrm_operands.modrm.reg == 2) {
+            // adc
+            binop = binop_adc;
+            should_store_result = true;
         } else if (modrm_operands.modrm.reg == 6) {
-            // xor r/m, imm8
+            // xor
             binop = binop_xor;
             should_store_result = true;
         } else if (modrm_operands.modrm.reg == 4) {
-            // and r/m, imm8
+            // and
             binop = binop_and;
             should_store_result = true;
         } else if (modrm_operands.modrm.reg == 7) {
-            // cmp r/m, imm8
+            // cmp
             binop = binop_sub;
             should_store_result = false;
         } else {
