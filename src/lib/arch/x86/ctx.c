@@ -764,6 +764,25 @@ cleanup:
     return err;
 }
 
+/// calculates a binary operation with modrm operands as inputs using the given operand size, and
+/// stores the result of the operation in the first operand.
+static err_t calc_and_store_binop_modrm_with_size(
+    const post_prefixes_ctx_t* ctx,
+    binop_fn_t binop,
+    pis_operand_size_t operand_size,
+    const modrm_operand_t* dst,
+    const modrm_operand_t* src
+) {
+    err_t err = SUCCESS;
+
+    pis_operand_t res_tmp = {};
+    CHECK_RETHROW(calc_binop_modrm_with_size(ctx, binop, operand_size, dst, src, &res_tmp));
+    CHECK_RETHROW(modrm_operand_write(ctx, dst, &res_tmp));
+
+cleanup:
+    return err;
+}
+
 /// calculates a binary operation with one modrm and one immediate operand as inputs using the given
 /// operand size, and stores the result of the operation in the first operand.
 static err_t calc_and_store_binop_modrm_imm_with_size(
@@ -2114,6 +2133,21 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
             binop_and,
+            &modrm_operands.reg_operand,
+            &modrm_operands.rm_operand
+        ));
+    } else if (first_opcode_byte == 0x20) {
+        // and r/m8, r8
+        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
+            ctx,
+            &modrm_operands,
+            PIS_OPERAND_SIZE_1,
+            PIS_OPERAND_SIZE_1
+        ));
+        CHECK_RETHROW(calc_and_store_binop_modrm_with_size(
+            ctx,
+            binop_and,
+            PIS_OPERAND_SIZE_1,
             &modrm_operands.reg_operand,
             &modrm_operands.rm_operand
         ));
