@@ -11,6 +11,8 @@
 typedef u64 (*binary_operator_fn_t)(u64 lhs, u64 rhs);
 typedef i64 (*signed_binary_operator_fn_t)(i64 lhs, i64 rhs);
 
+typedef u64 (*unary_operator_fn_t)(u64 x);
+
 void pis_emu_init(pis_emu_t* emu, pis_endianness_t endianness) {
     memset(emu, 0, sizeof(pis_emu_t));
     emu->endianness = endianness;
@@ -233,6 +235,29 @@ cleanup:
     return err;
 }
 
+static err_t run_unary_operator(pis_emu_t* emu, const pis_insn_t* insn, unary_operator_fn_t fn) {
+    err_t err = SUCCESS;
+    CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+    // make sure that all operands are of the same size
+    CHECK_TRACE_CODE(
+        insn->operands[0].size == insn->operands[1].size,
+        PIS_ERR_EMU_OPERAND_SIZE_MISMATCH,
+        "operand size mismatch in unary operator %s, operand sizes: %u %u",
+        pis_opcode_to_str(insn->opcode),
+        insn->operands[0].size,
+        insn->operands[1].size
+    );
+
+    u64 x = 0;
+    CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[2], &x));
+
+    u64 result = fn(x);
+    CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], result));
+cleanup:
+    return err;
+}
+
 static err_t run_signed_binary_operator(
     pis_emu_t* emu, const pis_insn_t* insn, signed_binary_operator_fn_t fn
 ) {
@@ -279,6 +304,14 @@ DEFINE_BINARY_OPERATOR(div, /);
 DEFINE_BINARY_OPERATOR(rem, %);
 DEFINE_SIGNED_BINARY_OPERATOR(mul, *);
 DEFINE_SIGNED_BINARY_OPERATOR(sar, >>);
+
+#define DEFINE_UNARY_OPERATOR(NAME, OP)                                                            \
+    static u64 unary_operator_##NAME(u64 x) {                                                      \
+        return OP x;                                                                               \
+    }
+
+DEFINE_UNARY_OPERATOR(not, ~);
+DEFINE_UNARY_OPERATOR(neg, -);
 
 void div128(u64 dividend_high, u64 dividend_low, u64 divisor, u64* quotient, u64* rem) {
     // compute initial quotient and remainder
@@ -476,24 +509,12 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         break;
     }
-    case PIS_OPCODE_NOT: {
-        CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
-
-        // check operand sizes
-        CHECK_CODE(
-            insn->operands[0].size == insn->operands[1].size,
-            PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
-        );
-
-        u64 value = 0;
-        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &value));
-
-        u64 result = ~value;
-
-        CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], result));
-
+    case PIS_OPCODE_NOT:
+        CHECK_RETHROW(run_unary_operator(emu, insn, unary_operator_not));
         break;
-    }
+    case PIS_OPCODE_NEG:
+        CHECK_RETHROW(run_unary_operator(emu, insn, unary_operator_neg));
+        break;
     case PIS_OPCODE_SHIFT_RIGHT:
         CHECK_RETHROW(run_binary_operator(emu, insn, binary_operator_shr));
         break;

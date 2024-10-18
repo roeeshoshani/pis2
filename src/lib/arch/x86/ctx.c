@@ -415,6 +415,34 @@ cleanup:
     return err;
 }
 
+/// performs a `NEG` operation on the input operand and returns an operand
+/// containing the result of the operation in `result`.
+static err_t unary_op_neg(
+    const post_prefixes_ctx_t* ctx, const pis_operand_t* operand, pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    pis_operand_size_t operand_size = operand->size;
+
+    pis_operand_t zero = PIS_OPERAND_CONST(0, operand_size);
+
+    // carry flag
+    pis_operand_t equals_zero = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_EQUALS, equals_zero, *operand, zero));
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_COND_NEGATE, FLAGS_CF, equals_zero));
+
+    // perform the actual negation
+    pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_NEG, res_tmp, *operand));
+
+    CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &res_tmp));
+
+    *result = res_tmp;
+
+cleanup:
+    return err;
+}
+
 /// performs an `AND` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
 static err_t binop_and(
@@ -1672,6 +1700,11 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         if (modrm_operands.modrm.reg == 6) {
             // div r/m
             CHECK_RETHROW(do_div_ax_dx(ctx, operand_size, &rm_value));
+        } else if (modrm_operands.modrm.reg == 3) {
+            // neg r/m
+            pis_operand_t res = {};
+            CHECK_RETHROW(unary_op_neg(ctx, &rm_value, &res));
+            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res));
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
