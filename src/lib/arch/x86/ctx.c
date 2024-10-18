@@ -723,11 +723,12 @@ cleanup:
     return err;
 }
 
-/// calculates a binary operation with one modrm and one immediate operand as inputs, and optionally
-/// stores the result of the operation in the first operand.
-static err_t calc_and_maybe_store_binop_modrm_imm(
+/// calculates a binary operation with one modrm and one immediate operand as inputs using the given
+/// operand size, and optionally stores the result of the operation in the first operand.
+static err_t calc_and_maybe_store_binop_modrm_imm_with_size(
     const post_prefixes_ctx_t* ctx,
     binop_fn_t binop,
+    pis_operand_size_t operand_size,
     bool should_store_result,
     const modrm_operand_t* dst,
     const pis_operand_t* src_imm
@@ -735,7 +736,7 @@ static err_t calc_and_maybe_store_binop_modrm_imm(
     err_t err = SUCCESS;
 
     pis_operand_t res_tmp = {};
-    CHECK_RETHROW(calc_binop_modrm_imm(ctx, binop, dst, src_imm, &res_tmp));
+    CHECK_RETHROW(calc_binop_modrm_imm_with_size(ctx, binop, operand_size, dst, src_imm, &res_tmp));
 
     if (should_store_result) {
         CHECK_RETHROW(modrm_operand_write(ctx, dst, &res_tmp));
@@ -1896,8 +1897,8 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
 
-    } else if (first_opcode_byte == 0x81 || first_opcode_byte == 0x83) {
-        // xxx r/m, imm/imm8
+    } else if (first_opcode_byte == 0x80 || first_opcode_byte == 0x81 || first_opcode_byte == 0x83) {
+        // xxx r/m[8], imm[8]
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
@@ -1906,13 +1907,29 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         // calculate the appropriate immediate operand according to the opcode
         pis_operand_t imm_operand = {};
-        if (first_opcode_byte == 0x81) {
+        switch (first_opcode_byte) {
+        case 0x80: {
+            // xxx r/m8, imm8
+
+            // override the operand size to 8
+            operand_size = PIS_OPERAND_SIZE_1;
+
+            u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+            imm_operand = PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1);
+            break;
+        }
+        case 0x81:
+            // xxx r/m, imm
             CHECK_RETHROW(fetch_imm_default_size_sign_extended(ctx, &imm_operand));
-        } else if (first_opcode_byte == 0x83) {
+            break;
+        case 0x83: {
+            // xxx r/m, imm8
             i8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
             u64 imm64 = pis_sign_extend_byte(imm8, operand_size);
             imm_operand = PIS_OPERAND_CONST(imm64, operand_size);
-        } else {
+            break;
+        }
+        default:
             UNREACHABLE();
         }
 
@@ -1945,9 +1962,10 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         // calculate the binary operation and optionally store its result
         CHECK(binop != NULL);
-        CHECK_RETHROW(calc_and_maybe_store_binop_modrm_imm(
+        CHECK_RETHROW(calc_and_maybe_store_binop_modrm_imm_with_size(
             ctx,
             binop,
+            operand_size,
             should_store_result,
             &modrm_operands.rm_operand,
             &imm_operand
@@ -2017,32 +2035,6 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         if (modrm_operands.modrm.reg == 0) {
             // mov r/m8, imm8
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &imm_operand));
-        } else {
-            CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
-        }
-    } else if (first_opcode_byte == 0x80) {
-        // xxx r/m8, imm8
-        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
-            ctx,
-            &modrm_operands,
-            PIS_OPERAND_SIZE_1,
-            PIS_OPERAND_SIZE_1
-        ));
-
-        u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-        pis_operand_t imm_operand = PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1);
-
-        if (modrm_operands.modrm.reg == 7) {
-            // cmp r/m8, imm8
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(calc_binop_modrm_imm_with_size(
-                ctx,
-                binop_sub,
-                PIS_OPERAND_SIZE_1,
-                &modrm_operands.rm_operand,
-                &imm_operand,
-                &res_tmp
-            ));
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
