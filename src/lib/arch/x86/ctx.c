@@ -824,13 +824,10 @@ static err_t do_cond_rel_jmp(
 ) {
     err_t err = SUCCESS;
 
-    u64 target = 0;
-    CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target_addr(ctx, operand_size, &target));
+    pis_operand_t target = {};
+    CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target(ctx, operand_size, &target));
 
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN2(PIS_OPCODE_JMP_COND, *cond, PIS_OPERAND_RAM(target, PIS_OPERAND_SIZE_1))
-    );
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_JMP_COND, *cond, target));
 
 cleanup:
     return err;
@@ -2026,6 +2023,12 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             near_branch_operand_default_operand_size(ctx),
             &target
         ));
+
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, target));
+    } else if (first_opcode_byte == 0xeb) {
+        // jmp rel8
+        pis_operand_t target = {};
+        CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target(ctx, PIS_OPERAND_SIZE_1, &target));
 
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, target));
     } else if (opcode_cond_opcode_only(first_opcode_byte) == 0x70) {
