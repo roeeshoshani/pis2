@@ -621,7 +621,7 @@ static pis_operand_size_t rel_jmp_operand_size_16_32(const post_prefixes_ctx_t* 
 }
 
 /// fetches an immediate of the given operand size and sign extends it to 64 bits.
-static err_t fetch_and_sign_extend_imm(
+static err_t fetch_and_sign_extend_imm_to_64_bits(
     const post_prefixes_ctx_t* ctx, pis_operand_size_t operand_size, u64* disp
 ) {
     err_t err = SUCCESS;
@@ -672,7 +672,7 @@ static err_t rel_jmp_fetch_disp_and_calc_target_addr(
     err_t err = SUCCESS;
 
     u64 disp = 0;
-    CHECK_RETHROW(fetch_and_sign_extend_imm(ctx, operand_size, &disp));
+    CHECK_RETHROW(fetch_and_sign_extend_imm_to_64_bits(ctx, operand_size, &disp));
 
     u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
     *target = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr + disp);
@@ -966,8 +966,10 @@ cleanup:
     return err;
 }
 
+/// fetches a 16/32 bit immediate operand and sign extends it to the appropriate size according to
+/// the instruction's default operand size.
 static err_t
-    fetch_sign_extended_imm_operand(const post_prefixes_ctx_t* ctx, pis_operand_t* operand) {
+    fetch_sign_extended_imm_operand_16_32(const post_prefixes_ctx_t* ctx, pis_operand_t* operand) {
     err_t err = SUCCESS;
     pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
 
@@ -1970,7 +1972,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
         pis_operand_t imm = {};
-        CHECK_RETHROW(fetch_sign_extended_imm_operand(ctx, &imm));
+        CHECK_RETHROW(fetch_sign_extended_imm_operand_16_32(ctx, &imm));
 
         if (modrm_operands.modrm.reg == 0) {
             // mov r/m, imm
@@ -1981,7 +1983,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
     } else if (first_opcode_byte == 0x25) {
         // and [R/E]AX, imm
         pis_operand_t imm = {};
-        CHECK_RETHROW(fetch_sign_extended_imm_operand(ctx, &imm));
+        CHECK_RETHROW(fetch_sign_extended_imm_operand_16_32(ctx, &imm));
 
         pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
 
@@ -1992,7 +1994,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
     } else if (first_opcode_byte == 0x2d) {
         // sub [R/E]AX, imm
         pis_operand_t imm = {};
-        CHECK_RETHROW(fetch_sign_extended_imm_operand(ctx, &imm));
+        CHECK_RETHROW(fetch_sign_extended_imm_operand_16_32(ctx, &imm));
 
         pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
 
@@ -2003,7 +2005,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
     } else if (first_opcode_byte == 0x05) {
         // add [R/E]AX, imm
         pis_operand_t imm = {};
-        CHECK_RETHROW(fetch_sign_extended_imm_operand(ctx, &imm));
+        CHECK_RETHROW(fetch_sign_extended_imm_operand_16_32(ctx, &imm));
 
         pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
 
@@ -2014,7 +2016,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
     } else if (first_opcode_byte == 0x3d) {
         // cmp [R/E]AX, imm
         pis_operand_t imm = {};
-        CHECK_RETHROW(fetch_sign_extended_imm_operand(ctx, &imm));
+        CHECK_RETHROW(fetch_sign_extended_imm_operand_16_32(ctx, &imm));
 
         pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
 
@@ -2025,7 +2027,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
         pis_operand_t imm = {};
-        CHECK_RETHROW(fetch_sign_extended_imm_operand(ctx, &imm));
+        CHECK_RETHROW(fetch_sign_extended_imm_operand_16_32(ctx, &imm));
 
         if (modrm_operands.modrm.reg == 7) {
             // cmp r/m, imm
