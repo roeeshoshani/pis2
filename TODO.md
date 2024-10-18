@@ -8,4 +8,4 @@ notes about stuff that needs to be done.
 - add a condition negate opcode instead of xoring with 1. this will look much cleaner once the entire thing becomes a graph.
 - extract common code patterns into functions. examples:
   * the `XXX EAX, IMM` instructions.
-- 2 functions with very similar names `fetch_sign_extended_imm_operand` and `fetch_and_sign_extend_imm`
+- get rid of `PIS_INSN_ADD2` and `PIS_INSN_UMUL2`

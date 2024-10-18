@@ -336,7 +336,7 @@ cleanup:
 
 /// performs an `ADD` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
-static err_t do_add(
+static err_t binop_add(
     const post_prefixes_ctx_t* ctx,
     const pis_operand_t* a,
     const pis_operand_t* b,
@@ -368,7 +368,7 @@ cleanup:
 
 /// performs an `SUB` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
-static err_t do_sub(
+static err_t binop_sub(
     const post_prefixes_ctx_t* ctx,
     const pis_operand_t* a,
     const pis_operand_t* b,
@@ -400,8 +400,9 @@ cleanup:
 
 /// performs a `DEC` operation on the input operand and returns an operand
 /// containing the result of the operation in `result`.
-static err_t
-    do_dec(const post_prefixes_ctx_t* ctx, const pis_operand_t* operand, pis_operand_t* result) {
+static err_t unary_op_dec(
+    const post_prefixes_ctx_t* ctx, const pis_operand_t* operand, pis_operand_t* result
+) {
     err_t err = SUCCESS;
 
     pis_operand_size_t operand_size = operand->size;
@@ -425,7 +426,7 @@ cleanup:
 
 /// performs an `AND` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
-static err_t do_and(
+static err_t binop_and(
     const post_prefixes_ctx_t* ctx,
     const pis_operand_t* a,
     const pis_operand_t* b,
@@ -461,7 +462,7 @@ cleanup:
 
 /// performs an `IMUL` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
-static err_t do_imul(
+static err_t binop_imul(
     const post_prefixes_ctx_t* ctx,
     const pis_operand_t* a,
     const pis_operand_t* b,
@@ -492,7 +493,7 @@ cleanup:
 
 /// performs a `XOR` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
-static err_t do_xor(
+static err_t binop_xor(
     const post_prefixes_ctx_t* ctx,
     const pis_operand_t* a,
     const pis_operand_t* b,
@@ -530,7 +531,7 @@ cleanup:
 
 /// performs an `OR` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
-static err_t do_or(
+static err_t binop_or(
     const post_prefixes_ctx_t* ctx,
     const pis_operand_t* a,
     const pis_operand_t* b,
@@ -815,6 +816,31 @@ cleanup:
     return err;
 }
 
+/// implements a `movzx/movsx r, r/m` operation.
+static err_t do_mov_extend_r_rm(
+    const post_prefixes_ctx_t* ctx,
+    pis_opcode_t extend_opcode,
+    pis_operand_size_t reg_size,
+    pis_operand_size_t rm_size
+) {
+    err_t err = SUCCESS;
+    modrm_operands_t modrm_operands = {};
+
+    CHECK_RETHROW(
+        modrm_fetch_and_process_with_operand_sizes(ctx, &modrm_operands, rm_size, reg_size)
+    );
+
+    pis_operand_t tmp_rm_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, rm_size);
+    CHECK_RETHROW(modrm_rm_read(ctx, &tmp_rm_value, &modrm_operands.rm_operand.rm));
+
+    pis_operand_t tmp_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, reg_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(extend_opcode, tmp_extended, tmp_rm_value));
+    CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp_extended));
+
+cleanup:
+    return err;
+}
+
 /// lift an instruction according to its second opcode byte
 static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_opcode_byte) {
     err_t err = SUCCESS;
@@ -822,7 +848,6 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
 
     if (second_opcode_byte >= 0x80 && second_opcode_byte <= 0x80 + X86_COND_ENCODING_MAX_VALUE) {
         // jcc rel
-
         pis_operand_t cond = {};
         CHECK_RETHROW(cond_decode_and_calc(ctx, second_opcode_byte - 0x80, &cond));
 
@@ -846,7 +871,7 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
-            do_imul,
+            binop_imul,
             &modrm_operands.reg_operand,
             &modrm_operands.rm_operand
         ));
@@ -861,80 +886,29 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
-    } else if (second_opcode_byte == 0xb6) {
-        // movzx r, r/m8
-        pis_operand_size_t dst_size = ctx->operand_sizes.insn_default_not_64_bit;
-        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
+    } else if (second_opcode_byte == 0xb6 || second_opcode_byte == 0xbe) {
+        // movzx/movsx r, r/m8
+        pis_opcode_t opcode =
+            second_opcode_byte == 0xb6 ? PIS_OPCODE_ZERO_EXTEND : PIS_OPCODE_SIGN_EXTEND;
+        CHECK_RETHROW(do_mov_extend_r_rm(
             ctx,
-            &modrm_operands,
-            PIS_OPERAND_SIZE_1,
-            dst_size
+            opcode,
+            ctx->operand_sizes.insn_default_not_64_bit,
+            PIS_OPERAND_SIZE_1
         ));
-
-        pis_operand_t tmp8 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        CHECK_RETHROW(modrm_rm_read(ctx, &tmp8, &modrm_operands.rm_operand.rm));
-
-        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, dst_size);
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, tmp, tmp8));
-        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp));
-    } else if (second_opcode_byte == 0xb7) {
-        // movzx r, r/m16
-        pis_operand_size_t dst_size = ctx->operand_sizes.insn_default_not_64_bit;
-        if (dst_size == PIS_OPERAND_SIZE_2) {
-            dst_size = PIS_OPERAND_SIZE_4;
-        }
-        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
-            ctx,
-            &modrm_operands,
-            PIS_OPERAND_SIZE_2,
-            dst_size
-        ));
-
-        pis_operand_t tmp16 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_2);
-        CHECK_RETHROW(modrm_rm_read(ctx, &tmp16, &modrm_operands.rm_operand.rm));
-
-        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, dst_size);
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, tmp, tmp16));
-        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp));
-    } else if (second_opcode_byte == 0xbe) {
-        // movsx r, r/m8
-        pis_operand_size_t dst_size = ctx->operand_sizes.insn_default_not_64_bit;
-        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
-            ctx,
-            &modrm_operands,
-            PIS_OPERAND_SIZE_1,
-            dst_size
-        ));
-
-        pis_operand_t tmp8 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        CHECK_RETHROW(modrm_rm_read(ctx, &tmp8, &modrm_operands.rm_operand.rm));
-
-        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, dst_size);
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, tmp, tmp8));
-        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp));
-    } else if (second_opcode_byte == 0xbf) {
-        // movsx r, r/m16
+    } else if (second_opcode_byte == 0xb7 || second_opcode_byte == 0xbf) {
+        // movzx/movsx r, r/m16
+        pis_opcode_t opcode =
+            second_opcode_byte == 0xb7 ? PIS_OPCODE_ZERO_EXTEND : PIS_OPCODE_SIGN_EXTEND;
         pis_operand_size_t reg_size;
         if (ctx->prefixes->rex.w) {
             reg_size = PIS_OPERAND_SIZE_8;
         } else {
             reg_size = PIS_OPERAND_SIZE_4;
         }
-        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
-            ctx,
-            &modrm_operands,
-            PIS_OPERAND_SIZE_2,
-            reg_size
-        ));
-
-        pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_2);
-        CHECK_RETHROW(modrm_rm_read(ctx, &rm_tmp, &modrm_operands.rm_operand.rm));
-
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, reg_size);
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, res_tmp, rm_tmp));
-        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &res_tmp));
+        CHECK_RETHROW(do_mov_extend_r_rm(ctx, opcode, reg_size, PIS_OPERAND_SIZE_2));
     } else if (second_opcode_byte >= 0x40 && second_opcode_byte <= 0x40 + X86_COND_ENCODING_MAX_VALUE) {
-        // cmovne r, r/m
+        // cmovcc r, r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
         pis_operand_t cond = {};
@@ -1257,7 +1231,7 @@ cleanup:
 
 /// performs a `SHL` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
-static err_t do_shl(
+static err_t binop_shl(
     const post_prefixes_ctx_t* ctx,
     const pis_operand_t* a,
     const pis_operand_t* b,
@@ -1353,7 +1327,7 @@ cleanup:
 
 /// performs a `SHR` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
-static err_t do_shr(
+static err_t binop_shr(
     const post_prefixes_ctx_t* ctx,
     const pis_operand_t* a,
     const pis_operand_t* b,
@@ -1388,7 +1362,7 @@ cleanup:
 
 /// performs a `SAR` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
-static err_t do_sar(
+static err_t binop_sar(
     const post_prefixes_ctx_t* ctx,
     const pis_operand_t* a,
     const pis_operand_t* b,
@@ -1635,7 +1609,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
-            do_add,
+            binop_add,
             &modrm_operands.rm_operand,
             &modrm_operands.reg_operand
         ));
@@ -1644,7 +1618,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
-            do_add,
+            binop_add,
             &modrm_operands.reg_operand,
             &modrm_operands.rm_operand
         ));
@@ -1653,7 +1627,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
-            do_or,
+            binop_or,
             &modrm_operands.reg_operand,
             &modrm_operands.rm_operand
         ));
@@ -1662,7 +1636,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
-            do_or,
+            binop_or,
             &modrm_operands.rm_operand,
             &modrm_operands.reg_operand
         ));
@@ -1671,7 +1645,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
-            do_and,
+            binop_and,
             &modrm_operands.reg_operand,
             &modrm_operands.rm_operand
         ));
@@ -1680,7 +1654,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
-            do_sub,
+            binop_sub,
             &modrm_operands.rm_operand,
             &modrm_operands.reg_operand
         ));
@@ -1689,7 +1663,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
-            do_sub,
+            binop_sub,
             &modrm_operands.reg_operand,
             &modrm_operands.rm_operand
         ));
@@ -1698,7 +1672,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
-            do_xor,
+            binop_xor,
             &modrm_operands.rm_operand,
             &modrm_operands.reg_operand
         ));
@@ -1707,7 +1681,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         CHECK_RETHROW(calc_and_store_binop_modrm(
             ctx,
-            do_xor,
+            binop_xor,
             &modrm_operands.reg_operand,
             &modrm_operands.rm_operand
         ));
@@ -1719,7 +1693,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t res_tmp = {};
         CHECK_RETHROW(calc_binop_modrm(
             ctx,
-            do_sub,
+            binop_sub,
             &modrm_operands.rm_operand,
             &modrm_operands.reg_operand,
             &res_tmp
@@ -1732,7 +1706,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t res_tmp = {};
         CHECK_RETHROW(calc_binop_modrm(
             ctx,
-            do_sub,
+            binop_sub,
             &modrm_operands.reg_operand,
             &modrm_operands.rm_operand,
             &res_tmp
@@ -1800,7 +1774,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             CHECK_RETHROW(modrm_rm_read(ctx, &rm_tmp, &rm_operand));
 
             pis_operand_t result = {};
-            CHECK_RETHROW(do_dec(ctx, &rm_tmp, &result));
+            CHECK_RETHROW(unary_op_dec(ctx, &rm_tmp, &result));
 
             CHECK_RETHROW(modrm_rm_write(ctx, &rm_operand, &result));
         } else {
@@ -1821,31 +1795,36 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         if (modrm_operands.modrm.reg == 5) {
             // sub r/m, imm8
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_sub(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp));
+            CHECK_RETHROW(binop_sub(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp)
+            );
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else if (modrm_operands.modrm.reg == 0) {
             // add r/m, imm8
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_add(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp));
+            CHECK_RETHROW(binop_add(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp)
+            );
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else if (modrm_operands.modrm.reg == 6) {
             // xor r/m, imm8
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_xor(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp));
+            CHECK_RETHROW(binop_xor(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp)
+            );
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else if (modrm_operands.modrm.reg == 4) {
             // and r/m, imm8
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_and(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp));
+            CHECK_RETHROW(binop_and(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp)
+            );
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else if (modrm_operands.modrm.reg == 7) {
             // cmp r/m, imm8
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_sub(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp));
+            CHECK_RETHROW(binop_sub(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp)
+            );
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
@@ -1867,7 +1846,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             CHECK_RETHROW(modrm_operand_read(ctx, &rm_tmp, &modrm_operands.rm_operand));
 
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_shr(ctx, &rm_tmp, &imm_operand, &res_tmp));
+            CHECK_RETHROW(binop_shr(ctx, &rm_tmp, &imm_operand, &res_tmp));
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else {
@@ -1891,7 +1870,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             CHECK_RETHROW(modrm_operand_read(ctx, &rm_tmp, &modrm_operands.rm_operand));
 
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_and(ctx, &rm_tmp, &imm_operand, &res_tmp));
+            CHECK_RETHROW(binop_and(ctx, &rm_tmp, &imm_operand, &res_tmp));
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
@@ -1933,7 +1912,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
             // perform subtraction but ignore the result
             pis_operand_t res = {};
-            CHECK_RETHROW(do_sub(ctx, &dst_tmp, &imm_operand, &res));
+            CHECK_RETHROW(binop_sub(ctx, &dst_tmp, &imm_operand, &res));
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
@@ -2010,7 +1989,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t res = {};
         CHECK_RETHROW(calc_binop_modrm(
             ctx,
-            do_and,
+            binop_and,
             &modrm_operands.rm_operand,
             &modrm_operands.reg_operand,
             &res
@@ -2035,7 +2014,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
 
         pis_operand_t res = {};
-        CHECK_RETHROW(do_xor(ctx, &AL, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1), &res));
+        CHECK_RETHROW(binop_xor(ctx, &AL, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1), &res));
         CHECK_RETHROW(write_gpr(ctx, &AL, &res));
     } else if (opcode_reg_opcode_only(first_opcode_byte) == 0xb8) {
         // mov <reg>, imm
@@ -2068,7 +2047,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
 
         pis_operand_t res = {};
-        CHECK_RETHROW(do_and(ctx, &ax, &imm, &res));
+        CHECK_RETHROW(binop_and(ctx, &ax, &imm, &res));
 
         CHECK_RETHROW(write_gpr(ctx, &ax, &res));
     } else if (first_opcode_byte == 0x2d) {
@@ -2079,7 +2058,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
 
         pis_operand_t res = {};
-        CHECK_RETHROW(do_sub(ctx, &ax, &imm, &res));
+        CHECK_RETHROW(binop_sub(ctx, &ax, &imm, &res));
 
         CHECK_RETHROW(write_gpr(ctx, &ax, &res));
     } else if (first_opcode_byte == 0x05) {
@@ -2090,7 +2069,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
 
         pis_operand_t res = {};
-        CHECK_RETHROW(do_add(ctx, &ax, &imm, &res));
+        CHECK_RETHROW(binop_add(ctx, &ax, &imm, &res));
 
         CHECK_RETHROW(write_gpr(ctx, &ax, &res));
     } else if (first_opcode_byte == 0x3d) {
@@ -2101,7 +2080,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
 
         pis_operand_t res = {};
-        CHECK_RETHROW(do_sub(ctx, &ax, &imm, &res));
+        CHECK_RETHROW(binop_sub(ctx, &ax, &imm, &res));
     } else if (first_opcode_byte == 0x81) {
         // xxx r/m, imm
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
@@ -2114,17 +2093,18 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
             // perform subtraction but ignore the result
             pis_operand_t res = {};
-            CHECK_RETHROW(calc_binop_modrm_imm(ctx, do_sub, &modrm_operands.rm_operand, &imm, &res)
+            CHECK_RETHROW(
+                calc_binop_modrm_imm(ctx, binop_sub, &modrm_operands.rm_operand, &imm, &res)
             );
         } else if (modrm_operands.modrm.reg == 0) {
             // add r/m, imm
             CHECK_RETHROW(
-                calc_and_store_binop_modrm_imm(ctx, do_add, &modrm_operands.rm_operand, &imm)
+                calc_and_store_binop_modrm_imm(ctx, binop_add, &modrm_operands.rm_operand, &imm)
             );
         } else if (modrm_operands.modrm.reg == 5) {
             // sub r/m, imm
             CHECK_RETHROW(
-                calc_and_store_binop_modrm_imm(ctx, do_sub, &modrm_operands.rm_operand, &imm)
+                calc_and_store_binop_modrm_imm(ctx, binop_sub, &modrm_operands.rm_operand, &imm)
             );
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
@@ -2134,7 +2114,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
 
         pis_operand_t res = {};
-        CHECK_RETHROW(do_and(ctx, &AL, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1), &res));
+        CHECK_RETHROW(binop_and(ctx, &AL, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1), &res));
     } else if (first_opcode_byte == 0x85) {
         // test r/m, r
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
@@ -2142,7 +2122,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t res = {};
         CHECK_RETHROW(calc_binop_modrm(
             ctx,
-            do_add,
+            binop_add,
             &modrm_operands.rm_operand,
             &modrm_operands.reg_operand,
             &res
@@ -2161,7 +2141,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_rm_read(ctx, &rm_value, &modrm_operands.rm_operand.rm));
 
         pis_operand_t res = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-        CHECK_RETHROW(do_imul(ctx, &rm_value, &imm_operand, &res));
+        CHECK_RETHROW(binop_imul(ctx, &rm_value, &imm_operand, &res));
 
         CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &res));
     } else if (first_opcode_byte == 0x98) {
@@ -2195,19 +2175,22 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         if (modrm_operands.modrm.reg == 4) {
             // shl/sal r/m, imm8
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_shl(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm8, operand_size), &res_tmp));
+            CHECK_RETHROW(binop_shl(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm8, operand_size), &res_tmp)
+            );
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else if (modrm_operands.modrm.reg == 5) {
             // shr r/m, imm8
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_shr(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm8, operand_size), &res_tmp));
+            CHECK_RETHROW(binop_shr(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm8, operand_size), &res_tmp)
+            );
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else if (modrm_operands.modrm.reg == 7) {
             // sar r/m, imm8
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_sar(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm8, operand_size), &res_tmp));
+            CHECK_RETHROW(binop_sar(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm8, operand_size), &res_tmp)
+            );
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else {
@@ -2224,19 +2207,19 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         if (modrm_operands.modrm.reg == 4) {
             // shl/sal r/m, 1
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_shl(ctx, &rm_tmp, &PIS_OPERAND_CONST(1, operand_size), &res_tmp));
+            CHECK_RETHROW(binop_shl(ctx, &rm_tmp, &PIS_OPERAND_CONST(1, operand_size), &res_tmp));
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else if (modrm_operands.modrm.reg == 5) {
             // shr r/m, 1
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_shr(ctx, &rm_tmp, &PIS_OPERAND_CONST(1, operand_size), &res_tmp));
+            CHECK_RETHROW(binop_shr(ctx, &rm_tmp, &PIS_OPERAND_CONST(1, operand_size), &res_tmp));
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else if (modrm_operands.modrm.reg == 7) {
             // sar r/m, 1
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_sar(ctx, &rm_tmp, &PIS_OPERAND_CONST(1, operand_size), &res_tmp));
+            CHECK_RETHROW(binop_sar(ctx, &rm_tmp, &PIS_OPERAND_CONST(1, operand_size), &res_tmp));
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else {
@@ -2256,25 +2239,25 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         if (modrm_operands.modrm.reg == 4) {
             // shl/sal r/m, cl
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_shl(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
+            CHECK_RETHROW(binop_shl(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else if (modrm_operands.modrm.reg == 5) {
             // shr r/m, cl
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_shr(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
+            CHECK_RETHROW(binop_shr(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else if (modrm_operands.modrm.reg == 5) {
             // shr r/m, cl
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_shr(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
+            CHECK_RETHROW(binop_shr(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else if (modrm_operands.modrm.reg == 7) {
             // sar r/m, cl
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(do_sar(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
+            CHECK_RETHROW(binop_sar(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
 
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
         } else {
