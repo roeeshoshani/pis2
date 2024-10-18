@@ -26,6 +26,16 @@ typedef struct {
     bool is_negative;
 } x86_cond_t;
 
+/// extracts the condition encoding of an opcode which has a condition encoded in its value.
+static u8 opcode_cond_extract(u8 opcode_byte) {
+    return opcode_byte & 0b1111;
+}
+
+/// returns the base opcode value of an opcode which has a condition encoded in its value.
+static u8 opcode_cond_opcode_only(u8 opcode_byte) {
+    return opcode_byte & (~0b1111);
+}
+
 /// decodes an x86 condition encoding. the encoding can usually be achieved by subtrating the opcode
 /// with some base opcode value.
 static err_t cond_decode(u8 cond_encoding, x86_cond_t* cond) {
@@ -111,14 +121,15 @@ cleanup:
     return err;
 }
 
-/// decodes an x86 condition encoding and calculates its value into the given result operand.
-/// the encoding can usually be achieved by subtrating the opcode with some base opcode value.
-static err_t
-    cond_decode_and_calc(const post_prefixes_ctx_t* ctx, u8 cond_encoding, pis_operand_t* result) {
+/// decodes an x86 condition encoding from the given opcode and calculates its value into the given
+/// result operand.
+static err_t cond_opcode_decode_and_calc(
+    const post_prefixes_ctx_t* ctx, u8 opcode_byte, pis_operand_t* result
+) {
     err_t err = SUCCESS;
 
     x86_cond_t cond = {};
-    CHECK_RETHROW(cond_decode(cond_encoding, &cond));
+    CHECK_RETHROW(cond_decode(opcode_cond_extract(opcode_byte), &cond));
 
     CHECK_RETHROW(calc_cond(ctx, cond, result));
 
@@ -575,11 +586,35 @@ typedef err_t (*binop_fn_t
   const pis_operand_t* b,
   pis_operand_t* result);
 
+/// calculates a binary operation with modrm operands as inputs using the given operand size.
+/// returns an operand containing the result of the operation in `result`.
+static err_t calc_binop_modrm_with_size(
+    const post_prefixes_ctx_t* ctx,
+    binop_fn_t binop,
+    pis_operand_size_t operand_size,
+    const modrm_operand_t* dst,
+    const modrm_operand_t* src,
+    pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    pis_operand_t dst_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    pis_operand_t src_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+
+    CHECK_RETHROW(modrm_operand_read(ctx, &dst_tmp, dst));
+    CHECK_RETHROW(modrm_operand_read(ctx, &src_tmp, src));
+
+    CHECK_RETHROW(binop(ctx, &dst_tmp, &src_tmp, result));
+
+cleanup:
+    return err;
+}
+
 /// calculates a binary operation with modrm operands as inputs. returns an operand containing the
 /// result of the operation in `result`.
 static err_t calc_binop_modrm(
     const post_prefixes_ctx_t* ctx,
-    binop_fn_t fn,
+    binop_fn_t binop,
     const modrm_operand_t* dst,
     const modrm_operand_t* src,
     pis_operand_t* result
@@ -587,13 +622,29 @@ static err_t calc_binop_modrm(
     err_t err = SUCCESS;
 
     pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+    CHECK_RETHROW(calc_binop_modrm_with_size(ctx, binop, operand_size, dst, src, result));
+
+cleanup:
+    return err;
+}
+
+/// calculates a binary operation with one modrm and one immediate operand as inputs using the given
+/// operand size. returns an operand containing the result of the operation in `result`.
+static err_t calc_binop_modrm_imm_with_size(
+    const post_prefixes_ctx_t* ctx,
+    binop_fn_t binop,
+    pis_operand_size_t operand_size,
+    const modrm_operand_t* dst,
+    const pis_operand_t* src_imm,
+    pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
     pis_operand_t dst_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    pis_operand_t src_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
 
     CHECK_RETHROW(modrm_operand_read(ctx, &dst_tmp, dst));
-    CHECK_RETHROW(modrm_operand_read(ctx, &src_tmp, src));
 
-    CHECK_RETHROW(fn(ctx, &dst_tmp, &src_tmp, result));
+    CHECK_RETHROW(binop(ctx, &dst_tmp, src_imm, result));
 
 cleanup:
     return err;
@@ -603,7 +654,7 @@ cleanup:
 /// operand containing the result of the operation in `result`.
 static err_t calc_binop_modrm_imm(
     const post_prefixes_ctx_t* ctx,
-    binop_fn_t fn,
+    binop_fn_t binop,
     const modrm_operand_t* dst,
     const pis_operand_t* src_imm,
     pis_operand_t* result
@@ -611,11 +662,7 @@ static err_t calc_binop_modrm_imm(
     err_t err = SUCCESS;
 
     pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
-    pis_operand_t dst_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-
-    CHECK_RETHROW(modrm_operand_read(ctx, &dst_tmp, dst));
-
-    CHECK_RETHROW(fn(ctx, &dst_tmp, src_imm, result));
+    CHECK_RETHROW(calc_binop_modrm_imm_with_size(ctx, binop, operand_size, dst, src_imm, result));
 
 cleanup:
     return err;
@@ -625,14 +672,33 @@ cleanup:
 /// operation in the first operand.
 static err_t calc_and_store_binop_modrm(
     const post_prefixes_ctx_t* ctx,
-    binop_fn_t fn,
+    binop_fn_t binop,
     const modrm_operand_t* dst,
     const modrm_operand_t* src
 ) {
     err_t err = SUCCESS;
 
     pis_operand_t res_tmp = {};
-    CHECK_RETHROW(calc_binop_modrm(ctx, fn, dst, src, &res_tmp));
+    CHECK_RETHROW(calc_binop_modrm(ctx, binop, dst, src, &res_tmp));
+    CHECK_RETHROW(modrm_operand_write(ctx, dst, &res_tmp));
+
+cleanup:
+    return err;
+}
+
+/// calculates a binary operation with one modrm and one immediate operand as inputs using the given
+/// operand size, and stores the result of the operation in the first operand.
+static err_t calc_and_store_binop_modrm_imm_with_size(
+    const post_prefixes_ctx_t* ctx,
+    binop_fn_t binop,
+    pis_operand_size_t operand_size,
+    const modrm_operand_t* dst,
+    const pis_operand_t* src_imm
+) {
+    err_t err = SUCCESS;
+
+    pis_operand_t res_tmp = {};
+    CHECK_RETHROW(calc_binop_modrm_imm_with_size(ctx, binop, operand_size, dst, src_imm, &res_tmp));
     CHECK_RETHROW(modrm_operand_write(ctx, dst, &res_tmp));
 
 cleanup:
@@ -643,24 +709,47 @@ cleanup:
 /// result of the operation in the first operand.
 static err_t calc_and_store_binop_modrm_imm(
     const post_prefixes_ctx_t* ctx,
-    binop_fn_t fn,
+    binop_fn_t binop,
     const modrm_operand_t* dst,
     const pis_operand_t* src_imm
 ) {
     err_t err = SUCCESS;
 
     pis_operand_t res_tmp = {};
-    CHECK_RETHROW(calc_binop_modrm_imm(ctx, fn, dst, src_imm, &res_tmp));
+    CHECK_RETHROW(calc_binop_modrm_imm(ctx, binop, dst, src_imm, &res_tmp));
     CHECK_RETHROW(modrm_operand_write(ctx, dst, &res_tmp));
 
 cleanup:
     return err;
 }
 
-/// the operand size for relative jumps which use 16/32 bit displacements.
+/// calculates a binary operation with one modrm and one immediate operand as inputs, and optionally
+/// stores the result of the operation in the first operand.
+static err_t calc_and_maybe_store_binop_modrm_imm(
+    const post_prefixes_ctx_t* ctx,
+    binop_fn_t binop,
+    bool should_store_result,
+    const modrm_operand_t* dst,
+    const pis_operand_t* src_imm
+) {
+    err_t err = SUCCESS;
+
+    pis_operand_t res_tmp = {};
+    CHECK_RETHROW(calc_binop_modrm_imm(ctx, binop, dst, src_imm, &res_tmp));
+
+    if (should_store_result) {
+        CHECK_RETHROW(modrm_operand_write(ctx, dst, &res_tmp));
+    }
+
+cleanup:
+    return err;
+}
+
+/// the default operand size for near branches.
+///
 /// please not that the operand size is not the size of the displacement immediate. for example, for
 /// an operand size of 8, the displacement is 4 bytes.
-static pis_operand_size_t rel_jmp_operand_size_16_32(const post_prefixes_ctx_t* ctx) {
+static pis_operand_size_t near_branch_operand_default_operand_size(const post_prefixes_ctx_t* ctx) {
     if (ctx->lift_ctx->pis_x86_ctx->cpumode == PIS_X86_CPUMODE_64_BIT) {
         // from the intel ia-32 spec:
         // "In 64-bit mode the target operand will always be 64-bits because the operand size is
@@ -704,7 +793,7 @@ cleanup:
 
 /// the instruction points size of a relative jump using a 16/32 bit displacement.
 static pis_operand_size_t rel_jmp_ip_operand_size(const post_prefixes_ctx_t* ctx) {
-    return rel_jmp_operand_size_16_32(ctx);
+    return near_branch_operand_default_operand_size(ctx);
 }
 
 /// masks the ip value which is the result of performing a relative jump with a 16/32 bit
@@ -846,13 +935,13 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
     err_t err = SUCCESS;
     modrm_operands_t modrm_operands = {};
 
-    if (second_opcode_byte >= 0x80 && second_opcode_byte <= 0x80 + X86_COND_ENCODING_MAX_VALUE) {
+    if (opcode_cond_opcode_only(second_opcode_byte) == 0x80) {
         // jcc rel
         pis_operand_t cond = {};
-        CHECK_RETHROW(cond_decode_and_calc(ctx, second_opcode_byte - 0x80, &cond));
+        CHECK_RETHROW(cond_opcode_decode_and_calc(ctx, second_opcode_byte, &cond));
 
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &cond, rel_jmp_operand_size_16_32(ctx)));
-    } else if (second_opcode_byte >= 0x90 && second_opcode_byte <= 0x90 + X86_COND_ENCODING_MAX_VALUE) {
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &cond, near_branch_operand_default_operand_size(ctx)));
+    } else if (opcode_cond_opcode_only(second_opcode_byte) == 0x90) {
         // setcc r/m8
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
             ctx,
@@ -863,7 +952,7 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         ));
 
         pis_operand_t cond = {};
-        CHECK_RETHROW(cond_decode_and_calc(ctx, second_opcode_byte - 0x90, &cond));
+        CHECK_RETHROW(cond_opcode_decode_and_calc(ctx, second_opcode_byte, &cond));
 
         CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &cond));
     } else if (second_opcode_byte == 0xaf) {
@@ -907,12 +996,12 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
             reg_size = PIS_OPERAND_SIZE_4;
         }
         CHECK_RETHROW(do_mov_extend_r_rm(ctx, opcode, reg_size, PIS_OPERAND_SIZE_2));
-    } else if (second_opcode_byte >= 0x40 && second_opcode_byte <= 0x40 + X86_COND_ENCODING_MAX_VALUE) {
+    } else if (opcode_cond_opcode_only(second_opcode_byte) == 0x40) {
         // cmovcc r, r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
         pis_operand_t cond = {};
-        CHECK_RETHROW(cond_decode_and_calc(ctx, second_opcode_byte - 0x40, &cond));
+        CHECK_RETHROW(cond_opcode_decode_and_calc(ctx, second_opcode_byte, &cond));
 
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
         pis_operand_t rm_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
@@ -1401,7 +1490,137 @@ static err_t push_ip(const post_prefixes_ctx_t* ctx) {
     err_t err = SUCCESS;
     u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
     u64 push_value = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr);
-    CHECK_RETHROW(push(ctx, &PIS_OPERAND_CONST(push_value, rel_jmp_operand_size_16_32(ctx))));
+    CHECK_RETHROW(
+        push(ctx, &PIS_OPERAND_CONST(push_value, near_branch_operand_default_operand_size(ctx)))
+    );
+cleanup:
+    return err;
+}
+
+/// peforms a division operation that operations on the `ax` and `dx` operands and stores its
+/// results in the `ax` and `dx` operand.
+static err_t do_div_ax_dx(
+    const post_prefixes_ctx_t* ctx, pis_operand_size_t operand_size, const pis_operand_t* divisor
+) {
+    err_t err = SUCCESS;
+    if (operand_size == PIS_OPERAND_SIZE_8) {
+        // divide `rdx:rax`.
+
+        // perform the division
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN4(PIS_OPCODE_UNSIGNED_DIV_16, RAX, RDX, RAX, *divisor)
+        );
+
+        // perform the remainder calculation
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN4(PIS_OPCODE_UNSIGNED_REM_16, RDX, RDX, RAX, *divisor)
+        );
+    } else {
+        // divide `dx:ax` or `edx:eax`.
+
+        // first, combine the 2 registers into a single operand.
+        pis_operand_size_t double_operand_size = operand_size * 2;
+        pis_operand_t divide_lhs = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, divide_lhs, get_ax_operand_of_size(operand_size))
+        );
+
+        // zero extend the dx part and shift it left
+        pis_operand_t zero_extended_dx = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(
+                PIS_OPCODE_ZERO_EXTEND,
+                zero_extended_dx,
+                get_dx_operand_of_size(operand_size)
+            )
+        );
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(
+                PIS_OPCODE_SHIFT_LEFT,
+                zero_extended_dx,
+                zero_extended_dx,
+                PIS_OPERAND_CONST(pis_operand_size_to_bits(operand_size), double_operand_size)
+            )
+        );
+
+        // or the shifted dx value into the result operand
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(PIS_OPCODE_OR, divide_lhs, divide_lhs, zero_extended_dx)
+        );
+
+        // zero extend the divisor
+        pis_operand_t zero_extended_divisor = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, zero_extended_divisor, *divisor)
+        );
+
+        // perform the division
+        pis_operand_t div_result = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(PIS_OPCODE_UNSIGNED_DIV, div_result, divide_lhs, *divisor)
+        );
+
+        // store the division result in ax
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, get_ax_operand_of_size(operand_size), div_result)
+        );
+
+        // perform the remainder calculation
+        pis_operand_t rem_result = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(PIS_OPCODE_UNSIGNED_REM, rem_result, divide_lhs, *divisor)
+        );
+
+        // store the division result in dx
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, get_dx_operand_of_size(operand_size), rem_result)
+        );
+    }
+cleanup:
+    return err;
+}
+
+/// calculates the given binary operation with the `ax` register of appropriate size as its first
+/// operand, and an immediate operand of appropriate size as its second operand. returns an operand
+/// containing the result in `result`.
+static err_t
+    calc_binop_ax_imm(const post_prefixes_ctx_t* ctx, binop_fn_t binop, pis_operand_t* result) {
+    err_t err = SUCCESS;
+
+    pis_operand_t imm = {};
+    CHECK_RETHROW(fetch_imm_default_size_sign_extended(ctx, &imm));
+
+    pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
+
+    CHECK_RETHROW(binop(ctx, &ax, &imm, result));
+
+cleanup:
+    return err;
+}
+
+/// calculates the given binary operation with the `ax` register of appropriate size as its first
+/// operand, and an immediate operand of appropriate size as its second operand. stores the result
+/// of the operation in the `ax` operand.
+static err_t calc_and_store_binop_ax_imm(const post_prefixes_ctx_t* ctx, binop_fn_t binop) {
+    err_t err = SUCCESS;
+
+    pis_operand_t res = {};
+    CHECK_RETHROW(calc_binop_ax_imm(ctx, binop, &res));
+
+    pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
+    CHECK_RETHROW(write_gpr(ctx, &ax, &res));
+
 cleanup:
     return err;
 }
@@ -1448,7 +1667,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t reg_operand = reg_get_operand(reg_encoding, operand_size, ctx->prefixes);
 
         if (pis_operand_equals(&ax_operand, &reg_operand)) {
-            // exchange [e/r]ax with itself, this is a nop, so don't emit anything
+            // exchange [e/r]ax with itself. this is a nop, so don't emit anything.
         } else {
             // actual exchange operation
             pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
@@ -1469,112 +1688,12 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
 
-        pis_operand_t divisor = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-        CHECK_RETHROW(modrm_rm_read(ctx, &divisor, &modrm_operands.rm_operand.rm));
+        pis_operand_t rm_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+        CHECK_RETHROW(modrm_rm_read(ctx, &rm_value, &modrm_operands.rm_operand.rm));
 
         if (modrm_operands.modrm.reg == 6) {
             // div r/m
-            if (operand_size == PIS_OPERAND_SIZE_8) {
-                // divide `rdx:rax`.
-
-                // perform the division
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN4(PIS_OPCODE_UNSIGNED_DIV_16, RAX, RDX, RAX, divisor)
-                );
-
-                // perform the remainder calculation
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN4(PIS_OPCODE_UNSIGNED_REM_16, RDX, RDX, RAX, divisor)
-                );
-            } else {
-                // divide `dx:ax` or `edx:eax`.
-
-                // first, combine the 2 registers into a single operand.
-                pis_operand_size_t double_operand_size = operand_size * 2;
-                pis_operand_t divide_lhs = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN2(
-                        PIS_OPCODE_ZERO_EXTEND,
-                        divide_lhs,
-                        get_ax_operand_of_size(operand_size)
-                    )
-                );
-
-                // zero extend the dx part and shift it left
-                pis_operand_t zero_extended_dx =
-                    LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN2(
-                        PIS_OPCODE_ZERO_EXTEND,
-                        zero_extended_dx,
-                        get_dx_operand_of_size(operand_size)
-                    )
-                );
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN3(
-                        PIS_OPCODE_SHIFT_LEFT,
-                        zero_extended_dx,
-                        zero_extended_dx,
-                        PIS_OPERAND_CONST(
-                            pis_operand_size_to_bits(operand_size),
-                            double_operand_size
-                        )
-                    )
-                );
-
-                // or the shifted dx value into the result operand
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN3(PIS_OPCODE_OR, divide_lhs, divide_lhs, zero_extended_dx)
-                );
-
-                // zero extend the divisor
-                pis_operand_t zero_extended_divisor =
-                    LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, zero_extended_divisor, divisor)
-                );
-
-                // perform the division
-                pis_operand_t div_result = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN3(PIS_OPCODE_UNSIGNED_DIV, div_result, divide_lhs, divisor)
-                );
-
-                // store the division result in ax
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN2(
-                        PIS_OPCODE_GET_LOW_BITS,
-                        get_ax_operand_of_size(operand_size),
-                        div_result
-                    )
-                );
-
-                // perform the remainder calculation
-                pis_operand_t rem_result = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN3(PIS_OPCODE_UNSIGNED_REM, rem_result, divide_lhs, divisor)
-                );
-
-                // store the division result in dx
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN2(
-                        PIS_OPCODE_GET_LOW_BITS,
-                        get_dx_operand_of_size(operand_size),
-                        rem_result
-                    )
-                );
-            }
+            CHECK_RETHROW(do_div_ax_dx(ctx, operand_size, &rm_value));
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
@@ -1591,13 +1710,13 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
         if (operand_size == PIS_OPERAND_SIZE_8) {
-            pis_operand_t tmp32 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_4);
-            CHECK_RETHROW(modrm_rm_read(ctx, &tmp32, &modrm_operands.rm_operand.rm));
-
-            pis_operand_t tmp64 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_8);
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, tmp64, tmp32));
-
-            CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &tmp64));
+            // movsxd r64, r/m32
+            CHECK_RETHROW(do_mov_extend_r_rm(
+                ctx,
+                PIS_OPCODE_SIGN_EXTEND,
+                PIS_OPERAND_SIZE_8,
+                PIS_OPERAND_SIZE_4
+            ));
         } else {
             // regular mov
             pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
@@ -1726,16 +1845,15 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         ));
     } else if (first_opcode_byte == 0xff) {
         // xxx r/m
+
+        // can't decode modrm operands here since we don't yet know the operand sizes. the operand
+        // sizes depend on the `reg` value.
         modrm_t modrm = modrm_decode_byte(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx));
 
         if (modrm.reg == 4) {
             // jmp r/m
 
-            // decide the operand size
-            pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
-            if (ctx->lift_ctx->pis_x86_ctx->cpumode == PIS_X86_CPUMODE_64_BIT) {
-                operand_size = PIS_OPERAND_SIZE_8;
-            }
+            pis_operand_size_t operand_size = near_branch_operand_default_operand_size(ctx);
 
             modrm_rm_operand_t rm_operand = {};
             CHECK_RETHROW(modrm_decode_rm_operand(ctx, &modrm, operand_size, &rm_operand));
@@ -1747,11 +1865,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         } else if (modrm.reg == 2) {
             // call r/m
 
-            // decide the operand size
-            pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
-            if (ctx->lift_ctx->pis_x86_ctx->cpumode == PIS_X86_CPUMODE_64_BIT) {
-                operand_size = PIS_OPERAND_SIZE_8;
-            }
+            pis_operand_size_t operand_size = near_branch_operand_default_operand_size(ctx);
 
             modrm_rm_operand_t rm_operand = {};
             CHECK_RETHROW(modrm_decode_rm_operand(ctx, &modrm, operand_size, &rm_operand));
@@ -1781,53 +1895,62 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
 
-    } else if (first_opcode_byte == 0x83) {
-        // xxx r/m, imm8
+    } else if (first_opcode_byte == 0x81 || first_opcode_byte == 0x83) {
+        // xxx r/m, imm/imm8
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
         pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
         CHECK_RETHROW(modrm_operand_read(ctx, &rm_tmp, &modrm_operands.rm_operand));
 
-        i8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-        u64 imm64 = pis_sign_extend_byte(imm8, operand_size);
+        // calculate the appropriate immediate operand according to the opcode
+        pis_operand_t imm_operand = {};
+        if (first_opcode_byte == 0x81) {
+            CHECK_RETHROW(fetch_imm_default_size_sign_extended(ctx, &imm_operand));
+        } else if (first_opcode_byte == 0x83) {
+            i8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+            u64 imm64 = pis_sign_extend_byte(imm8, operand_size);
+            imm_operand = PIS_OPERAND_CONST(imm64, operand_size);
+        } else {
+            UNREACHABLE();
+        }
 
+        // determine the kind of binary operation according to the modrm `reg` value.
+        binop_fn_t binop = NULL;
+        bool should_store_result = false;
         if (modrm_operands.modrm.reg == 5) {
             // sub r/m, imm8
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_sub(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp)
-            );
-
-            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+            binop = binop_sub;
+            should_store_result = true;
         } else if (modrm_operands.modrm.reg == 0) {
             // add r/m, imm8
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_add(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp)
-            );
-
-            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+            binop = binop_add;
+            should_store_result = true;
         } else if (modrm_operands.modrm.reg == 6) {
             // xor r/m, imm8
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_xor(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp)
-            );
-
-            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+            binop = binop_xor;
+            should_store_result = true;
         } else if (modrm_operands.modrm.reg == 4) {
             // and r/m, imm8
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_and(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp)
-            );
-
-            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+            binop = binop_and;
+            should_store_result = true;
         } else if (modrm_operands.modrm.reg == 7) {
             // cmp r/m, imm8
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_sub(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm64, operand_size), &res_tmp)
-            );
+            binop = binop_sub;
+            should_store_result = false;
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
+
+        // calculate the binary operation and optionally store its result
+        CHECK(binop != NULL);
+        CHECK_RETHROW(calc_and_maybe_store_binop_modrm_imm(
+            ctx,
+            binop,
+            should_store_result,
+            &modrm_operands.rm_operand,
+            &imm_operand
+        ));
     } else if (first_opcode_byte == 0xc0) {
         // xxx r/m8, imm8
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
@@ -1842,13 +1965,13 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         if (modrm_operands.modrm.reg == 5) {
             // shr r/m8, imm8
-            pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-            CHECK_RETHROW(modrm_operand_read(ctx, &rm_tmp, &modrm_operands.rm_operand));
-
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_shr(ctx, &rm_tmp, &imm_operand, &res_tmp));
-
-            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+            CHECK_RETHROW(calc_and_store_binop_modrm_imm_with_size(
+                ctx,
+                binop_shr,
+                PIS_OPERAND_SIZE_1,
+                &modrm_operands.rm_operand,
+                &imm_operand
+            ));
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
@@ -1866,11 +1989,15 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         if (modrm_operands.modrm.reg == 0) {
             // test r/m8, imm8
-            pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-            CHECK_RETHROW(modrm_operand_read(ctx, &rm_tmp, &modrm_operands.rm_operand));
-
             pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_and(ctx, &rm_tmp, &imm_operand, &res_tmp));
+            CHECK_RETHROW(calc_binop_modrm_imm_with_size(
+                ctx,
+                binop_and,
+                PIS_OPERAND_SIZE_1,
+                &modrm_operands.rm_operand,
+                &imm_operand,
+                &res_tmp
+            ));
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
@@ -1906,39 +2033,42 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         if (modrm_operands.modrm.reg == 7) {
             // cmp r/m8, imm8
-
-            pis_operand_t dst_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-            CHECK_RETHROW(modrm_rm_read(ctx, &dst_tmp, &modrm_operands.rm_operand.rm));
-
-            // perform subtraction but ignore the result
-            pis_operand_t res = {};
-            CHECK_RETHROW(binop_sub(ctx, &dst_tmp, &imm_operand, &res));
+            pis_operand_t res_tmp = {};
+            CHECK_RETHROW(calc_binop_modrm_imm_with_size(
+                ctx,
+                binop_sub,
+                PIS_OPERAND_SIZE_1,
+                &modrm_operands.rm_operand,
+                &imm_operand,
+                &res_tmp
+            ));
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
     } else if (first_opcode_byte == 0xe9) {
         // jmp rel
         pis_operand_t target = {};
-        CHECK_RETHROW(
-            rel_jmp_fetch_disp_and_calc_target(ctx, rel_jmp_operand_size_16_32(ctx), &target)
-        );
+        CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target(
+            ctx,
+            near_branch_operand_default_operand_size(ctx),
+            &target
+        ));
 
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, target));
-    } else if (first_opcode_byte == 0x74) {
-        // je rel8
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &FLAGS_ZF, PIS_OPERAND_SIZE_1));
-    } else if (first_opcode_byte == 0x75) {
-        // jne rel8
-        pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        CHECK_RETHROW(cond_negate(ctx, &res_tmp, &FLAGS_ZF));
+    } else if (opcode_cond_opcode_only(first_opcode_byte) == 0x70) {
+        // jcc rel8
+        pis_operand_t cond = {};
+        CHECK_RETHROW(cond_opcode_decode_and_calc(ctx, first_opcode_byte, &cond));
 
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &res_tmp, PIS_OPERAND_SIZE_1));
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &cond, PIS_OPERAND_SIZE_1));
     } else if (first_opcode_byte == 0xe8) {
         // call rel
         pis_operand_t target = {};
-        CHECK_RETHROW(
-            rel_jmp_fetch_disp_and_calc_target(ctx, rel_jmp_operand_size_16_32(ctx), &target)
-        );
+        CHECK_RETHROW(rel_jmp_fetch_disp_and_calc_target(
+            ctx,
+            near_branch_operand_default_operand_size(ctx),
+            &target
+        ));
 
         CHECK_RETHROW(push_ip(ctx));
 
@@ -1987,9 +2117,10 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         ));
 
         pis_operand_t res = {};
-        CHECK_RETHROW(calc_binop_modrm(
+        CHECK_RETHROW(calc_binop_modrm_with_size(
             ctx,
             binop_and,
+            PIS_OPERAND_SIZE_1,
             &modrm_operands.rm_operand,
             &modrm_operands.reg_operand,
             &res
@@ -2041,74 +2172,17 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         }
     } else if (first_opcode_byte == 0x25) {
         // and [R/E]AX, imm
-        pis_operand_t imm = {};
-        CHECK_RETHROW(fetch_imm_default_size_sign_extended(ctx, &imm));
-
-        pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
-
-        pis_operand_t res = {};
-        CHECK_RETHROW(binop_and(ctx, &ax, &imm, &res));
-
-        CHECK_RETHROW(write_gpr(ctx, &ax, &res));
+        CHECK_RETHROW(calc_and_store_binop_ax_imm(ctx, binop_and));
     } else if (first_opcode_byte == 0x2d) {
         // sub [R/E]AX, imm
-        pis_operand_t imm = {};
-        CHECK_RETHROW(fetch_imm_default_size_sign_extended(ctx, &imm));
-
-        pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
-
-        pis_operand_t res = {};
-        CHECK_RETHROW(binop_sub(ctx, &ax, &imm, &res));
-
-        CHECK_RETHROW(write_gpr(ctx, &ax, &res));
+        CHECK_RETHROW(calc_and_store_binop_ax_imm(ctx, binop_sub));
     } else if (first_opcode_byte == 0x05) {
         // add [R/E]AX, imm
-        pis_operand_t imm = {};
-        CHECK_RETHROW(fetch_imm_default_size_sign_extended(ctx, &imm));
-
-        pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
-
-        pis_operand_t res = {};
-        CHECK_RETHROW(binop_add(ctx, &ax, &imm, &res));
-
-        CHECK_RETHROW(write_gpr(ctx, &ax, &res));
+        CHECK_RETHROW(calc_and_store_binop_ax_imm(ctx, binop_add));
     } else if (first_opcode_byte == 0x3d) {
         // cmp [R/E]AX, imm
-        pis_operand_t imm = {};
-        CHECK_RETHROW(fetch_imm_default_size_sign_extended(ctx, &imm));
-
-        pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
-
         pis_operand_t res = {};
-        CHECK_RETHROW(binop_sub(ctx, &ax, &imm, &res));
-    } else if (first_opcode_byte == 0x81) {
-        // xxx r/m, imm
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-
-        pis_operand_t imm = {};
-        CHECK_RETHROW(fetch_imm_default_size_sign_extended(ctx, &imm));
-
-        if (modrm_operands.modrm.reg == 7) {
-            // cmp r/m, imm
-
-            // perform subtraction but ignore the result
-            pis_operand_t res = {};
-            CHECK_RETHROW(
-                calc_binop_modrm_imm(ctx, binop_sub, &modrm_operands.rm_operand, &imm, &res)
-            );
-        } else if (modrm_operands.modrm.reg == 0) {
-            // add r/m, imm
-            CHECK_RETHROW(
-                calc_and_store_binop_modrm_imm(ctx, binop_add, &modrm_operands.rm_operand, &imm)
-            );
-        } else if (modrm_operands.modrm.reg == 5) {
-            // sub r/m, imm
-            CHECK_RETHROW(
-                calc_and_store_binop_modrm_imm(ctx, binop_sub, &modrm_operands.rm_operand, &imm)
-            );
-        } else {
-            CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
-        }
+        CHECK_RETHROW(calc_binop_ax_imm(ctx, binop_sub, &res));
     } else if (first_opcode_byte == 0xa8) {
         // test al, imm8
         u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
@@ -2152,117 +2226,61 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN2(
-                PIS_OPCODE_SIGN_EXTEND,
-                // ,
-                tmp,
-                get_ax_operand_of_size(half_operand_size)
-            )
+            PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, tmp, get_ax_operand_of_size(half_operand_size))
         );
 
         pis_operand_t dst = get_ax_operand_of_size(operand_size);
         CHECK_RETHROW(write_gpr(ctx, &dst, &tmp));
-    } else if (first_opcode_byte == 0xc1) {
-        // xxx r/m, imm8
+    } else if (first_opcode_byte == 0xc1 || first_opcode_byte == 0xd1 || first_opcode_byte == 0xd3) {
+        // shift r/m, imm/cl
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
-        pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-        CHECK_RETHROW(modrm_operand_read(ctx, &rm_tmp, &modrm_operands.rm_operand));
 
-        u8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        // determine the rhs operand according to the opcode
+        pis_operand_t rhs_operand = {};
+        switch (first_opcode_byte) {
+        case 0xc1: {
+            // shift r/m, imm8
+            u8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+            rhs_operand = PIS_OPERAND_CONST(imm8, operand_size);
+            break;
+        }
+        case 0xd1:
+            // shift r/m, 1
+            rhs_operand = PIS_OPERAND_CONST(1, operand_size);
+            break;
+        case 0xd3: {
+            // shift r/m, cl
+            pis_operand_t cl_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, cl_zero_extended, CL));
+            rhs_operand = cl_zero_extended;
+            break;
+        }
+        default:
+            UNREACHABLE();
+        }
 
+        // determine the kind of binary operation according to the modrm `reg` value.
+        binop_fn_t binop = NULL;
         if (modrm_operands.modrm.reg == 4) {
-            // shl/sal r/m, imm8
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_shl(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm8, operand_size), &res_tmp)
-            );
-
-            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+            // shl/sal
+            binop = binop_shl;
         } else if (modrm_operands.modrm.reg == 5) {
-            // shr r/m, imm8
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_shr(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm8, operand_size), &res_tmp)
-            );
-
-            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+            // shr
+            binop = binop_shr;
         } else if (modrm_operands.modrm.reg == 7) {
-            // sar r/m, imm8
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_sar(ctx, &rm_tmp, &PIS_OPERAND_CONST(imm8, operand_size), &res_tmp)
-            );
-
-            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
+            // sar
+            binop = binop_sar;
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
-    } else if (first_opcode_byte == 0xd1) {
-        // xxx r/m, 1
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
 
-        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
-        pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-        CHECK_RETHROW(modrm_operand_read(ctx, &rm_tmp, &modrm_operands.rm_operand));
-
-        if (modrm_operands.modrm.reg == 4) {
-            // shl/sal r/m, 1
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_shl(ctx, &rm_tmp, &PIS_OPERAND_CONST(1, operand_size), &res_tmp));
-
-            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
-        } else if (modrm_operands.modrm.reg == 5) {
-            // shr r/m, 1
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_shr(ctx, &rm_tmp, &PIS_OPERAND_CONST(1, operand_size), &res_tmp));
-
-            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
-        } else if (modrm_operands.modrm.reg == 7) {
-            // sar r/m, 1
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_sar(ctx, &rm_tmp, &PIS_OPERAND_CONST(1, operand_size), &res_tmp));
-
-            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
-        } else {
-            CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
-        }
-    } else if (first_opcode_byte == 0xd3) {
-        // xxx r/m, cl
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-
-        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
-        pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-        CHECK_RETHROW(modrm_operand_read(ctx, &rm_tmp, &modrm_operands.rm_operand));
-
-        pis_operand_t cl_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, cl_zero_extended, CL));
-
-        if (modrm_operands.modrm.reg == 4) {
-            // shl/sal r/m, cl
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_shl(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
-
-            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
-        } else if (modrm_operands.modrm.reg == 5) {
-            // shr r/m, cl
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_shr(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
-
-            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
-        } else if (modrm_operands.modrm.reg == 5) {
-            // shr r/m, cl
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_shr(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
-
-            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
-        } else if (modrm_operands.modrm.reg == 7) {
-            // sar r/m, cl
-            pis_operand_t res_tmp = {};
-            CHECK_RETHROW(binop_sar(ctx, &rm_tmp, &cl_zero_extended, &res_tmp));
-
-            CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res_tmp));
-        } else {
-            CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
-        }
+        // calculate the binary operation and store its result
+        CHECK(binop != NULL);
+        CHECK_RETHROW(
+            calc_and_store_binop_modrm_imm(ctx, binop, &modrm_operands.rm_operand, &rhs_operand)
+        );
     } else if (first_opcode_byte == 0x0f) {
         // opcode is longer than 1 byte
         u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
