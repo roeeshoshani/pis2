@@ -2328,6 +2328,74 @@ cleanup:
     return err;
 }
 
+/// the context used to implement a REP prefix.
+typedef struct {
+    size_t insn_index_at_loop_start;
+    pis_insn_t* jmp_end_insn;
+} rep_ctx_t;
+
+/// begin implementing a rep loop. this emits the first half of the rep loop which is at the start
+/// of the lifted instruction. after calling this, you should emit your logic for a single iteration
+/// of the loop, and then call the rep end function to emit the second half of the rep loop.
+static err_t rep_begin(const post_prefixes_ctx_t* ctx, rep_ctx_t* rep_ctx) {
+    err_t err = SUCCESS;
+
+    // save the instruction index at the start of the loop so that we can jump to it later.
+    rep_ctx->insn_index_at_loop_start = lift_ctx_index(ctx->lift_ctx);
+
+    // first check if `cx` if zero
+    pis_operand_t cx = operand_resize(&RCX, ctx->addr_size);
+    pis_operand_t cx_equals_zero = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_EQUALS, cx_equals_zero, cx, PIS_OPERAND_CONST(0, ctx->addr_size))
+    );
+
+    // emit a jump which should skip over the entire code. the offset is currently 0 since we
+    // don't know the size of the code, but it will be filled with the correct value later on.
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN2(PIS_OPCODE_JMP_COND, cx_equals_zero, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+    );
+    CHECK_RETHROW(
+        pis_lift_result_get_last_emitted_insn(ctx->lift_ctx->result, &rep_ctx->jmp_end_insn)
+    );
+
+    // now that we know that `cx` is not zero, decrement it.
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_SUB, cx, cx, PIS_OPERAND_CONST(1, ctx->addr_size))
+    );
+
+cleanup:
+    return err;
+}
+
+/// emits the second half of the rep loop, at the end of the instruction. this should be called
+/// after calling the rep begin function and after emitting your code for a single iteration of the
+/// rep loop.
+static err_t rep_end(const post_prefixes_ctx_t* ctx, const rep_ctx_t* rep_ctx) {
+    err_t err = SUCCESS;
+
+
+    // now jump back to the start of the loop, for the next iteration of the loop.
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN1(
+            PIS_OPCODE_JMP,
+            PIS_OPERAND_CONST(rep_ctx->insn_index_at_loop_start, PIS_OPERAND_SIZE_1)
+        )
+    );
+
+    // now that we finished emitting the code, update the offset of the jmp instruction at the start
+    // of the loop which should jump to the end of the instruction.
+    rep_ctx->jmp_end_insn->operands[1] =
+        PIS_OPERAND_CONST(lift_ctx_index(ctx->lift_ctx), PIS_OPERAND_SIZE_1);
+
+cleanup:
+    return err;
+}
+
 /// lift an instruction with a REP or a BND prefix according to its first opcode byte
 static err_t
     rep_or_bnd_lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opcode_byte) {
@@ -2344,31 +2412,8 @@ static err_t
         // movsb can only be used with a REP prefix, not a REPNE prefix.
         CHECK(group1_prefix(ctx) == LEGACY_PREFIX_REPZ_OR_REP);
 
-        // save the instruction index at the start of the loop so that we can jump to it later.
-        size_t insn_index_at_loop_start = lift_ctx_index(ctx->lift_ctx);
-
-        // first check if `cx` if zero
-        pis_operand_t cx = operand_resize(&RCX, ctx->addr_size);
-        pis_operand_t cx_equals_zero = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN3(PIS_OPCODE_EQUALS, cx_equals_zero, cx, PIS_OPERAND_CONST(0, ctx->addr_size))
-        );
-
-        // emit a jump which should skip over the entire code. the offset is currently 0 since we
-        // don't know the size of the code, but it will be filled with the correct value later on.
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_JMP_COND, cx_equals_zero, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
-        );
-        pis_insn_t* jmp_end_insn = NULL;
-        CHECK_RETHROW(pis_lift_result_get_last_emitted_insn(ctx->lift_ctx->result, &jmp_end_insn));
-
-        // now that we know that `cx` is not zero, decrement it.
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN3(PIS_OPCODE_SUB, cx, cx, PIS_OPERAND_CONST(1, ctx->addr_size))
-        );
+        rep_ctx_t rep_ctx = {};
+        CHECK_RETHROW(rep_begin(ctx, &rep_ctx));
 
         // now implement the actual movsb logic.
         pis_operand_t si = operand_resize(&RSI, ctx->addr_size);
@@ -2389,19 +2434,7 @@ static err_t
             PIS_INSN3(PIS_OPCODE_ADD, di, di, PIS_OPERAND_CONST(1, ctx->addr_size))
         );
 
-        // now jump back to the start of the loop, for the next iteration of the loop.
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN1(
-                PIS_OPCODE_JMP,
-                PIS_OPERAND_CONST(insn_index_at_loop_start, PIS_OPERAND_SIZE_1)
-            )
-        );
-
-        // now that we finished emitting the movsb code, update the offset of the jmp instruction
-        // that should jump to the end of the instruction.
-        jmp_end_insn->operands[1] =
-            PIS_OPERAND_CONST(lift_ctx_index(ctx->lift_ctx), PIS_OPERAND_SIZE_1);
+        CHECK_RETHROW(rep_end(ctx, &rep_ctx));
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
