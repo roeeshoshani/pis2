@@ -1643,6 +1643,129 @@ cleanup:
     return err;
 }
 
+/// performs a `BT` operation with the first operand being a memory operand.
+static err_t do_bt_memory(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* bit_base_addr,
+    const pis_operand_t* bit_offset
+) {
+    err_t err = SUCCESS;
+
+    // resize the bit offset operand to the address size, since we need to add it to the address
+    pis_operand_t resized_bit_offset;
+    if (ctx->addr_size > bit_offset->size) {
+        // sign extend it
+        resized_bit_offset = LIFT_CTX_NEW_TMP(ctx->lift_ctx, ctx->addr_size);
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, resized_bit_offset, *bit_offset)
+        );
+    } else if (ctx->addr_size < bit_offset->size) {
+        // truncate it
+        resized_bit_offset = LIFT_CTX_NEW_TMP(ctx->lift_ctx, ctx->addr_size);
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, resized_bit_offset, *bit_offset)
+        );
+    } else {
+        // same size
+        resized_bit_offset = *bit_offset;
+    }
+
+    // divide the bit offset by 8 to get the byte offset. this can be done by shifting it right 3
+    // times.
+    pis_operand_t byte_offset = LIFT_CTX_NEW_TMP(ctx->lift_ctx, ctx->addr_size);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(
+            PIS_OPCODE_SHIFT_RIGHT_SIGNED,
+            byte_offset,
+            resized_bit_offset,
+            PIS_OPERAND_CONST(3, ctx->addr_size)
+        )
+    );
+
+    // add the byte offset to the base address to get the byte address
+    pis_operand_t byte_addr = LIFT_CTX_NEW_TMP(ctx->lift_ctx, ctx->addr_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, byte_addr, *bit_base_addr, byte_offset));
+
+    // load the byte from memory
+    pis_operand_t byte = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_LOAD, byte, byte_addr));
+
+    // calculate the in-byte bit offset
+    pis_operand_t in_byte_bit_offset;
+    if (bit_offset->size == PIS_OPERAND_SIZE_1) {
+        in_byte_bit_offset = *bit_offset;
+    } else {
+        in_byte_bit_offset = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, in_byte_bit_offset, *bit_offset)
+        );
+    }
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(
+            PIS_OPCODE_AND,
+            in_byte_bit_offset,
+            in_byte_bit_offset,
+            PIS_OPERAND_CONST(7, PIS_OPERAND_SIZE_1)
+        )
+    );
+
+    // extract the bit into the carry flag.
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, FLAGS_CF, byte, in_byte_bit_offset)
+    );
+
+cleanup:
+    return err;
+}
+
+/// performs a `BT` operation with the first operand being a register operand.
+static err_t do_bt_reg(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* bit_base_reg,
+    const pis_operand_t* bit_offset
+) {
+    err_t err = SUCCESS;
+
+    CHECK(bit_base_reg->size == bit_offset->size);
+
+    pis_operand_size_t operand_size = bit_base_reg->size;
+    pis_operand_t masked_bit_offset = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    CHECK_RETHROW(mask_shift_count(ctx, bit_offset, &masked_bit_offset, operand_size));
+
+    // extract the bit into the carry flag.
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, FLAGS_CF, *bit_base_reg, masked_bit_offset)
+    );
+
+cleanup:
+    return err;
+}
+
+/// performs a `BT` operation with the first operand being an rm operand.
+static err_t do_bt_rm(
+    const post_prefixes_ctx_t* ctx,
+    const modrm_rm_operand_t* bit_base,
+    const pis_operand_t* bit_offset
+) {
+    err_t err = SUCCESS;
+
+    if (bit_base->is_memory) {
+        CHECK_RETHROW(do_bt_memory(ctx, &bit_base->addr_or_reg, bit_offset));
+    } else {
+        CHECK_RETHROW(do_bt_reg(ctx, &bit_base->addr_or_reg, bit_offset));
+    }
+
+cleanup:
+    return err;
+}
+
 /// lift an instruction according to its second opcode byte
 static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_opcode_byte) {
     err_t err = SUCCESS;
@@ -1725,6 +1848,12 @@ static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_o
         );
 
         CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &final_value));
+    } else if (second_opcode_byte == 0xa3) {
+        // bt r/m, r
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+
+        CHECK_RETHROW(do_bt_rm(ctx, &modrm_operands.rm_operand.rm, &modrm_operands.reg_operand.reg)
+        );
     } else if (second_opcode_byte == 0xa4 || second_opcode_byte == 0xa5) {
         // shld r/m, r, imm8/cl
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
