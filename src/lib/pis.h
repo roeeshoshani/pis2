@@ -44,12 +44,6 @@
         .operands_amount = 4,                                                                      \
     })
 
-#define PIS_INSN_ADD2(OPERAND_1, OPERAND_2)                                                        \
-    PIS_INSN3(PIS_OPCODE_ADD, OPERAND_1, OPERAND_1, OPERAND_2)
-
-#define PIS_INSN_UMUL2(OPERAND_1, OPERAND_2)                                                       \
-    PIS_INSN3(PIS_OPCODE_UNSIGNED_MUL, OPERAND_1, OPERAND_1, OPERAND_2)
-
 #define PIS_ADDR(SPACE, OFFSET) ((pis_addr_t) {.space = (SPACE), .offset = (OFFSET)})
 
 #define PIS_OPERAND(ADDR, SIZE) ((pis_operand_t) {.addr = (ADDR), .size = (SIZE)})

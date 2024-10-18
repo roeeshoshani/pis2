@@ -1052,7 +1052,7 @@ static err_t push(const post_prefixes_ctx_t* ctx, const pis_operand_t* operand_t
     // subtract sp
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN_ADD2(sp, PIS_OPERAND_CONST_NEG(operand_size_bytes, sp.size))
+        PIS_INSN3(PIS_OPCODE_ADD, sp, sp, PIS_OPERAND_CONST_NEG(operand_size_bytes, sp.size))
     );
 
     // write the memory
@@ -1653,7 +1653,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN_ADD2(sp, PIS_OPERAND_CONST(operand_size_bytes, sp.size))
+            PIS_INSN3(PIS_OPCODE_ADD, sp, sp, PIS_OPERAND_CONST(operand_size_bytes, sp.size))
         );
 
         pis_operand_t reg_operand = reg_get_operand(reg_encoding, operand_size, ctx->prefixes);
@@ -2078,7 +2078,7 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN_ADD2(sp, PIS_OPERAND_CONST(operand_size_bytes, sp.size))
+            PIS_INSN3(PIS_OPCODE_ADD, sp, sp, PIS_OPERAND_CONST(operand_size_bytes, sp.size))
         );
 
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, tmp));
