@@ -945,99 +945,6 @@ cleanup:
     return err;
 }
 
-/// lift an instruction according to its second opcode byte
-static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_opcode_byte) {
-    err_t err = SUCCESS;
-    modrm_operands_t modrm_operands = {};
-
-    if (opcode_cond_opcode_only(second_opcode_byte) == 0x80) {
-        // jcc rel
-        pis_operand_t cond = {};
-        CHECK_RETHROW(cond_opcode_decode_and_calc(ctx, second_opcode_byte, &cond));
-
-        CHECK_RETHROW(do_cond_rel_jmp(ctx, &cond, near_branch_operand_default_operand_size(ctx)));
-    } else if (opcode_cond_opcode_only(second_opcode_byte) == 0x90) {
-        // setcc r/m8
-        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
-            ctx,
-            &modrm_operands,
-            PIS_OPERAND_SIZE_1,
-            // don't care
-            PIS_OPERAND_SIZE_1
-        ));
-
-        pis_operand_t cond = {};
-        CHECK_RETHROW(cond_opcode_decode_and_calc(ctx, second_opcode_byte, &cond));
-
-        CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &cond));
-    } else if (second_opcode_byte == 0xaf) {
-        // imul r, r/m
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-        CHECK_RETHROW(calc_and_store_binop_modrm(
-            ctx,
-            binop_imul,
-            &modrm_operands.reg_operand,
-            &modrm_operands.rm_operand
-        ));
-    } else if (second_opcode_byte == 0x1f) {
-        // xxx r/m
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-
-        if (modrm_operands.modrm.reg == 0) {
-            // nop r/m
-
-            // don't emit anything, this is a nop
-        } else {
-            CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
-        }
-    } else if (second_opcode_byte == 0xb6 || second_opcode_byte == 0xbe) {
-        // movzx/movsx r, r/m8
-        pis_opcode_t opcode =
-            second_opcode_byte == 0xb6 ? PIS_OPCODE_ZERO_EXTEND : PIS_OPCODE_SIGN_EXTEND;
-        CHECK_RETHROW(do_mov_extend_r_rm(
-            ctx,
-            opcode,
-            ctx->operand_sizes.insn_default_not_64_bit,
-            PIS_OPERAND_SIZE_1
-        ));
-    } else if (second_opcode_byte == 0xb7 || second_opcode_byte == 0xbf) {
-        // movzx/movsx r, r/m16
-        pis_opcode_t opcode =
-            second_opcode_byte == 0xb7 ? PIS_OPCODE_ZERO_EXTEND : PIS_OPCODE_SIGN_EXTEND;
-        pis_operand_size_t reg_size;
-        if (ctx->prefixes->rex.w) {
-            reg_size = PIS_OPERAND_SIZE_8;
-        } else {
-            reg_size = PIS_OPERAND_SIZE_4;
-        }
-        CHECK_RETHROW(do_mov_extend_r_rm(ctx, opcode, reg_size, PIS_OPERAND_SIZE_2));
-    } else if (opcode_cond_opcode_only(second_opcode_byte) == 0x40) {
-        // cmovcc r, r/m
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-
-        pis_operand_t cond = {};
-        CHECK_RETHROW(cond_opcode_decode_and_calc(ctx, second_opcode_byte, &cond));
-
-        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
-        pis_operand_t rm_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-        CHECK_RETHROW(modrm_rm_read(ctx, &rm_value, &modrm_operands.rm_operand.rm));
-
-        pis_operand_t final_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-        CHECK_RETHROW(ternary(ctx, &cond, &rm_value, &modrm_operands.reg_operand.reg, &final_value)
-        );
-
-        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &final_value));
-    } else {
-        CHECK_FAIL_TRACE_CODE(
-            PIS_ERR_UNSUPPORTED_INSN,
-            "unsupported second opcode byte: 0x%x",
-            second_opcode_byte
-        );
-    }
-
-cleanup:
-    return err;
-}
 
 /// extracts the register encoding of an opcode which has a register encoded in its value.
 /// this also takes into account the `B` bit of the rex prefix of the instruction.
@@ -1275,6 +1182,49 @@ cleanup:
     return err;
 }
 
+/// calculates the overflow flag of a `SHLD` operation. `to_shift` is the value to be shifted,
+/// `count` is the masked shift count.
+static err_t shld_calc_overflow_flag(
+    const post_prefixes_ctx_t* ctx, const pis_operand_t* to_shift, const pis_operand_t* count
+) {
+    err_t err = SUCCESS;
+
+    CHECK(count->size == to_shift->size);
+
+    pis_operand_size_t operand_size = to_shift->size;
+
+    // the overflow flag is set to `MSB(dst << src) ^ MSB(dst)`
+    pis_operand_t shifted = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, shifted, *to_shift, *count));
+
+    pis_operand_t new_msb = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    CHECK_RETHROW(extract_most_significant_bit(ctx, &shifted, &new_msb));
+
+    pis_operand_t old_msb = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    CHECK_RETHROW(extract_most_significant_bit(ctx, to_shift, &old_msb));
+
+    pis_operand_t new_overflow_flag_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_XOR, new_overflow_flag_value, new_msb, old_msb)
+    );
+
+    // we only want to set the overflow flag if the count is 1, otherwise we want to use
+    // the original OF value.
+    pis_operand_t is_count_1 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_CONST(1, operand_size))
+    );
+
+    CHECK_RETHROW(
+        cond_expr_ternary(ctx, &is_count_1, &new_overflow_flag_value, &FLAGS_OF, &FLAGS_OF)
+    );
+
+cleanup:
+    return err;
+}
+
 /// calculates the parity zero and sign flags of a shift operation, and stores the results in the
 /// appropriate flag registers. `count` is the masked shift count, and `shift_result` is the shifted
 /// value.
@@ -1359,6 +1309,63 @@ static err_t binop_shl(
 
     // perform the actual shift
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, res_tmp, *a, count));
+
+    CHECK_RETHROW(shift_calc_parity_zero_sign_flags(ctx, &count, &res_tmp));
+
+    *result = res_tmp;
+
+cleanup:
+    return err;
+}
+
+/// performs a `SHLD` operation.
+static err_t do_shld(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* dst,
+    const pis_operand_t* src,
+    const pis_operand_t* count_operand,
+    pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    CHECK(dst->size == src->size);
+    pis_operand_size_t operand_size = dst->size;
+
+    pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+
+    pis_operand_t count = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    CHECK_RETHROW(mask_shift_count(ctx, count_operand, &count, operand_size));
+
+    // carry flag
+    CHECK_RETHROW(shl_calc_carry_flag(ctx, dst, &count));
+
+    // overflow flag
+    CHECK_RETHROW(shld_calc_overflow_flag(ctx, dst, &count));
+
+    // perform the actual shift
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, res_tmp, *dst, count));
+
+    // copy the bits shifted in from the src operand.
+    // to do that, we shift the src operand `size - count` bits, and then OR the result into the
+    // result.
+    pis_operand_t src_shift_count = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(
+            PIS_OPCODE_SUB,
+            src_shift_count,
+            PIS_OPERAND_CONST(pis_operand_size_to_bytes(operand_size), operand_size),
+            count
+        )
+    );
+
+    pis_operand_t shifted_src = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, shifted_src, *src, src_shift_count)
+    );
+
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, res_tmp, res_tmp, shifted_src));
 
     CHECK_RETHROW(shift_calc_parity_zero_sign_flags(ctx, &count, &res_tmp));
 
@@ -1631,6 +1638,136 @@ static err_t calc_and_store_binop_ax_imm(const post_prefixes_ctx_t* ctx, binop_f
 
     pis_operand_t ax = operand_resize(&RAX, ctx->operand_sizes.insn_default_not_64_bit);
     CHECK_RETHROW(write_gpr(ctx, &ax, &res));
+
+cleanup:
+    return err;
+}
+
+/// lift an instruction according to its second opcode byte
+static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_opcode_byte) {
+    err_t err = SUCCESS;
+    modrm_operands_t modrm_operands = {};
+
+    if (opcode_cond_opcode_only(second_opcode_byte) == 0x80) {
+        // jcc rel
+        pis_operand_t cond = {};
+        CHECK_RETHROW(cond_opcode_decode_and_calc(ctx, second_opcode_byte, &cond));
+
+        CHECK_RETHROW(do_cond_rel_jmp(ctx, &cond, near_branch_operand_default_operand_size(ctx)));
+    } else if (opcode_cond_opcode_only(second_opcode_byte) == 0x90) {
+        // setcc r/m8
+        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
+            ctx,
+            &modrm_operands,
+            PIS_OPERAND_SIZE_1,
+            // don't care
+            PIS_OPERAND_SIZE_1
+        ));
+
+        pis_operand_t cond = {};
+        CHECK_RETHROW(cond_opcode_decode_and_calc(ctx, second_opcode_byte, &cond));
+
+        CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &cond));
+    } else if (second_opcode_byte == 0xaf) {
+        // imul r, r/m
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+        CHECK_RETHROW(calc_and_store_binop_modrm(
+            ctx,
+            binop_imul,
+            &modrm_operands.reg_operand,
+            &modrm_operands.rm_operand
+        ));
+    } else if (second_opcode_byte == 0x1f) {
+        // xxx r/m
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+
+        if (modrm_operands.modrm.reg == 0) {
+            // nop r/m
+
+            // don't emit anything, this is a nop
+        } else {
+            CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
+        }
+    } else if (second_opcode_byte == 0xb6 || second_opcode_byte == 0xbe) {
+        // movzx/movsx r, r/m8
+        pis_opcode_t opcode =
+            second_opcode_byte == 0xb6 ? PIS_OPCODE_ZERO_EXTEND : PIS_OPCODE_SIGN_EXTEND;
+        CHECK_RETHROW(do_mov_extend_r_rm(
+            ctx,
+            opcode,
+            ctx->operand_sizes.insn_default_not_64_bit,
+            PIS_OPERAND_SIZE_1
+        ));
+    } else if (second_opcode_byte == 0xb7 || second_opcode_byte == 0xbf) {
+        // movzx/movsx r, r/m16
+        pis_opcode_t opcode =
+            second_opcode_byte == 0xb7 ? PIS_OPCODE_ZERO_EXTEND : PIS_OPCODE_SIGN_EXTEND;
+        pis_operand_size_t reg_size;
+        if (ctx->prefixes->rex.w) {
+            reg_size = PIS_OPERAND_SIZE_8;
+        } else {
+            reg_size = PIS_OPERAND_SIZE_4;
+        }
+        CHECK_RETHROW(do_mov_extend_r_rm(ctx, opcode, reg_size, PIS_OPERAND_SIZE_2));
+    } else if (opcode_cond_opcode_only(second_opcode_byte) == 0x40) {
+        // cmovcc r, r/m
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+
+        pis_operand_t cond = {};
+        CHECK_RETHROW(cond_opcode_decode_and_calc(ctx, second_opcode_byte, &cond));
+
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+        pis_operand_t rm_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+        CHECK_RETHROW(modrm_rm_read(ctx, &rm_value, &modrm_operands.rm_operand.rm));
+
+        pis_operand_t final_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+        CHECK_RETHROW(ternary(ctx, &cond, &rm_value, &modrm_operands.reg_operand.reg, &final_value)
+        );
+
+        CHECK_RETHROW(write_gpr(ctx, &modrm_operands.reg_operand.reg, &final_value));
+    } else if (second_opcode_byte == 0xa4 || second_opcode_byte == 0xa5) {
+        // shld r/m, r, imm8/cl
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+
+        // determine the rhs operand according to the opcode
+        pis_operand_t shift_count = {};
+        switch (second_opcode_byte) {
+        case 0xa4: {
+            // shld r/m, r, imm8
+            u8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+            shift_count = PIS_OPERAND_CONST(imm8, operand_size);
+            break;
+        }
+        case 0xa5: {
+            // shld r/m, r, cl
+            pis_operand_t cl_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, cl_zero_extended, CL));
+            shift_count = cl_zero_extended;
+            break;
+        }
+        default:
+            UNREACHABLE();
+        }
+
+        pis_operand_t rm_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+        CHECK_RETHROW(modrm_rm_read(ctx, &rm_value, &modrm_operands.rm_operand.rm));
+
+        pis_operand_t result = {};
+        CHECK_RETHROW(
+            do_shld(ctx, &rm_value, &modrm_operands.reg_operand.reg, &shift_count, &result)
+        );
+
+        CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &result));
+
+    } else {
+        CHECK_FAIL_TRACE_CODE(
+            PIS_ERR_UNSUPPORTED_INSN,
+            "unsupported second opcode byte: 0x%x",
+            second_opcode_byte
+        );
+    }
 
 cleanup:
     return err;
