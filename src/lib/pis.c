@@ -79,6 +79,16 @@ void pis_lift_result_reset(pis_lift_result_t* result) {
     result->machine_insn_len = 0;
 }
 
+err_t pis_lift_result_get_last_emitted_insn(pis_lift_result_t* result, pis_insn_t** insn) {
+    err_t err = SUCCESS;
+
+    CHECK(result->insns_amount > 0);
+    *insn = &result->insns[result->insns_amount - 1];
+
+cleanup:
+    return err;
+}
+
 u32 pis_operand_size_to_bytes(pis_operand_size_t operand_size) {
     return (u32) operand_size;
 }

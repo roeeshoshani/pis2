@@ -138,19 +138,9 @@ static pis_operand_size_t get_effective_stack_addr_size(pis_x86_cpumode_t cpumod
     return cpumode_get_operand_size(cpumode);
 }
 
-/// returns the `sp` operand of the right size to be used with stack-addressing operations.
-static pis_operand_t get_sp_operand(pis_x86_cpumode_t cpumode) {
-    return PIS_OPERAND_REG(0b100 * 8, get_effective_stack_addr_size(cpumode));
-}
-
-/// returns an `ax` operand of the given size.
-static pis_operand_t get_ax_operand_of_size(pis_operand_size_t size) {
-    return PIS_OPERAND_REG(0, size);
-}
-
-/// returns a `dx` operand of the given size.
-static pis_operand_t get_dx_operand_of_size(pis_operand_size_t size) {
-    return PIS_OPERAND_REG(0b010 * 8, size);
+/// resizes the given operand to the given new size.
+static pis_operand_t operand_resize(const pis_operand_t* operand, pis_operand_size_t size) {
+    return PIS_OPERAND(operand->addr, size);
 }
 
 /// calculates the effective operand size for the instruction.
@@ -1531,18 +1521,14 @@ static err_t do_div_ax_dx(
         pis_operand_t divide_lhs = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, divide_lhs, get_ax_operand_of_size(operand_size))
+            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, divide_lhs, operand_resize(&RAX, operand_size))
         );
 
         // zero extend the dx part and shift it left
         pis_operand_t zero_extended_dx = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN2(
-                PIS_OPCODE_ZERO_EXTEND,
-                zero_extended_dx,
-                get_dx_operand_of_size(operand_size)
-            )
+            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, zero_extended_dx, operand_resize(&RDX, operand_size))
         );
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
@@ -1577,7 +1563,7 @@ static err_t do_div_ax_dx(
         // store the division result in ax
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, get_ax_operand_of_size(operand_size), div_result)
+            PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, operand_resize(&RAX, operand_size), div_result)
         );
 
         // perform the remainder calculation
@@ -1590,7 +1576,7 @@ static err_t do_div_ax_dx(
         // store the division result in dx
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, get_dx_operand_of_size(operand_size), rem_result)
+            PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, operand_resize(&RDX, operand_size), rem_result)
         );
     }
 cleanup:
@@ -1607,7 +1593,7 @@ static err_t
     pis_operand_t imm = {};
     CHECK_RETHROW(fetch_imm_default_size_sign_extended(ctx, &imm));
 
-    pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
+    pis_operand_t ax = operand_resize(&RAX, ctx->operand_sizes.insn_default_not_64_bit);
 
     CHECK_RETHROW(binop(ctx, &ax, &imm, result));
 
@@ -1624,7 +1610,7 @@ static err_t calc_and_store_binop_ax_imm(const post_prefixes_ctx_t* ctx, binop_f
     pis_operand_t res = {};
     CHECK_RETHROW(calc_binop_ax_imm(ctx, binop, &res));
 
-    pis_operand_t ax = get_ax_operand_of_size(ctx->operand_sizes.insn_default_not_64_bit);
+    pis_operand_t ax = operand_resize(&RAX, ctx->operand_sizes.insn_default_not_64_bit);
     CHECK_RETHROW(write_gpr(ctx, &ax, &res));
 
 cleanup:
@@ -2235,10 +2221,10 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, tmp, get_ax_operand_of_size(half_operand_size))
+            PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, tmp, operand_resize(&RAX, half_operand_size))
         );
 
-        pis_operand_t dst = get_ax_operand_of_size(operand_size);
+        pis_operand_t dst = operand_resize(&RAX, operand_size);
         CHECK_RETHROW(write_gpr(ctx, &dst, &tmp));
     } else if (first_opcode_byte == 0xc1 || first_opcode_byte == 0xd1 || first_opcode_byte == 0xd3) {
         // shift r/m, imm/cl
@@ -2310,8 +2296,14 @@ cleanup:
     return err;
 }
 
-/// lift an instruction with a REP prefix according to its second opcode byte
-static err_t rep_lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_opcode_byte) {
+/// returns the group 1 prefix of the current instruction.
+static legacy_prefix_t group1_prefix(const post_prefixes_ctx_t* ctx) {
+    return ctx->prefixes->legacy.by_group[LEGACY_PREFIX_GROUP_1];
+}
+
+/// lift an instruction with a REP or a BND prefix according to its second opcode byte
+static err_t
+    rep_or_bnd_lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_opcode_byte) {
     err_t err = SUCCESS;
 
     if (second_opcode_byte == 0x1e) {
@@ -2328,7 +2320,7 @@ static err_t rep_lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 seco
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
-            "unsupported second opcode byte with rep prefix: 0x%x",
+            "unsupported second opcode byte with rep or bnd prefix: 0x%x",
             second_opcode_byte
         );
     }
@@ -2336,19 +2328,84 @@ cleanup:
     return err;
 }
 
-/// lift an instruction with a REP prefix according to its first opcode byte
-static err_t rep_lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opcode_byte) {
+/// lift an instruction with a REP or a BND prefix according to its first opcode byte
+static err_t
+    rep_or_bnd_lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opcode_byte) {
     err_t err = SUCCESS;
 
     if (first_opcode_byte == 0x0f) {
         // opcode is longer than 1 byte
         u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
 
-        CHECK_RETHROW(rep_lift_second_opcode_byte(ctx, second_opcode_byte));
+        CHECK_RETHROW(rep_or_bnd_lift_second_opcode_byte(ctx, second_opcode_byte));
+    } else if (first_opcode_byte == 0xa4) {
+        // movsb
+
+        // movsb can only be used with a REP prefix, not a REPNE prefix.
+        CHECK(group1_prefix(ctx) == LEGACY_PREFIX_REPZ_OR_REP);
+
+        // save the instruction index at the start of the loop so that we can jump to it later.
+        size_t insn_index_at_loop_start = lift_ctx_index(ctx->lift_ctx);
+
+        // first check if `cx` if zero
+        pis_operand_t cx = operand_resize(&RCX, ctx->addr_size);
+        pis_operand_t cx_equals_zero = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(PIS_OPCODE_EQUALS, cx_equals_zero, cx, PIS_OPERAND_CONST(0, ctx->addr_size))
+        );
+
+        // emit a jump which should skip over the entire code. the offset is currently 0 since we
+        // don't know the size of the code, but it will be filled with the correct value later on.
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_JMP_COND, cx_equals_zero, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+        );
+        pis_insn_t* jmp_end_insn = NULL;
+        CHECK_RETHROW(pis_lift_result_get_last_emitted_insn(ctx->lift_ctx->result, &jmp_end_insn));
+
+        // now that we know that `cx` is not zero, decrement it.
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(PIS_OPCODE_SUB, cx, cx, PIS_OPERAND_CONST(1, ctx->addr_size))
+        );
+
+        // now implement the actual movsb logic.
+        pis_operand_t si = operand_resize(&RSI, ctx->addr_size);
+        pis_operand_t di = operand_resize(&RDI, ctx->addr_size);
+
+        // first, copy one byte from [si] to [di].
+        pis_operand_t byte_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_LOAD, byte_tmp, si));
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_STORE, di, byte_tmp));
+
+        // increment si and di
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(PIS_OPCODE_ADD, si, si, PIS_OPERAND_CONST(1, ctx->addr_size))
+        );
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(PIS_OPCODE_ADD, di, di, PIS_OPERAND_CONST(1, ctx->addr_size))
+        );
+
+        // now jump back to the start of the loop, for the next iteration of the loop.
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN1(
+                PIS_OPCODE_JMP,
+                PIS_OPERAND_CONST(insn_index_at_loop_start, PIS_OPERAND_SIZE_1)
+            )
+        );
+
+        // now that we finished emitting the movsb code, update the offset of the jmp instruction
+        // that should jump to the end of the instruction.
+        jmp_end_insn->operands[1] =
+            PIS_OPERAND_CONST(lift_ctx_index(ctx->lift_ctx), PIS_OPERAND_SIZE_1);
     } else {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
-            "unsupported first opcode byte with rep prefix: 0x%x",
+            "unsupported first opcode byte with rep or bnd prefix: 0x%x",
             first_opcode_byte
         );
     }
@@ -2362,13 +2419,14 @@ static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
 
     u8 first_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
 
-    switch (ctx->prefixes->legacy.by_group[LEGACY_PREFIX_GROUP_1]) {
+    // decide how to lift based on the group 1 prefix. group 1 prefixes completely change the
+    // behaviour of the instruction, so we want different lifting logic for each group 1 prefix.
+    switch (group1_prefix(ctx)) {
     case LEGACY_PREFIX_LOCK:
         UNREACHABLE();
     case LEGACY_PREFIX_REPNZ_OR_BND:
-        UNREACHABLE();
     case LEGACY_PREFIX_REPZ_OR_REP:
-        CHECK_RETHROW(rep_lift_first_opcode_byte(ctx, first_opcode_byte));
+        CHECK_RETHROW(rep_or_bnd_lift_first_opcode_byte(ctx, first_opcode_byte));
         break;
     case LEGACY_PREFIX_INVALID:
         // no group-1 prefix, regular opcode
@@ -2429,7 +2487,7 @@ err_t pis_x86_lift(
         .cur_tmp_offset = 0,
         .result = result,
         .stack_addr_size = get_effective_stack_addr_size(ctx->cpumode),
-        .sp = get_sp_operand(ctx->cpumode),
+        .sp = operand_resize(&RSP, get_effective_stack_addr_size(ctx->cpumode)),
     };
     CHECK_RETHROW(lift(&lift_ctx));
 
