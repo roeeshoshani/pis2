@@ -33,7 +33,7 @@ static err_t lift_x86_64(u8* code, size_t code_len, u64 addr, pis_lift_result_t*
     pis_x86_ctx_t ctx = {
         .cpumode = PIS_X86_CPUMODE_64_BIT,
     };
-    CHECK_RETHROW(pis_x86_lift(&ctx, code, code_len, addr, result));
+    CHECK_RETHROW_VERBOSE(pis_x86_lift(&ctx, code, code_len, addr, result));
 cleanup:
     return err;
 }
@@ -43,7 +43,7 @@ static err_t lift_i386(u8* code, size_t code_len, u64 addr, pis_lift_result_t* r
     pis_x86_ctx_t ctx = {
         .cpumode = PIS_X86_CPUMODE_32_BIT,
     };
-    CHECK_RETHROW(pis_x86_lift(&ctx, code, code_len, addr, result));
+    CHECK_RETHROW_VERBOSE(pis_x86_lift(&ctx, code, code_len, addr, result));
 cleanup:
     return err;
 }
@@ -55,19 +55,21 @@ static err_t prepare_x86_64(pis_emu_t* emu, const shellcode_args_t* args) {
 
     // push the return address
     sp -= 8;
-    CHECK_RETHROW(pis_emu_write_mem_value(emu, sp, SHELLCODE_FINISH_ADDR, PIS_OPERAND_SIZE_8));
+    CHECK_RETHROW_VERBOSE(
+        pis_emu_write_mem_value(emu, sp, SHELLCODE_FINISH_ADDR, PIS_OPERAND_SIZE_8)
+    );
 
-    CHECK_RETHROW(pis_emu_write_operand(emu, &RSP, sp));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RSP, sp));
 
     // the shellcode sometimes preserves register values, in which case it tries to read their
     // original value. we must write a dummy value to avoid an uninitialized read which will result
     // in an error.
-    CHECK_RETHROW(pis_emu_write_operand(emu, &RBP, 0));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RBP, 0));
 
-    CHECK_RETHROW(pis_emu_write_operand(emu, &RDI, args->arg1));
-    CHECK_RETHROW(pis_emu_write_operand(emu, &RSI, args->arg2));
-    CHECK_RETHROW(pis_emu_write_operand(emu, &RDX, args->arg3));
-    CHECK_RETHROW(pis_emu_write_operand(emu, &RCX, args->arg4));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RDI, args->arg1));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RSI, args->arg2));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RDX, args->arg3));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RCX, args->arg4));
 
 cleanup:
     return err;
@@ -80,25 +82,27 @@ static err_t prepare_i386(pis_emu_t* emu, const shellcode_args_t* args) {
 
     // push all arguments
     sp -= 4;
-    CHECK_RETHROW(pis_emu_write_mem_value(emu, sp, args->arg4, PIS_OPERAND_SIZE_4));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(emu, sp, args->arg4, PIS_OPERAND_SIZE_4));
     sp -= 4;
-    CHECK_RETHROW(pis_emu_write_mem_value(emu, sp, args->arg3, PIS_OPERAND_SIZE_4));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(emu, sp, args->arg3, PIS_OPERAND_SIZE_4));
     sp -= 4;
-    CHECK_RETHROW(pis_emu_write_mem_value(emu, sp, args->arg2, PIS_OPERAND_SIZE_4));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(emu, sp, args->arg2, PIS_OPERAND_SIZE_4));
     sp -= 4;
-    CHECK_RETHROW(pis_emu_write_mem_value(emu, sp, args->arg1, PIS_OPERAND_SIZE_4));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(emu, sp, args->arg1, PIS_OPERAND_SIZE_4));
 
     // push the return address
     sp -= 4;
-    CHECK_RETHROW(pis_emu_write_mem_value(emu, sp, SHELLCODE_FINISH_ADDR, PIS_OPERAND_SIZE_4));
+    CHECK_RETHROW_VERBOSE(
+        pis_emu_write_mem_value(emu, sp, SHELLCODE_FINISH_ADDR, PIS_OPERAND_SIZE_4)
+    );
 
     // initialize the stack pointer
-    CHECK_RETHROW(pis_emu_write_operand(emu, &ESP, sp));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &ESP, sp));
 
     // the shellcode sometimes preserves register values, in which case it tries to read their
     // original value. we must write a dummy value to avoid an uninitialized read which will result
     // in an error.
-    CHECK_RETHROW(pis_emu_write_operand(emu, &EBP, 0));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &EBP, 0));
 
 cleanup:
     return err;
@@ -129,14 +133,14 @@ static err_t
     while (cur_offset < code_len) {
         pis_lift_result_reset(&result);
 
-        CHECK_RETHROW(lift_fn(
+        CHECK_RETHROW_VERBOSE(lift_fn(
             shellcode->code + cur_offset,
             code_len - cur_offset,
             SHELLCODE_BASE_ADDR + cur_offset,
             &result
         ));
 
-        CHECK_RETHROW(pis_emu_run(emu, &result));
+        CHECK_RETHROW_VERBOSE(pis_emu_run(emu, &result));
 
         if (emu->did_jump) {
             if (emu->jump_addr == SHELLCODE_FINISH_ADDR) {
@@ -167,12 +171,12 @@ static err_t check_arch_specific_shellcode_result(
     pis_emu_init(&g_emu, arch->endianness);
 
     // preare for execution
-    CHECK_RETHROW(arch->prepare(&g_emu, args));
+    CHECK_RETHROW_VERBOSE(arch->prepare(&g_emu, args));
 
-    CHECK_RETHROW(run_arch_specific_shellcode(&g_emu, shellcode, arch->lift));
+    CHECK_RETHROW_VERBOSE(run_arch_specific_shellcode(&g_emu, shellcode, arch->lift));
 
     u64 return_value = 0;
-    CHECK_RETHROW(pis_emu_read_operand(&g_emu, arch->result_operand, &return_value));
+    CHECK_RETHROW_VERBOSE(pis_emu_read_operand(&g_emu, arch->result_operand, &return_value));
 
     u64 truncated_expected_return_value =
         expected_return_value & pis_operand_size_max_unsigned_value(arch->result_operand->size);
@@ -193,7 +197,7 @@ static err_t test_shellcode_result(
 ) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(check_arch_specific_shellcode_result(
+    CHECK_RETHROW_VERBOSE(check_arch_specific_shellcode_result(
         &arch_def_x86_64,
         &shellcode->x86_64,
         args,
@@ -204,9 +208,24 @@ cleanup:
     return err;
 }
 
+static err_t test_factorial(u64 input, u64 expected_output) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW_VERBOSE(test_shellcode_result(
+        &shellcode_factorial,
+        &(shellcode_args_t) {.arg1 = input},
+        expected_output
+    ));
+cleanup:
+    return err;
+}
+
 DEFINE_TEST(test_shellcode_factorial) {
     err_t err = SUCCESS;
-    CHECK_RETHROW(test_shellcode_result(&shellcode_factorial, &(shellcode_args_t) {.arg1 = 5}, 15));
+
+    CHECK_RETHROW_VERBOSE(test_factorial(0, 1));
+    CHECK_RETHROW_VERBOSE(test_factorial(2, 2));
+    CHECK_RETHROW_VERBOSE(test_factorial(5, 120));
+
 cleanup:
     return err;
 }
