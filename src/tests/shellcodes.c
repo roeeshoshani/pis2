@@ -327,7 +327,7 @@ cleanup:
 DEFINE_TEST(test_shellcode_chacha20) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW_VERBOSE(test_chacha20(0x1234, 0x5678, 0xabcd, 0xcafe, 524622));
+    CHECK_RETHROW_VERBOSE(test_chacha20(0x1234, 0x5678, 0xabcd, 0xcafe, 0xfe4f));
 
 cleanup:
     return err;

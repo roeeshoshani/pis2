@@ -185,7 +185,7 @@ size_t SHELLCODE_ENTRY _start(u32 key_seed, u32 nonce_seed, u32 counter, u32 pla
     chacha20_init_context(&ctx, key, nonce, counter);
 
     // encrypt a bunch of data
-    u8 plaintext[4096] = {};
+    u8 plaintext[512] = {};
     expand_u32(plaintext_seed, plaintext, sizeof(plaintext));
     chacha20_xor(&ctx, plaintext, sizeof(plaintext));
 
