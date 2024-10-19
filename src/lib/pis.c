@@ -120,11 +120,11 @@ u64 pis_sign_extend_byte(i8 byte, pis_operand_size_t desired_size) {
     case PIS_OPERAND_SIZE_1:
         return (u8) byte;
     case PIS_OPERAND_SIZE_2:
-        return (i16) byte;
+        return (u16) ((i16) byte);
     case PIS_OPERAND_SIZE_4:
-        return (i32) byte;
+        return (u32) ((i32) byte);
     case PIS_OPERAND_SIZE_8:
-        return (i64) byte;
+        return (u64) ((i64) byte);
     default:
         // unreachable
         return 0;
