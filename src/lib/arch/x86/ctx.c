@@ -562,8 +562,6 @@ static err_t binop_imul(
     CHECK(a->size == b->size);
     pis_operand_size_t operand_size = a->size;
 
-    pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-
     // update CF
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SIGNED_MUL_OVERFLOW, FLAGS_CF, *a, *b));
 
@@ -571,8 +569,8 @@ static err_t binop_imul(
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, FLAGS_CF));
 
     // perform the actual multiplication
-    pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SIGNED_MUL, tmp, *a, *b));
+    pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SIGNED_MUL, res_tmp, *a, *b));
 
     *result = res_tmp;
 
