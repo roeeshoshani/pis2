@@ -2720,6 +2720,22 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             &modrm_operands.reg_operand,
             &res
         ));
+    } else if (first_opcode_byte == 0x30) {
+        // xor r/m8, r8
+        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
+            ctx,
+            &modrm_operands,
+            PIS_OPERAND_SIZE_1,
+            PIS_OPERAND_SIZE_1
+        ));
+
+        CHECK_RETHROW(calc_and_store_binop_modrm_with_size(
+            ctx,
+            binop_xor,
+            PIS_OPERAND_SIZE_1,
+            &modrm_operands.rm_operand,
+            &modrm_operands.reg_operand
+        ));
     } else if (first_opcode_byte == 0x8a) {
         // mov r8, r/m8
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
