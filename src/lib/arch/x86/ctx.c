@@ -2228,6 +2228,15 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             &modrm_operands.reg_operand,
             &modrm_operands.rm_operand
         ));
+    } else if (first_opcode_byte == 0x21) {
+        // and r/m, r
+        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
+        CHECK_RETHROW(calc_and_store_binop_modrm(
+            ctx,
+            binop_and,
+            &modrm_operands.rm_operand,
+            &modrm_operands.reg_operand
+        ));
     } else if (first_opcode_byte == 0x20) {
         // and r/m8, r8
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
