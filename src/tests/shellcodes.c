@@ -205,6 +205,18 @@ static err_t check_arch_specific_shellcode_result(
     // preare for execution
     CHECK_RETHROW_VERBOSE(arch->prepare(&g_emu, args));
 
+    // write the shellcode content to the emulator's memory. this will allow the shellcode to access
+    // its embedded data.
+    size_t code_len = shellcode->code_end - shellcode->code;
+    for (size_t i = 0; i < code_len; i++) {
+        CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(
+            &g_emu,
+            SHELLCODE_BASE_ADDR + i,
+            shellcode->code[i],
+            PIS_OPERAND_SIZE_1
+        ));
+    }
+
     CHECK_RETHROW_VERBOSE(run_arch_specific_shellcode(&g_emu, shellcode, arch->lift));
 
     u64 return_value = 0;
