@@ -18,11 +18,11 @@ typedef struct {
 } shellcode_args_t;
 
 typedef err_t (*lift_fn_t)(u8* code, size_t code_len, u64 addr, pis_lift_result_t* result);
-typedef err_t (*prepare_args_fn_t)(pis_emu_t* emu, const shellcode_args_t* args);
+typedef err_t (*prepare_fn_t)(pis_emu_t* emu, const shellcode_args_t* args);
 
 typedef struct {
     lift_fn_t lift;
-    prepare_args_fn_t prepare_args;
+    prepare_fn_t prepare;
     pis_endianness_t endianness;
     const pis_operand_t* return_value_operand;
     const pis_operand_t* stack_pointer_operand;
@@ -38,8 +38,11 @@ cleanup:
     return err;
 }
 
-static err_t prepare_args_x86_64(pis_emu_t* emu, const shellcode_args_t* args) {
+static err_t prepare_x86_64(pis_emu_t* emu, const shellcode_args_t* args) {
     err_t err = SUCCESS;
+
+    CHECK_RETHROW(pis_emu_write_operand(emu, &RSP, INITIAL_STACK_POINTER_VALUE));
+    CHECK_RETHROW(pis_emu_write_operand(emu, &RBP, INITIAL_STACK_POINTER_VALUE));
 
     CHECK_RETHROW(pis_emu_write_operand(emu, &RDI, args->arg1));
     CHECK_RETHROW(pis_emu_write_operand(emu, &RSI, args->arg2));
@@ -52,7 +55,7 @@ cleanup:
 
 const arch_def_t arch_def_x86_64 = {
     .lift = lift_x86_64,
-    .prepare_args = prepare_args_x86_64,
+    .prepare = prepare_x86_64,
     .endianness = PIS_ENDIANNESS_LITTLE,
     .return_value_operand = &RAX,
     .stack_pointer_operand = &RSP};
@@ -94,13 +97,8 @@ static err_t check_arch_specific_shellcode_result(
 
     pis_emu_init(&g_emu, arch->endianness);
 
-    // initialize the stack pointer
-    CHECK_RETHROW(
-        pis_emu_write_operand(&g_emu, arch->stack_pointer_operand, INITIAL_STACK_POINTER_VALUE)
-    );
-
-    // prepare the arguments to the shellcode
-    CHECK_RETHROW(arch->prepare_args(&g_emu, args));
+    // preare for execution
+    CHECK_RETHROW(arch->prepare(&g_emu, args));
 
     CHECK_RETHROW(run_arch_specific_shellcode(&g_emu, shellcode, arch->lift));
 
