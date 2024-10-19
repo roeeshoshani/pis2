@@ -6,7 +6,8 @@
 #include "pis.h"
 #include "test_utils.h"
 
-#define INITIAL_STACK_POINTER_VALUE 0xf0000
+#define INITIAL_STACK_POINTER_VALUE 0x20000000
+#define SHELLCODE_FINISH_ADDR 0x13371337
 
 EACH_SHELLCODE(DEFINE_SHELLCODE);
 
@@ -25,7 +26,6 @@ typedef struct {
     prepare_fn_t prepare;
     pis_endianness_t endianness;
     const pis_operand_t* result_operand;
-    const pis_operand_t* stack_pointer_operand;
 } arch_def_t;
 
 static err_t lift_x86_64(u8* code, size_t code_len, u64 addr, pis_lift_result_t* result) {
@@ -38,10 +38,26 @@ cleanup:
     return err;
 }
 
+static err_t lift_i386(u8* code, size_t code_len, u64 addr, pis_lift_result_t* result) {
+    err_t err = SUCCESS;
+    pis_x86_ctx_t ctx = {
+        .cpumode = PIS_X86_CPUMODE_32_BIT,
+    };
+    CHECK_RETHROW(pis_x86_lift(&ctx, code, code_len, addr, result));
+cleanup:
+    return err;
+}
+
 static err_t prepare_x86_64(pis_emu_t* emu, const shellcode_args_t* args) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(pis_emu_write_operand(emu, &RSP, INITIAL_STACK_POINTER_VALUE));
+    u64 sp = INITIAL_STACK_POINTER_VALUE;
+
+    // push the return address
+    sp -= 8;
+    CHECK_RETHROW(pis_emu_write_mem_value(emu, sp, SHELLCODE_FINISH_ADDR, PIS_OPERAND_SIZE_8));
+
+    CHECK_RETHROW(pis_emu_write_operand(emu, &RSP, sp));
 
     // the shellcode sometimes preserves register values, in which case it tries to read their
     // original value. we must write a dummy value to avoid an uninitialized read which will result
@@ -57,13 +73,50 @@ cleanup:
     return err;
 }
 
+static err_t prepare_i386(pis_emu_t* emu, const shellcode_args_t* args) {
+    err_t err = SUCCESS;
+
+    u32 sp = INITIAL_STACK_POINTER_VALUE;
+
+    // push all arguments
+    sp -= 4;
+    CHECK_RETHROW(pis_emu_write_mem_value(emu, sp, args->arg4, PIS_OPERAND_SIZE_4));
+    sp -= 4;
+    CHECK_RETHROW(pis_emu_write_mem_value(emu, sp, args->arg3, PIS_OPERAND_SIZE_4));
+    sp -= 4;
+    CHECK_RETHROW(pis_emu_write_mem_value(emu, sp, args->arg2, PIS_OPERAND_SIZE_4));
+    sp -= 4;
+    CHECK_RETHROW(pis_emu_write_mem_value(emu, sp, args->arg1, PIS_OPERAND_SIZE_4));
+
+    // push the return address
+    sp -= 4;
+    CHECK_RETHROW(pis_emu_write_mem_value(emu, sp, SHELLCODE_FINISH_ADDR, PIS_OPERAND_SIZE_4));
+
+    // initialize the stack pointer
+    CHECK_RETHROW(pis_emu_write_operand(emu, &ESP, sp));
+
+    // the shellcode sometimes preserves register values, in which case it tries to read their
+    // original value. we must write a dummy value to avoid an uninitialized read which will result
+    // in an error.
+    CHECK_RETHROW(pis_emu_write_operand(emu, &EBP, 0));
+
+cleanup:
+    return err;
+}
+
 const arch_def_t arch_def_x86_64 = {
     .lift = lift_x86_64,
     .prepare = prepare_x86_64,
     .endianness = PIS_ENDIANNESS_LITTLE,
-    .result_operand = &RDI,
-    .stack_pointer_operand = &RSP};
+    .result_operand = &RAX,
+};
 
+const arch_def_t arch_def_i386 = {
+    .lift = lift_i386,
+    .prepare = prepare_i386,
+    .endianness = PIS_ENDIANNESS_LITTLE,
+    .result_operand = &EAX,
+};
 
 static err_t
     run_arch_specific_shellcode(pis_emu_t* emu, const shellcode_t* shellcode, lift_fn_t lift_fn) {
@@ -86,8 +139,8 @@ static err_t
         CHECK_RETHROW(pis_emu_run(emu, &result));
 
         if (emu->did_jump) {
-            if (emu->jump_addr == 0) {
-                // a jump to 0 is a shellcode finish. so, stop running.
+            if (emu->jump_addr == SHELLCODE_FINISH_ADDR) {
+                // shellcode finished running.
                 break;
             } else {
                 // convert the jump address to an offset inside the shellcode

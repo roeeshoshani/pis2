@@ -30,7 +30,7 @@ typedef struct {
 #define DEFINE_SHELLCODE(NAME)                                                                     \
     const per_arch_shellcode_t shellcode_##NAME = {EACH_ARCH(_ARCH_INIT_SHELLCODE_FIELD, NAME)};
 
-#define SHELLCODE_BASE_ADDR 0x10000
+#define SHELLCODE_BASE_ADDR 0x10000000
 
 #define EACH_SHELLCODE(_) _(factorial)
 

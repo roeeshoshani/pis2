@@ -1,6 +1,6 @@
 SECTIONS
 {
-	. = 0x10000;
+	. = 0x10000000;
 	.all : { *(.text*) *(.rodata* .bss* .data*) } :all
 }
 
