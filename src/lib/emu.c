@@ -845,12 +845,21 @@ cleanup:
 err_t pis_emu_run(pis_emu_t* emu, const pis_lift_result_t* lift_result) {
     err_t err = SUCCESS;
     size_t cursor = 0;
+
+    // make sure that previous jumps were properly handled
+    CHECK(!emu->did_jump);
+
     while (cursor < lift_result->insns_amount) {
         exec_ctx_t exec_ctx = {};
         CHECK_RETHROW(pis_emu_run_one(emu, &exec_ctx, &lift_result->insns[cursor]));
-        if (exec_ctx.did_rel_jump) {
+        if (emu->did_jump) {
+            // if we jumped, then we are done with this instruction.
+            break;
+        } else if (exec_ctx.did_rel_jump) {
+            // relative jump inside the current instruction, update the cursor accordingly.
             cursor = exec_ctx.rel_jump_to_index;
         } else {
+            // no jump, just advance to the next instruction.
             cursor++;
         }
     }
