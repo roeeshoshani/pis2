@@ -5,6 +5,7 @@ SHELLCODE_CFLAGS += -static
 SHELLCODE_CFLAGS += -ffreestanding -nostdlib
 SHELLCODE_CFLAGS += -Wall -Wextra
 SHELLCODE_CFLAGS += -Werror
+SHELLCODE_CFLAGS += -O3
 
 SHELLCODE_LDFLAGS ?=
 SHELLCODE_LDFLAGS += -Tsrc/test_shellcodes/shellcode.lds
