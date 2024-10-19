@@ -215,7 +215,7 @@ static err_t check_arch_specific_shellcode_result(
 
     CHECK_TRACE(
         return_value == truncated_expected_return_value,
-        "unexpected shellcode result, expected 0x%lx, instead got 0x%lx",
+        "unexpected shellcode result, expected %lu, instead got %lu",
         truncated_expected_return_value,
         return_value
     );
@@ -287,6 +287,7 @@ DEFINE_TEST(test_shellcode_gcd) {
 
     CHECK_RETHROW_VERBOSE(test_gcd(0, 0, 0));
     CHECK_RETHROW_VERBOSE(test_gcd(1, 1, 1));
+    CHECK_RETHROW_VERBOSE(test_gcd(10, 14, 2));
 
 cleanup:
     return err;
