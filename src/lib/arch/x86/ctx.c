@@ -2471,30 +2471,6 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             &modrm_operands.rm_operand,
             &imm_operand
         ));
-    } else if (first_opcode_byte == 0xc0) {
-        // xxx r/m8, imm8
-        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
-            ctx,
-            &modrm_operands,
-            PIS_OPERAND_SIZE_1,
-            PIS_OPERAND_SIZE_1
-        ));
-
-        u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-        pis_operand_t imm_operand = PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1);
-
-        if (modrm_operands.modrm.reg == 5) {
-            // shr r/m8, imm8
-            CHECK_RETHROW(calc_and_store_binop_modrm_imm_with_size(
-                ctx,
-                binop_shr,
-                PIS_OPERAND_SIZE_1,
-                &modrm_operands.rm_operand,
-                &imm_operand
-            ));
-        } else {
-            CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
-        }
     } else if (first_opcode_byte == 0xf6) {
         // xxx r/m8, imm8
         CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
