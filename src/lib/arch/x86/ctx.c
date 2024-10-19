@@ -1656,7 +1656,7 @@ static err_t binop_rol(
         PIS_INSN3(
             PIS_OPCODE_SUB,
             right_shift_count,
-            PIS_OPERAND_CONST(pis_operand_size_to_bytes(operand_size), operand_size),
+            PIS_OPERAND_CONST(pis_operand_size_to_bits(operand_size), operand_size),
             count
         )
     );
