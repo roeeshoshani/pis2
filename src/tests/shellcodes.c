@@ -258,17 +258,6 @@ cleanup:
     return err;
 }
 
-static err_t test_gcd(u64 a, u64 b, u64 expected_output) {
-    err_t err = SUCCESS;
-    CHECK_RETHROW_VERBOSE(test_shellcode_result(
-        &shellcode_gcd,
-        &(shellcode_args_t) {.arg1 = a, .arg2 = b},
-        expected_output
-    ));
-cleanup:
-    return err;
-}
-
 DEFINE_TEST(test_shellcode_factorial) {
     err_t err = SUCCESS;
 
@@ -278,6 +267,17 @@ DEFINE_TEST(test_shellcode_factorial) {
     CHECK_RETHROW_VERBOSE(test_factorial(10, 3628800));
     CHECK_RETHROW_VERBOSE(test_factorial(13, 6227020800));
 
+cleanup:
+    return err;
+}
+
+static err_t test_gcd(u64 a, u64 b, u64 expected_output) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW_VERBOSE(test_shellcode_result(
+        &shellcode_gcd,
+        &(shellcode_args_t) {.arg1 = a, .arg2 = b},
+        expected_output
+    ));
 cleanup:
     return err;
 }
