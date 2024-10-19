@@ -225,6 +225,8 @@ DEFINE_TEST(test_shellcode_factorial) {
     CHECK_RETHROW_VERBOSE(test_factorial(0, 1));
     CHECK_RETHROW_VERBOSE(test_factorial(2, 2));
     CHECK_RETHROW_VERBOSE(test_factorial(5, 120));
+    CHECK_RETHROW_VERBOSE(test_factorial(10, 3628800));
+    CHECK_RETHROW_VERBOSE(test_factorial(13, 6227020800));
 
 cleanup:
     return err;
