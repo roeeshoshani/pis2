@@ -2738,11 +2738,12 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         pis_operand_t dst = operand_resize(&RAX, operand_size);
         CHECK_RETHROW(write_gpr(ctx, &dst, &tmp));
-    } else if (first_opcode_byte == 0xc1 || first_opcode_byte == 0xd0 || first_opcode_byte == 0xd1 || first_opcode_byte == 0xd3) {
+    } else if (first_opcode_byte == 0xc1 || first_opcode_byte == 0xc0 || first_opcode_byte == 0xd0 || first_opcode_byte == 0xd1 || first_opcode_byte == 0xd3) {
         // shift r/m, imm/cl
 
-        // `0xd0` is `shift r/m8, 1`. so, set the operand size to 1 in that case.
-        pis_operand_size_t operand_size = first_opcode_byte == 0xd0
+        // `0xd0` is `shift r/m8, 1` and `0xc0` is `shift r/m8, imm8`. so, set the operand size to 1
+        // in those cases.
+        pis_operand_size_t operand_size = (first_opcode_byte == 0xd0 || first_opcode_byte == 0xc0)
                                               ? PIS_OPERAND_SIZE_1
                                               : ctx->operand_sizes.insn_default_not_64_bit;
 
@@ -2757,18 +2758,16 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         // determine the rhs operand according to the opcode
         pis_operand_t rhs_operand = {};
         switch (first_opcode_byte) {
+        case 0xc0:
         case 0xc1: {
-            // shift r/m, imm8
+            // shift r/m[8], imm8
             u8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
             rhs_operand = PIS_OPERAND_CONST(imm8, operand_size);
             break;
         }
-        case 0xd1:
-            // shift r/m, 1
-            rhs_operand = PIS_OPERAND_CONST(1, operand_size);
-            break;
         case 0xd0:
-            // shift r/m8, 1
+        case 0xd1:
+            // shift r/m[8], 1
             rhs_operand = PIS_OPERAND_CONST(1, operand_size);
             break;
         case 0xd3: {
