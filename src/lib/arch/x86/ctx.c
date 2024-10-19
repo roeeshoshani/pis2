@@ -2441,6 +2441,10 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             // add
             binop = binop_add;
             should_store_result = true;
+        } else if (modrm_operands.modrm.reg == 1) {
+            // or
+            binop = binop_or;
+            should_store_result = true;
         } else if (modrm_operands.modrm.reg == 2) {
             // adc
             binop = binop_adc;
