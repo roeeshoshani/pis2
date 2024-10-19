@@ -85,7 +85,6 @@ static err_t
             // convert the jump address to an offset inside the shellcode
             CHECK(emu->jump_addr >= SHELLCODE_BASE_ADDR);
             cur_offset = emu->jump_addr - SHELLCODE_BASE_ADDR;
-            emu->did_jump = false;
         } else {
             // advance to the next instruction
             cur_offset += result.machine_insn_len;

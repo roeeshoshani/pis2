@@ -846,8 +846,8 @@ err_t pis_emu_run(pis_emu_t* emu, const pis_lift_result_t* lift_result) {
     err_t err = SUCCESS;
     size_t cursor = 0;
 
-    // make sure that previous jumps were properly handled
-    CHECK(!emu->did_jump);
+    // reset the did jump flag
+    emu->did_jump = false;
 
     while (cursor < lift_result->insns_amount) {
         exec_ctx_t exec_ctx = {};
