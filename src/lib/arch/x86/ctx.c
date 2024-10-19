@@ -2625,6 +2625,13 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         // mov al, imm8
         u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
         CHECK_RETHROW(write_gpr(ctx, &AL, &PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1)));
+    } else if (first_opcode_byte == 0x3c) {
+        // cmp al, imm8
+        u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        pis_operand_t imm_operand = PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1);
+
+        pis_operand_t res = {};
+        CHECK_RETHROW(binop_sub(ctx, &AL, &imm_operand, &res));
     } else if (first_opcode_byte == 0x34) {
         // xor al, imm8
         u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
