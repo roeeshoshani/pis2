@@ -120,7 +120,12 @@ err_t pis_emu_read_operand(const pis_emu_t* emu, const pis_operand_t* operand, u
     if (operand->addr.space == PIS_SPACE_CONST) {
         u64 const_value = operand->addr.offset;
         u64 max_value = pis_operand_size_max_unsigned_value(operand->size);
-        CHECK(const_value <= max_value);
+        CHECK_TRACE(
+            const_value <= max_value,
+            "const value 0x%lx is larger than the max value of its operand size 0x%lx",
+            const_value,
+            max_value
+        );
         *operand_value = const_value;
     } else {
         size_t operand_size_in_bytes = pis_operand_size_to_bytes(operand->size);
