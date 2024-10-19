@@ -2524,9 +2524,19 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
     } else if (first_opcode_byte == 0x80 || first_opcode_byte == 0x81 || first_opcode_byte == 0x83) {
         // xxx r/m[8], imm[8]
-        CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
-
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+        if (first_opcode_byte == 0x80) {
+            // xxx r/m8, imm8
+            operand_size = PIS_OPERAND_SIZE_1;
+        }
+
+        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
+            ctx,
+            &modrm_operands,
+            operand_size,
+            operand_size
+        ));
+
         pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
         CHECK_RETHROW(modrm_operand_read(ctx, &rm_tmp, &modrm_operands.rm_operand));
 
@@ -2535,10 +2545,6 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         switch (first_opcode_byte) {
         case 0x80: {
             // xxx r/m8, imm8
-
-            // override the operand size to 8
-            operand_size = PIS_OPERAND_SIZE_1;
-
             u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
             imm_operand = PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1);
             break;
