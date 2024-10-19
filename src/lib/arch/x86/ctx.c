@@ -2197,6 +2197,22 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t pushed_reg = reg_get_operand(reg_encoding, operand_size, ctx->prefixes);
 
         CHECK_RETHROW(push(ctx, &pushed_reg));
+    } else if (first_opcode_byte == 0x68) {
+        // push imm16/imm32
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+        if (operand_size == PIS_OPERAND_SIZE_8) {
+            operand_size = PIS_OPERAND_SIZE_4;
+        }
+
+        pis_operand_t imm = {};
+        CHECK_RETHROW(fetch_imm_operand_of_size(ctx, operand_size, &imm));
+
+        CHECK_RETHROW(push(ctx, &imm));
+    } else if (first_opcode_byte == 0x6a) {
+        // push imm8
+        pis_operand_t imm =
+            PIS_OPERAND_CONST(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_1);
+        CHECK_RETHROW(push(ctx, &imm));
     } else if (opcode_reg_opcode_only(first_opcode_byte) == 0x58) {
         // pop <reg>
         u8 reg_encoding = opcode_reg_extract(ctx, first_opcode_byte);
