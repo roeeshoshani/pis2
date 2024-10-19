@@ -1610,16 +1610,23 @@ static err_t do_div_ax_dx(
         // divide `rdx:rax`.
 
         // perform the division
+        pis_operand_t quotient = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_8);
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN4(PIS_OPCODE_UNSIGNED_DIV_16, RAX, RDX, RAX, *divisor)
+            PIS_INSN4(PIS_OPCODE_UNSIGNED_DIV_16, quotient, RDX, RAX, *divisor)
         );
 
         // perform the remainder calculation
+        pis_operand_t rem = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_8);
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN4(PIS_OPCODE_UNSIGNED_REM_16, RDX, RDX, RAX, *divisor)
+            PIS_INSN4(PIS_OPCODE_UNSIGNED_REM_16, rem, RDX, RAX, *divisor)
         );
+
+        // write the results back to RAX and RDX
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, RAX, quotient));
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, RDX, rem));
+
     } else {
         // divide `dx:ax` or `edx:eax`.
 
