@@ -12,9 +12,7 @@ HDRS := $(shell find src -type f -name "*.h")
 OBJS := $(SRCS:src/%.c=build/%.o)
 DEPS := $(OBJS:%.o=%.d)
 
-SHELLCODE_SRCS := $(shell find src/test_shellcodes -type f -name "*.c")
-SHELLCODE_ELFS := $(SHELLCODE_SRCS:src/%.c=build/%.shellcode.elf)
-SHELLCODE_BINS := $(SHELLCODE_SRCS:src/%.c=build/%.shellcode.o)
+ARCHS := x86_64 i386
 
 EXAMPLE_BIN := build/example.elf
 TESTS_BIN := build/tests.elf
@@ -28,13 +26,6 @@ CFLAGS += -Wall -Wextra
 CFLAGS += -Werror
 CFLAGS += -mno-sse -mno-avx
 CFLAGS += -O1
-
-SHELLCODE_CFLAGS ?=
-SHELLCODE_CFLAGS += -static
-SHELLCODE_CFLAGS += -ffreestanding -nostdlib
-
-SHELLCODE_LDFLAGS ?=
-SHELLCODE_LDFLAGS += -Tsrc/test_shellcodes/shellcode.lds
 
 .phony: all
 all: $(EXAMPLE_BIN) $(TESTS_BIN) $(OBJS)
@@ -56,22 +47,12 @@ build/%.o: src/%.c
 build/%.elf:
 	$(CC) $(LDFLAGS) $(CFLAGS) $^ -o $@
 
+# shellcode support
+include makefiles/test_shellcodes.mk
+
 # binaries
 $(TESTS_BIN): $(LIB_OBJS) $(TESTS_OBJS) $(SHELLCODE_BINS)
 $(EXAMPLE_BIN): $(LIB_OBJS) $(EXAMPLE_OBJS)
-
-# shellcode support
-build/test_shellcodes/%.o: CFLAGS += $(SHELLCODE_CFLAGS)
-
-build/test_shellcodes/%.shellcode.elf: build/test_shellcodes/%.o
-	$(CC) $(SHELLCODE_LDFLAGS) $(SHELLCODE_CFLAGS) $(LDFLAGS) $(CFLAGS) $< -o $@
-
-.PRECIOUS: build/test_shellcodes/%.shellcode.bin
-build/test_shellcodes/%.shellcode.bin: build/test_shellcodes/%.shellcode.elf
-	$(OBJCOPY) -j .all -O binary $< $@
-
-build/test_shellcodes/%.shellcode.o: build/test_shellcodes/%.shellcode.bin
-	$(CC) -c -DWRAP_FILENAME='"$<"' -DSHELLCODE_NAME=$* src/test_shellcodes/shellcode_wrapper.S -o $@
 
 .phony: format
 format:

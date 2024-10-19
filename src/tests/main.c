@@ -2,6 +2,7 @@
 #include "errors.h"
 #include "except.h"
 #include "pis.h"
+#include "shellcodes.h"
 #include "test_utils.h"
 #include "utils.h"
 #include <stdarg.h>
