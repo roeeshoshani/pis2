@@ -17,11 +17,11 @@ typedef struct {
     EACH_ARCH(_ARCH_DEFINE_SHELLCODE_FIELD);
 } per_arch_shellcode_t;
 
-#define _DECLARE_ARCH_SPECIFIC_SHELLCODE(ARCH, NAME)                                                \
+#define _DECLARE_ARCH_SPECIFIC_SHELLCODE(ARCH, NAME)                                               \
     extern u8 __start_shellcode_##NAME##_##ARCH[];                                                 \
     extern u8 __end_shellcode_##NAME##_##ARCH[];
 
-#define _ARCH_SPECIFIC_SHELLCODE(ARCH, NAME)                                                        \
+#define _ARCH_SPECIFIC_SHELLCODE(ARCH, NAME)                                                       \
     { .code = __start_shellcode_##NAME##_##ARCH, .code_end = __end_shellcode_##NAME##_##ARCH, }
 
 #define DECLARE_SHELLCODE(NAME) EACH_ARCH(_DECLARE_ARCH_SPECIFIC_SHELLCODE, NAME);
@@ -32,6 +32,8 @@ typedef struct {
 
 #define SHELLCODE_BASE_ADDR 0x10000000
 
-#define EACH_SHELLCODE(_) _(factorial)
+#define EACH_SHELLCODE(_)                                                                          \
+    _(factorial)                                                                                   \
+    _(gcd)
 
 EACH_SHELLCODE(DECLARE_SHELLCODE);
