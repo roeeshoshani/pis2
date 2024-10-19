@@ -466,6 +466,32 @@ cleanup:
     return err;
 }
 
+/// performs an `INC` operation on the input operand and returns an operand
+/// containing the result of the operation in `result`.
+static err_t unary_op_inc(
+    const post_prefixes_ctx_t* ctx, const pis_operand_t* operand, pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    pis_operand_size_t operand_size = operand->size;
+
+    pis_operand_t one = PIS_OPERAND_CONST(1, operand_size);
+
+    // overflow flag
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SIGNED_CARRY, FLAGS_OF, *operand, one));
+
+    // perform the actual subtraction
+    pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, res_tmp, *operand, one));
+
+    CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &res_tmp));
+
+    *result = res_tmp;
+
+cleanup:
+    return err;
+}
+
 /// performs a `NEG` operation on the input operand and returns an operand
 /// containing the result of the operation in `result`.
 static err_t unary_op_neg(
@@ -2462,6 +2488,21 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
             pis_operand_t result = {};
             CHECK_RETHROW(unary_op_dec(ctx, &rm_tmp, &result));
+
+            CHECK_RETHROW(modrm_rm_write(ctx, &rm_operand, &result));
+        } else if (modrm.reg == 0) {
+            // inc r/m
+
+            pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+
+            modrm_rm_operand_t rm_operand = {};
+            CHECK_RETHROW(modrm_decode_rm_operand(ctx, &modrm, operand_size, &rm_operand));
+
+            pis_operand_t rm_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+            CHECK_RETHROW(modrm_rm_read(ctx, &rm_tmp, &rm_operand));
+
+            pis_operand_t result = {};
+            CHECK_RETHROW(unary_op_inc(ctx, &rm_tmp, &result));
 
             CHECK_RETHROW(modrm_rm_write(ctx, &rm_operand, &result));
         } else {
