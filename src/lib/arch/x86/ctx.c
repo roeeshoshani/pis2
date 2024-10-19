@@ -1152,20 +1152,26 @@ static err_t shl_calc_carry_flag(
 
     pis_operand_size_t operand_size = to_shift->size;
 
-    // to get the last shifted out but, shift the original value `count - 1` bits, and then extract
-    // its most significant bit.
-    pis_operand_t count_minus_1 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    // to get the last shifted out bit, shift the original value `size - count` bits to the right.
+    pis_operand_t right_shift_count = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_SUB, count_minus_1, *count, PIS_OPERAND_CONST(1, operand_size))
+        PIS_INSN3(
+            PIS_OPCODE_SUB,
+            right_shift_count,
+            PIS_OPERAND_CONST(pis_operand_size_to_bits(operand_size), operand_size),
+            *count
+        )
     );
-    pis_operand_t shifted_by_count_minus_1 = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    pis_operand_t right_shifted = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, shifted_by_count_minus_1, *to_shift, count_minus_1)
+        PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, right_shifted, *to_shift, right_shift_count)
     );
     pis_operand_t last_extracted_bit = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    CHECK_RETHROW(extract_most_significant_bit(ctx, &shifted_by_count_minus_1, &last_extracted_bit)
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, last_extracted_bit, right_shifted)
     );
 
     // now, we only want to set the carry flag if the count is non-zero, otherwise we want to use
@@ -1225,8 +1231,13 @@ cleanup:
 
 /// calculates the overflow flag of a `SHL` operation. `to_shift` is the value to be shifted,
 /// `count` is the masked shift count.
+/// this must be called after calculating the `CF` flag accordingly, since its calculation relies on
+/// the `CF` value.
 static err_t shl_calc_overflow_flag(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* to_shift, const pis_operand_t* count
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* to_shift,
+    const pis_operand_t* count,
+    const pis_operand_t* shift_result
 ) {
     err_t err = SUCCESS;
 
@@ -1234,12 +1245,9 @@ static err_t shl_calc_overflow_flag(
 
     pis_operand_size_t operand_size = to_shift->size;
 
-    // the overflow flag is set to `MSB(A << B) ^ CF`
-    pis_operand_t shifted = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, shifted, *to_shift, *count));
-
+    // the overflow flag is set to `MSB(shift_result) ^ CF`
     pis_operand_t msb = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    CHECK_RETHROW(extract_most_significant_bit(ctx, &shifted, &msb));
+    CHECK_RETHROW(extract_most_significant_bit(ctx, shift_result, &msb));
 
     pis_operand_t new_overflow_flag_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_XOR, new_overflow_flag_value, msb, FLAGS_CF));
@@ -1374,19 +1382,18 @@ static err_t binop_shl(
     CHECK(a->size == b->size);
     pis_operand_size_t operand_size = a->size;
 
-    pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-
     pis_operand_t count = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
     CHECK_RETHROW(mask_shift_count(ctx, b, &count, operand_size));
 
     // carry flag
     CHECK_RETHROW(shl_calc_carry_flag(ctx, a, &count));
 
-    // overflow flag
-    CHECK_RETHROW(shl_calc_overflow_flag(ctx, a, &count));
-
     // perform the actual shift
+    pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, res_tmp, *a, count));
+
+    // overflow flag
+    CHECK_RETHROW(shl_calc_overflow_flag(ctx, a, &count, &res_tmp));
 
     CHECK_RETHROW(shift_calc_parity_zero_sign_flags(ctx, &count, &res_tmp));
 
@@ -1575,6 +1582,65 @@ static err_t binop_sar(
 
     // perform the actual shift
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT_SIGNED, res_tmp, *a, count));
+
+    CHECK_RETHROW(shift_calc_parity_zero_sign_flags(ctx, &count, &res_tmp));
+
+    *result = res_tmp;
+
+cleanup:
+    return err;
+}
+
+/// performs a `ROL` operation on the 2 input operands `a` and `b` and returns an operand
+/// containing the result of the operation in `result`.
+static err_t binop_rol(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* a,
+    const pis_operand_t* b,
+    pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    CHECK(a->size == b->size);
+    pis_operand_size_t operand_size = a->size;
+
+    pis_operand_t count = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    CHECK_RETHROW(mask_shift_count(ctx, b, &count, operand_size));
+
+    // perform the actual rotation
+    pis_operand_t left_shifted = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, left_shifted, *a, count));
+
+    pis_operand_t right_shift_count = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(
+            PIS_OPCODE_SUB,
+            right_shift_count,
+            PIS_OPERAND_CONST(pis_operand_size_to_bytes(operand_size), operand_size),
+            count
+        )
+    );
+
+    pis_operand_t right_shifted = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, right_shifted, *a, right_shift_count)
+    );
+
+    pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, res_tmp, right_shifted, left_shifted));
+
+    // calculate the carry flag
+    pis_operand_t last_extracted_bit = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_AND, last_extracted_bit, res_tmp, PIS_OPERAND_CONST(1, operand_size))
+    );
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, FLAGS_CF, last_extracted_bit));
+
+    // overflow flag is the same as `shl`
+    CHECK_RETHROW(shl_calc_overflow_flag(ctx, a, &count, &res_tmp));
 
     CHECK_RETHROW(shift_calc_parity_zero_sign_flags(ctx, &count, &res_tmp));
 
@@ -2788,6 +2854,9 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         } else if (modrm_operands.modrm.reg == 7) {
             // sar
             binop = binop_sar;
+        } else if (modrm_operands.modrm.reg == 0) {
+            // rol
+            binop = binop_rol;
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
