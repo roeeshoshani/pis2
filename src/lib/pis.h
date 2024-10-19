@@ -144,6 +144,7 @@
     _(PIS_OPCODE_UNSIGNED_MUL, )                                                                   \
     _(PIS_OPCODE_UNSIGNED_DIV_16, )                                                                \
     _(PIS_OPCODE_UNSIGNED_REM_16, )                                                                \
+    _(PIS_OPCODE_UNSIGNED_MUL_16, )                                                                \
     _(PIS_OPCODE_UNSIGNED_REM, )                                                                   \
     _(PIS_OPCODE_UNSIGNED_DIV, )
 STR_ENUM(pis_opcode, PIS_OPCODE);

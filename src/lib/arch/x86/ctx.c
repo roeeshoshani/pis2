@@ -1599,8 +1599,8 @@ cleanup:
     return err;
 }
 
-/// peforms a division operation that operations on the `ax` and `dx` operands and stores its
-/// results in the `ax` and `dx` operand.
+/// peforms a division operation that operates on the `ax` and `dx` operands and stores its
+/// results in the `ax` and `dx` operands.
 static err_t do_div_ax_dx(
     const post_prefixes_ctx_t* ctx, pis_operand_size_t operand_size, const pis_operand_t* divisor
 ) {
@@ -1685,6 +1685,95 @@ static err_t do_div_ax_dx(
             PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, operand_resize(&RDX, operand_size), rem_result)
         );
     }
+cleanup:
+    return err;
+}
+
+/// peforms a multiplication operation that operates on the `ax` operand and stores its
+/// result in the `ax` and `dx` operands.
+static err_t do_mul_ax(
+    const post_prefixes_ctx_t* ctx, pis_operand_size_t operand_size, const pis_operand_t* factor
+) {
+    err_t err = SUCCESS;
+
+    CHECK(factor->size == operand_size);
+
+    pis_operand_t result_high = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    pis_operand_t result_low = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+
+    // compute the result of the multiplication and split it into 2 parts - high and low.
+    if (operand_size == PIS_OPERAND_SIZE_8) {
+        // when the operand size is 8 we can't use the regular multiplication opcode, since we want
+        // a 16-byte result. so, we use a special opcode for it.
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN4(PIS_OPCODE_UNSIGNED_MUL_16, result_high, result_low, RAX, *factor)
+        );
+
+        // store the result of the multiplication
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, RDX, result_high));
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, RAX, result_low));
+    } else {
+        // operand size is less than 8, so we can use the regular multiplication opcode.
+        pis_operand_size_t double_operand_size = operand_size * 2;
+
+        pis_operand_t factor_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, factor_zero_extended, *factor)
+        );
+
+        pis_operand_t ax = operand_resize(&RAX, double_operand_size);
+
+        pis_operand_t multiplication_result = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(PIS_OPCODE_UNSIGNED_MUL, multiplication_result, ax, factor_zero_extended)
+        );
+
+        // split the result into the low and high parts
+        pis_operand_t result_high = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+        pis_operand_t result_low = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, result_low, multiplication_result)
+        );
+
+        pis_operand_t shifted_multiplication_result =
+            LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(
+                PIS_OPCODE_SHIFT_RIGHT,
+                shifted_multiplication_result,
+                multiplication_result,
+                PIS_OPERAND_CONST(pis_operand_size_to_bits(operand_size), double_operand_size)
+            )
+        );
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, result_high, shifted_multiplication_result)
+        );
+
+        // store the result of the multiplication
+        if (operand_size == PIS_OPERAND_SIZE_1) {
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, AX, multiplication_result));
+        } else {
+            pis_operand_t dx = operand_resize(&RDX, double_operand_size);
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, dx, result_high));
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, ax, result_low));
+        }
+    }
+
+    // calculate the carry and overflow flags
+    pis_operand_t is_high_zero = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_EQUALS, is_high_zero, result_high, PIS_OPERAND_CONST(0, operand_size))
+    );
+
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_COND_NEGATE, FLAGS_CF, is_high_zero));
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, FLAGS_CF));
 cleanup:
     return err;
 }
@@ -2061,6 +2150,9 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             pis_operand_t res = {};
             CHECK_RETHROW(unary_op_not(ctx, &rm_value, &res));
             CHECK_RETHROW(modrm_rm_write(ctx, &modrm_operands.rm_operand.rm, &res));
+        } else if (modrm_operands.modrm.reg == 4) {
+            // mul r/m
+            CHECK_RETHROW(do_mul_ax(ctx, operand_size, &rm_value));
         } else {
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
