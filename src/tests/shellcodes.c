@@ -24,7 +24,7 @@ typedef struct {
     lift_fn_t lift;
     prepare_fn_t prepare;
     pis_endianness_t endianness;
-    const pis_operand_t* return_value_operand;
+    const pis_operand_t* result_operand;
     const pis_operand_t* stack_pointer_operand;
 } arch_def_t;
 
@@ -42,7 +42,11 @@ static err_t prepare_x86_64(pis_emu_t* emu, const shellcode_args_t* args) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(pis_emu_write_operand(emu, &RSP, INITIAL_STACK_POINTER_VALUE));
-    CHECK_RETHROW(pis_emu_write_operand(emu, &RBP, INITIAL_STACK_POINTER_VALUE));
+
+    // the shellcode sometimes preserves register values, in which case it tries to read their
+    // original value. we must write a dummy value to avoid an uninitialized read which will result
+    // in an error.
+    CHECK_RETHROW(pis_emu_write_operand(emu, &RBP, 0));
 
     CHECK_RETHROW(pis_emu_write_operand(emu, &RDI, args->arg1));
     CHECK_RETHROW(pis_emu_write_operand(emu, &RSI, args->arg2));
@@ -57,7 +61,7 @@ const arch_def_t arch_def_x86_64 = {
     .lift = lift_x86_64,
     .prepare = prepare_x86_64,
     .endianness = PIS_ENDIANNESS_LITTLE,
-    .return_value_operand = &RAX,
+    .result_operand = &RDI,
     .stack_pointer_operand = &RSP};
 
 
@@ -82,9 +86,14 @@ static err_t
         CHECK_RETHROW(pis_emu_run(emu, &result));
 
         if (emu->did_jump) {
-            // convert the jump address to an offset inside the shellcode
-            CHECK(emu->jump_addr >= SHELLCODE_BASE_ADDR);
-            cur_offset = emu->jump_addr - SHELLCODE_BASE_ADDR;
+            if (emu->jump_addr == 0) {
+                // a jump to 0 is a shellcode finish. so, stop running.
+                break;
+            } else {
+                // convert the jump address to an offset inside the shellcode
+                CHECK(emu->jump_addr >= SHELLCODE_BASE_ADDR);
+                cur_offset = emu->jump_addr - SHELLCODE_BASE_ADDR;
+            }
         } else {
             // advance to the next instruction
             cur_offset += result.machine_insn_len;
@@ -110,13 +119,17 @@ static err_t check_arch_specific_shellcode_result(
     CHECK_RETHROW(run_arch_specific_shellcode(&g_emu, shellcode, arch->lift));
 
     u64 return_value = 0;
-    CHECK_RETHROW(pis_emu_read_operand(&g_emu, arch->return_value_operand, &return_value));
+    CHECK_RETHROW(pis_emu_read_operand(&g_emu, arch->result_operand, &return_value));
 
     u64 truncated_expected_return_value =
-        expected_return_value &
-        pis_operand_size_max_unsigned_value(arch->return_value_operand->size);
+        expected_return_value & pis_operand_size_max_unsigned_value(arch->result_operand->size);
 
-    CHECK(return_value == truncated_expected_return_value);
+    CHECK_TRACE(
+        return_value == truncated_expected_return_value,
+        "unexpected shellcode result, expected 0x%lx, instead got 0x%lx",
+        truncated_expected_return_value,
+        return_value
+    );
 
 cleanup:
     return err;
