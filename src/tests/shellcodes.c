@@ -229,7 +229,7 @@ cleanup:
 static err_t test_gcd(u64 a, u64 b, u64 expected_output) {
     err_t err = SUCCESS;
     CHECK_RETHROW_VERBOSE(test_shellcode_result(
-        &shellcode_factorial,
+        &shellcode_gcd,
         &(shellcode_args_t) {.arg1 = a, .arg2 = b},
         expected_output
     ));
