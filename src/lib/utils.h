@@ -11,3 +11,5 @@
 
 #define MAX(A, B) ((A) >= (B) ? (A) : (B))
 #define MIN(A, B) ((A) <= (B) ? (A) : (B))
+
+#define USED __attribute__((used))

@@ -804,7 +804,7 @@ cleanup:
 
 /// calculates a binary operation with one modrm and one immediate operand as inputs, and stores the
 /// result of the operation in the first operand.
-static err_t calc_and_store_binop_modrm_imm(
+static err_t USED calc_and_store_binop_modrm_imm(
     const post_prefixes_ctx_t* ctx,
     binop_fn_t binop,
     const modrm_operand_t* dst,
@@ -2219,6 +2219,21 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             &modrm_operands.rm_operand,
             &modrm_operands.reg_operand
         ));
+    } else if (first_opcode_byte == 0x08) {
+        // or r/m8, r8
+        CHECK_RETHROW(modrm_fetch_and_process_with_operand_sizes(
+            ctx,
+            &modrm_operands,
+            PIS_OPERAND_SIZE_1,
+            PIS_OPERAND_SIZE_1
+        ));
+        CHECK_RETHROW(calc_and_store_binop_modrm_with_size(
+            ctx,
+            binop_or,
+            PIS_OPERAND_SIZE_1,
+            &modrm_operands.rm_operand,
+            &modrm_operands.reg_operand
+        ));
     } else if (first_opcode_byte == 0x23) {
         // and r, r/m
         CHECK_RETHROW(modrm_fetch_and_process(ctx, &modrm_operands));
@@ -2784,9 +2799,13 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         // calculate the binary operation and store its result
         CHECK(binop != NULL);
-        CHECK_RETHROW(
-            calc_and_store_binop_modrm_imm(ctx, binop, &modrm_operands.rm_operand, &rhs_operand)
-        );
+        CHECK_RETHROW(calc_and_store_binop_modrm_imm_with_size(
+            ctx,
+            binop,
+            operand_size,
+            &modrm_operands.rm_operand,
+            &rhs_operand
+        ));
     } else if (first_opcode_byte == 0x0f) {
         // opcode is longer than 1 byte
         u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
