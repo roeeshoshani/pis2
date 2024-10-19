@@ -63,7 +63,12 @@ err_t pis_emu_mem_storage_read_byte(
 
     const pis_emu_mem_storage_slot_t* slot =
         pis_emu_mem_storage_find_slot_by_addr_const(storage, addr);
-    CHECK_CODE(slot != NULL, PIS_ERR_EMU_READ_UNINIT);
+    CHECK_TRACE_CODE(
+        slot != NULL,
+        PIS_ERR_EMU_READ_UNINIT,
+        "reading uninitialized memory at address 0x%lx",
+        (unsigned long) addr
+    );
 
     *byte_value = slot->byte_value;
 

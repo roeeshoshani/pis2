@@ -13,6 +13,13 @@ typedef i64 (*signed_binary_operator_fn_t)(i64 lhs, i64 rhs);
 
 typedef u64 (*unary_operator_fn_t)(u64 x);
 
+/// an execution context. this is used to control the execution while emulating a machine
+/// instruction.
+typedef struct {
+    bool did_rel_jump;
+    u64 rel_jump_to_index;
+} exec_ctx_t;
+
 void pis_emu_init(pis_emu_t* emu, pis_endianness_t endianness) {
     memset(emu, 0, sizeof(pis_emu_t));
     emu->endianness = endianness;
@@ -350,7 +357,32 @@ void mul128(u64 a, u64 b, u64* result_high, u64* result_low) {
     *result_high = high_high + (mid2 >> 32) + (carry1 << 32) + (carry2 << 32);
 }
 
-err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
+static err_t do_jmp(pis_emu_t* emu, exec_ctx_t* exec_ctx, const pis_operand_t* jump_target) {
+    err_t err = SUCCESS;
+
+    switch (jump_target->addr.space) {
+    case PIS_SPACE_RAM:
+        // jump to a fixed ram address
+        emu->jump_addr = jump_target->addr.offset;
+        emu->did_jump = true;
+        break;
+    case PIS_SPACE_CONST:
+        // jump to a pis instruction inside the current translation
+        exec_ctx->did_rel_jump = true;
+        exec_ctx->rel_jump_to_index = jump_target->addr.offset;
+        break;
+    default:
+        // symbolic address, evaluate it
+        CHECK_RETHROW(pis_emu_read_operand(emu, jump_target, &emu->jump_addr));
+        emu->did_jump = true;
+        break;
+    }
+
+cleanup:
+    return err;
+}
+
+err_t pis_emu_run_one(pis_emu_t* emu, exec_ctx_t* exec_ctx, const pis_insn_t* insn) {
     err_t err = SUCCESS;
     switch (insn->opcode) {
     case PIS_OPCODE_MOVE: {
@@ -595,29 +627,26 @@ err_t pis_emu_run_one(pis_emu_t* emu, const pis_insn_t* insn) {
 
         break;
     }
-    case PIS_OPCODE_JMP_COND:
-        UNREACHABLE();
+    case PIS_OPCODE_JMP_COND: {
+        CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+        // check operand sizes
+        CHECK_CODE(insn->operands[0].size == PIS_OPERAND_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
+
+        u64 cond = 0;
+        CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[0], &cond));
+
+        if (cond) {
+            CHECK_RETHROW(do_jmp(emu, exec_ctx, &insn->operands[1]));
+        }
         break;
-    case PIS_OPCODE_JMP:
+    }
+    case PIS_OPCODE_JMP: {
         CHECK_CODE(insn->operands_amount == 1, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
 
-        const pis_operand_t* jump_target = &insn->operands[0];
-
-        // determine the jump target address
-        u64 addr = 0;
-        switch (jump_target->addr.space) {
-        case PIS_SPACE_RAM:
-            // jump to a fixed ram address
-            addr = jump_target->addr.offset;
-            break;
-        default:
-            // symbolic address, evaluate it
-            CHECK_RETHROW(pis_emu_read_operand(emu, jump_target, &addr));
-        }
-
-        emu->did_jump = true;
-        emu->jump_addr = addr;
+        CHECK_RETHROW(do_jmp(emu, exec_ctx, &insn->operands[0]));
         break;
+    }
     case PIS_OPCODE_SIGN_EXTEND: {
         CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
 
@@ -815,8 +844,15 @@ cleanup:
 
 err_t pis_emu_run(pis_emu_t* emu, const pis_lift_result_t* lift_result) {
     err_t err = SUCCESS;
-    for (size_t i = 0; i < lift_result->insns_amount; i++) {
-        CHECK_RETHROW(pis_emu_run_one(emu, &lift_result->insns[i]));
+    size_t cursor = 0;
+    while (cursor < lift_result->insns_amount) {
+        exec_ctx_t exec_ctx = {};
+        CHECK_RETHROW(pis_emu_run_one(emu, &exec_ctx, &lift_result->insns[cursor]));
+        if (exec_ctx.did_rel_jump) {
+            cursor = exec_ctx.rel_jump_to_index;
+        } else {
+            cursor++;
+        }
     }
 cleanup:
     return err;
