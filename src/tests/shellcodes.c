@@ -204,6 +204,13 @@ static err_t test_shellcode_result(
         expected_result
     ));
 
+    CHECK_RETHROW_VERBOSE(check_arch_specific_shellcode_result(
+        &arch_def_i386,
+        &shellcode->i386,
+        args,
+        expected_result
+    ));
+
 cleanup:
     return err;
 }
