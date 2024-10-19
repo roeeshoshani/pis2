@@ -1603,6 +1603,9 @@ static err_t do_div_ax_dx(
     const post_prefixes_ctx_t* ctx, pis_operand_size_t operand_size, const pis_operand_t* divisor
 ) {
     err_t err = SUCCESS;
+
+    CHECK(divisor->size == operand_size);
+
     if (operand_size == PIS_OPERAND_SIZE_8) {
         // divide `rdx:rax`.
 
@@ -1661,7 +1664,7 @@ static err_t do_div_ax_dx(
         pis_operand_t div_result = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN3(PIS_OPCODE_UNSIGNED_DIV, div_result, divide_lhs, *divisor)
+            PIS_INSN3(PIS_OPCODE_UNSIGNED_DIV, div_result, divide_lhs, zero_extended_divisor)
         );
 
         // store the division result in ax
@@ -1674,7 +1677,7 @@ static err_t do_div_ax_dx(
         pis_operand_t rem_result = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN3(PIS_OPCODE_UNSIGNED_REM, rem_result, divide_lhs, *divisor)
+            PIS_INSN3(PIS_OPCODE_UNSIGNED_REM, rem_result, divide_lhs, zero_extended_divisor)
         );
 
         // store the division result in dx

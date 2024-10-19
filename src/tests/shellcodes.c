@@ -286,6 +286,7 @@ DEFINE_TEST(test_shellcode_gcd) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW_VERBOSE(test_gcd(0, 0, 0));
+    CHECK_RETHROW_VERBOSE(test_gcd(1, 1, 1));
 
 cleanup:
     return err;
