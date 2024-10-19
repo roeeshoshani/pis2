@@ -1,0 +1,11 @@
+#define CONCAT(A, B) A##B
+#define START_SYM(NAME) CONCAT(__start_shellcode_, NAME)
+#define END_SYM(NAME) CONCAT(__end_shellcode_, NAME)
+
+.global START_SYM(SHELLCODE_NAME)
+START_SYM(SHELLCODE_NAME):
+
+.incbin WRAP_FILENAME
+
+.global END_SYM(SHELLCODE_NAME)
+END_SYM(SHELLCODE_NAME):

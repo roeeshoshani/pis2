@@ -9,3 +9,4 @@ notes about stuff that needs to be done.
   for example look at `lift_ctx`'s wrappers around the `lift_result` functions.
 - in the `calc_binop*` functions, instead of having `*_with_size` variants, maybe take the size from the `reg` operand of the
   modrm instead of using the default operand size?
+- test shellcodes across all supported archs? clang supports cross compilation...
