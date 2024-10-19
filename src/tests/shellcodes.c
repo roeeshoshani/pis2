@@ -5,9 +5,11 @@
 #include "except.h"
 #include "pis.h"
 #include "test_utils.h"
+#include "utils.h"
 
 #define INITIAL_STACK_POINTER_VALUE 0x20000000
 #define SHELLCODE_FINISH_ADDR 0x13371337
+#define UNUSED_REG_MAGIC 0x73317331
 
 EACH_SHELLCODE(DEFINE_SHELLCODE);
 
@@ -48,6 +50,20 @@ cleanup:
     return err;
 }
 
+/// initialize registers that should be unused by the shellcode.
+/// we need to initialize them since the shellcode may still sometimes read them, for example when
+/// preserving register values.
+/// we initialize them with magic values so that if the shellcode accidentally accesses them due to
+/// a bug in the lifting logic, it will get garbage values, which will hopefully fail the tests.
+static err_t init_unused_regs(pis_emu_t* emu, const pis_operand_t* regs[], size_t count) {
+    err_t err = SUCCESS;
+    for (size_t i = 0; i < count; i++) {
+        CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, regs[i], UNUSED_REG_MAGIC));
+    }
+cleanup:
+    return err;
+}
+
 static err_t prepare_x86_64(pis_emu_t* emu, const shellcode_args_t* args) {
     err_t err = SUCCESS;
 
@@ -61,15 +77,25 @@ static err_t prepare_x86_64(pis_emu_t* emu, const shellcode_args_t* args) {
 
     CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RSP, sp));
 
-    // the shellcode sometimes preserves register values, in which case it tries to read their
-    // original value. we must write a dummy value to avoid an uninitialized read which will result
-    // in an error.
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RBP, 0));
-
     CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RDI, args->arg1));
     CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RSI, args->arg2));
     CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RDX, args->arg3));
     CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RCX, args->arg4));
+
+    const pis_operand_t* unused_regs[] = {
+        &RAX,
+        &RBX,
+        &RBP,
+        &R8,
+        &R9,
+        &R10,
+        &R11,
+        &R12,
+        &R13,
+        &R14,
+        &R15,
+    };
+    CHECK_RETHROW_VERBOSE(init_unused_regs(emu, unused_regs, ARRAY_SIZE(unused_regs)));
 
 cleanup:
     return err;
@@ -99,10 +125,16 @@ static err_t prepare_i386(pis_emu_t* emu, const shellcode_args_t* args) {
     // initialize the stack pointer
     CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &ESP, sp));
 
-    // the shellcode sometimes preserves register values, in which case it tries to read their
-    // original value. we must write a dummy value to avoid an uninitialized read which will result
-    // in an error.
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &EBP, 0));
+    const pis_operand_t* unused_regs[] = {
+        &EAX,
+        &EBX,
+        &ECX,
+        &EDX,
+        &ESI,
+        &EDI,
+        &EBP,
+    };
+    CHECK_RETHROW_VERBOSE(init_unused_regs(emu, unused_regs, ARRAY_SIZE(unused_regs)));
 
 cleanup:
     return err;
