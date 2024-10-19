@@ -288,6 +288,7 @@ DEFINE_TEST(test_shellcode_gcd) {
     CHECK_RETHROW_VERBOSE(test_gcd(0, 0, 0));
     CHECK_RETHROW_VERBOSE(test_gcd(1, 1, 1));
     CHECK_RETHROW_VERBOSE(test_gcd(10, 14, 2));
+    CHECK_RETHROW_VERBOSE(test_gcd(3046468425, 1954953000, 16291275));
 
 cleanup:
     return err;
