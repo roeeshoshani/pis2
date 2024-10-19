@@ -262,7 +262,7 @@ static err_t run_unary_operator(pis_emu_t* emu, const pis_insn_t* insn, unary_op
     );
 
     u64 x = 0;
-    CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[2], &x));
+    CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &x));
 
     u64 result = fn(x);
     CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], result));
