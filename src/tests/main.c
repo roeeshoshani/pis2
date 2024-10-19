@@ -8,7 +8,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-pis_emu_t g_emu = {};
+pis_emu_t g_emu;
 
 // define an example trace function
 void trace(const char* format, ...) {

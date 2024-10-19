@@ -63,7 +63,14 @@ err_t pis_emu_storage_read_byte(
     err_t err = SUCCESS;
 
     const pis_emu_storage_slot_t* slot = pis_emu_storage_find_slot_by_addr_const(storage, addr);
-    CHECK_CODE(slot != NULL, PIS_ERR_EMU_READ_UNINIT);
+
+    CHECK_TRACE_CODE(
+        slot != NULL,
+        PIS_ERR_EMU_READ_UNINIT,
+        "reading uninitialized storage at %s[0x%lx]",
+        pis_space_to_str(addr->space),
+        (unsigned long) addr->offset
+    );
 
     *byte_value = slot->byte_value;
 
