@@ -153,7 +153,7 @@ cleanup:
 
 DEFINE_TEST(test_shellcode_factorial) {
     err_t err = SUCCESS;
-    CHECK_RETHROW(test_shellcode_result(&shellcode_factorial, &(shellcode_args_t) {.arg1 = 5}, 16));
+    CHECK_RETHROW(test_shellcode_result(&shellcode_factorial, &(shellcode_args_t) {.arg1 = 5}, 15));
 cleanup:
     return err;
 }
