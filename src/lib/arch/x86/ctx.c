@@ -196,9 +196,14 @@ static err_t calc_parity_flag_into(
 ) {
     err_t err = SUCCESS;
 
-    pis_operand_t low_byte_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, low_byte_tmp, *value));
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_PARITY, *result, low_byte_tmp));
+    pis_operand_t low_byte;
+    if (value->size != PIS_OPERAND_SIZE_1) {
+        low_byte = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, low_byte, *value));
+    } else {
+        low_byte = *value;
+    }
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_PARITY, *result, low_byte));
 
 cleanup:
     return err;
@@ -260,7 +265,15 @@ static err_t extract_most_significant_bit(
         PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, tmp, *value, PIS_OPERAND_CONST(shift_amount, value->size))
     );
 
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, *result, tmp));
+    // write the result into the result operand, while optionally truncating its size
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN2(
+            value->size == PIS_OPERAND_SIZE_1 ? PIS_OPCODE_MOVE : PIS_OPCODE_GET_LOW_BITS,
+            *result,
+            tmp
+        )
+    );
 
 cleanup:
     return err;
