@@ -293,3 +293,30 @@ DEFINE_TEST(test_shellcode_gcd) {
 cleanup:
     return err;
 }
+
+static err_t test_chacha20(
+    u32 key_seed, u32 nonce_seed, u32 counter, u32 plaintext_seed, u32 expected_output
+) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW_VERBOSE(test_shellcode_result(
+        &shellcode_chacha20,
+        &(shellcode_args_t) {
+            .arg1 = key_seed,
+            .arg2 = nonce_seed,
+            .arg3 = counter,
+            .arg4 = plaintext_seed,
+        },
+        expected_output
+    ));
+cleanup:
+    return err;
+}
+
+DEFINE_TEST(test_shellcode_chacha20) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(test_chacha20(0x1234, 0x5678, 0xabcd, 0xcafe, 524622));
+
+cleanup:
+    return err;
+}

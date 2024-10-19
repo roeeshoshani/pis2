@@ -2,6 +2,7 @@ SECTIONS
 {
 	. = 0x10000000;
 	.all : {
+		*(.shellcode_entry)
 		*(.text*)
 		*(.rodata*)
 		*(.bss*)
