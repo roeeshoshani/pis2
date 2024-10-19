@@ -1,10 +1,12 @@
 #pragma once
 
 #include "types.h"
+#include "utils.h"
 
 typedef struct {
     u8* code;
     u8* code_end;
+    const char* name;
 } shellcode_t;
 
 #define EACH_ARCH(_, ...)                                                                          \
@@ -22,7 +24,10 @@ typedef struct {
     extern u8 __end_shellcode_##NAME##_##ARCH[];
 
 #define _ARCH_SPECIFIC_SHELLCODE(ARCH, NAME)                                                       \
-    { .code = __start_shellcode_##NAME##_##ARCH, .code_end = __end_shellcode_##NAME##_##ARCH, }
+    {                                                                                              \
+        .code = __start_shellcode_##NAME##_##ARCH, .code_end = __end_shellcode_##NAME##_##ARCH,    \
+        .name = STRINGIFY(NAME##_##ARCH)                                                           \
+    }
 
 #define DECLARE_SHELLCODE(NAME) EACH_ARCH(_DECLARE_ARCH_SPECIFIC_SHELLCODE, NAME);
 

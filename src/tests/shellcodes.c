@@ -165,14 +165,24 @@ static err_t
     while (cur_offset < code_len) {
         pis_lift_result_reset(&result);
 
-        CHECK_RETHROW_VERBOSE(lift_fn(
-            shellcode->code + cur_offset,
-            code_len - cur_offset,
-            SHELLCODE_BASE_ADDR + cur_offset,
-            &result
-        ));
+        CHECK_RETHROW_TRACE(
+            lift_fn(
+                shellcode->code + cur_offset,
+                code_len - cur_offset,
+                SHELLCODE_BASE_ADDR + cur_offset,
+                &result
+            ),
+            "failed to lift insn at offset 0x%lx in shellcode %s",
+            cur_offset,
+            shellcode->name
+        );
 
-        CHECK_RETHROW_VERBOSE(pis_emu_run(emu, &result));
+        CHECK_RETHROW_TRACE(
+            pis_emu_run(emu, &result),
+            "failed to emulate insn at offset 0x%lx in shellcode %s",
+            cur_offset,
+            shellcode->name
+        );
 
         if (emu->did_jump) {
             if (emu->jump_addr == SHELLCODE_FINISH_ADDR) {
