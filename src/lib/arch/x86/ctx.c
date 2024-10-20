@@ -3049,7 +3049,7 @@ static err_t rep_begin(const post_prefixes_ctx_t* ctx, rep_ctx_t* rep_ctx) {
     err_t err = SUCCESS;
 
     // save the instruction index at the start of the loop so that we can jump to it later.
-    rep_ctx->insn_index_at_loop_start = lift_ctx_index(ctx->lift_ctx);
+    rep_ctx->insn_index_at_loop_start = ctx->lift_ctx->result->insns_amount;
 
     // first check if `cx` if zero
     pis_operand_t cx = operand_resize(&RCX, ctx->addr_size);
@@ -3098,7 +3098,7 @@ static err_t rep_end(const post_prefixes_ctx_t* ctx, const rep_ctx_t* rep_ctx) {
     // now that we finished emitting the code, update the offset of the jmp instruction at the start
     // of the loop which should jump to the end of the instruction.
     rep_ctx->jmp_end_insn->operands[1] =
-        PIS_OPERAND_CONST(lift_ctx_index(ctx->lift_ctx), PIS_OPERAND_SIZE_1);
+        PIS_OPERAND_CONST(ctx->lift_ctx->result->insns_amount, PIS_OPERAND_SIZE_1);
 
 cleanup:
     return err;
