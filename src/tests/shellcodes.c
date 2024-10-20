@@ -316,6 +316,29 @@ cleanup:
     return err;
 }
 
+static err_t test_ackermann(u64 a, u64 b, u64 expected_output) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW_VERBOSE(test_shellcode_result(
+        &shellcode_ackermann,
+        &(shellcode_args_t) {.arg1 = a, .arg2 = b},
+        expected_output
+    ));
+cleanup:
+    return err;
+}
+
+DEFINE_TEST(test_shellcode_ackermann) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(test_ackermann(0, 0, 1));
+    CHECK_RETHROW_VERBOSE(test_ackermann(0, 1, 2));
+    CHECK_RETHROW_VERBOSE(test_ackermann(1, 1, 3));
+    CHECK_RETHROW_VERBOSE(test_ackermann(3, 2, 29));
+
+cleanup:
+    return err;
+}
+
 static err_t test_chacha20(
     u32 key_seed, u32 nonce_seed, u32 counter, u32 plaintext_seed, u32 expected_output
 ) {

@@ -40,6 +40,7 @@ typedef struct {
 #define EACH_SHELLCODE(_)                                                                          \
     _(factorial)                                                                                   \
     _(gcd)                                                                                         \
+    _(ackermann)                                                                                   \
     _(chacha20)
 
 EACH_SHELLCODE(DECLARE_SHELLCODE);
