@@ -695,11 +695,12 @@ cleanup:
 
 /// the prototype for a binary operation function - that is an operation which takes 2 input
 /// operands and produces a single result, for example an `ADD` operation.
-typedef err_t (*binop_fn_t
-)(const post_prefixes_ctx_t* ctx,
-  const pis_operand_t* a,
-  const pis_operand_t* b,
-  pis_operand_t* result);
+typedef err_t (*binop_fn_t)(
+    const post_prefixes_ctx_t* ctx,
+    const pis_operand_t* a,
+    const pis_operand_t* b,
+    pis_operand_t* result
+);
 
 /// calculates a binary operation with modrm operands as inputs using the given operand size.
 /// returns an operand containing the result of the operation in `result`.
@@ -1005,31 +1006,25 @@ static err_t ternary(
     pis_operand_size_t operand_size = then_value->size;
     CHECK(operand_size > PIS_OPERAND_SIZE_1);
 
-    // calculate the negative condition
-    pis_operand_t not_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_COND_NEGATE, not_cond, *cond));
-
-    // zero extend the condition and its negative
+    // zero extend the condition
     pis_operand_t cond_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, cond_zero_extended, *cond));
 
-    pis_operand_t not_cond_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, not_cond_zero_extended, not_cond)
-    );
+    // arithmetically negate the condition to convert it to a bit mask.
+    // if the condition is 1, negating it will produce an all 1s mask, and if it is zero, it will
+    // produce an all 0s mask.
+    pis_operand_t cond_mask = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_NEG, cond_mask, cond_zero_extended));
+
+    // calculate the negative condition mask
+    pis_operand_t not_cond_mask = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_NOT, not_cond_mask, cond_mask));
 
     pis_operand_t true_case = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_AND, true_case, cond_zero_extended, *then_value)
-    );
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, true_case, cond_mask, *then_value));
 
     pis_operand_t false_case = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_AND, false_case, not_cond_zero_extended, *else_value)
-    );
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, false_case, not_cond_mask, *else_value));
 
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, *result, true_case, false_case));
 
@@ -2550,7 +2545,8 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
             CHECK_FAIL_CODE(PIS_ERR_UNSUPPORTED_INSN);
         }
 
-    } else if (first_opcode_byte == 0x80 || first_opcode_byte == 0x81 || first_opcode_byte == 0x83) {
+    } else if (first_opcode_byte == 0x80 || first_opcode_byte == 0x81 ||
+               first_opcode_byte == 0x83) {
         // xxx r/m[8], imm[8]
         pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
         if (first_opcode_byte == 0x80) {
@@ -2906,7 +2902,9 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
 
         pis_operand_t dst = operand_resize(&RAX, operand_size);
         CHECK_RETHROW(write_gpr(ctx, &dst, &tmp));
-    } else if (first_opcode_byte == 0xc1 || first_opcode_byte == 0xc0 || first_opcode_byte == 0xd0 || first_opcode_byte == 0xd1 || first_opcode_byte == 0xd3) {
+    } else if (first_opcode_byte == 0xc1 || first_opcode_byte == 0xc0 ||
+               first_opcode_byte == 0xd0 || first_opcode_byte == 0xd1 ||
+               first_opcode_byte == 0xd3) {
         // shift r/m, imm/cl
 
         // `0xd0` is `shift r/m8, 1` and `0xc0` is `shift r/m8, imm8`. so, set the operand size to 1
