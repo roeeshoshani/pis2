@@ -333,6 +333,7 @@ DEFINE_TEST(test_shellcode_ackermann) {
     CHECK_RETHROW_VERBOSE(test_ackermann(0, 0, 1));
     CHECK_RETHROW_VERBOSE(test_ackermann(0, 1, 2));
     CHECK_RETHROW_VERBOSE(test_ackermann(1, 1, 3));
+    CHECK_RETHROW_VERBOSE(test_ackermann(2, 2, 7));
     CHECK_RETHROW_VERBOSE(test_ackermann(3, 2, 29));
 
 cleanup:
