@@ -2239,6 +2239,16 @@ static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opc
         pis_operand_t result = {};
         CHECK_RETHROW(unary_op_inc(ctx, &reg_operand, &result));
         CHECK_RETHROW(write_gpr(ctx, &reg_operand, &result));
+    } else if (opcode_reg_opcode_only(first_opcode_byte) == 0x48) {
+        // dec <reg>
+        u8 reg_encoding = opcode_reg_extract(ctx, first_opcode_byte);
+
+        pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
+        pis_operand_t reg_operand = reg_get_operand(reg_encoding, operand_size, ctx->prefixes);
+
+        pis_operand_t result = {};
+        CHECK_RETHROW(unary_op_dec(ctx, &reg_operand, &result));
+        CHECK_RETHROW(write_gpr(ctx, &reg_operand, &result));
     } else if (opcode_reg_opcode_only(first_opcode_byte) == 0x90) {
         // xchg [e/r]ax, r
         u8 reg_encoding = opcode_reg_extract(ctx, first_opcode_byte);
