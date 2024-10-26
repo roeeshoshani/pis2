@@ -26,7 +26,7 @@ CFLAGS += -Wall -Wextra
 CFLAGS += -Werror
 CFLAGS += -mno-sse -mno-avx
 CFLAGS += -Os
-CFLAGS += -DDISTORM_LIGHT
+# CFLAGS += -DDISTORM_LIGHT
 
 .phony: all
 all: $(EXAMPLE_BIN) $(TESTS_BIN) $(OBJS)

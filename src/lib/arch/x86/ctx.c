@@ -2,6 +2,7 @@
 #include "arch/x86/regs.h"
 #include "distorm/include/distorm.h"
 #include "distorm/include/mnemonics.h"
+#include "errors.h"
 #include "except.h"
 #include "pis.h"
 #include "utils.h"
@@ -12,10 +13,11 @@ typedef struct {
     pis_operand_size_t addr_size;
     u64 cur_tmp_offset;
     pis_lift_result_t* lift_result;
+    u64 machine_code_addr;
 } ctx_t;
 
 static inline pis_operand_size_t distorm_addr_or_operand_size_to_pis(u8 distorm_size) {
-    return (pis_operand_size_t) (distorm_size + 2);
+    return (pis_operand_size_t) (1 << (distorm_size + 1));
 }
 
 static inline pis_operand_size_t insn_operand_size(const _DInst* insn) {
@@ -213,6 +215,33 @@ cleanup:
     return err;
 }
 
+static err_t lift_by_mnemonic(ctx_t* ctx) {
+    err_t err = SUCCESS;
+    UNUSED(read_operand);
+    UNUSED(write_operand);
+    switch (ctx->insn.opcode) {
+    case I_MOV: {
+        CHECK(ctx->insn.opsNo == 2);
+
+        pis_operand_t src;
+        CHECK_RETHROW(read_operand(ctx, &ctx->insn.ops[1], &src));
+        CHECK_RETHROW(write_operand(ctx, &ctx->insn.ops[0], &src));
+        break;
+    }
+    default:
+        // CHECK_FAIL_TRACE_CODE(
+        //     PIS_ERR_UNSUPPORTED_INSN,
+        //     "unsupported opcode: %s",
+        //     GET_MNEMONIC_NAME(ctx->insn.opcode)
+        // );
+        TRACE("unsupported opcode: %s", GET_MNEMONIC_NAME(ctx->insn.opcode));
+        break;
+    }
+    goto cleanup;
+cleanup:
+    return err;
+}
+
 err_t pis_x86_lift(
     const pis_x86_ctx_t* ctx,
     const u8* machine_code,
@@ -233,6 +262,7 @@ err_t pis_x86_lift(
     ctx_t inner_ctx = {
         .cur_tmp_offset = 0,
         .lift_result = result,
+        .machine_code_addr = machine_code_addr,
     };
 
     unsigned int insn_count = 0;
@@ -245,9 +275,9 @@ err_t pis_x86_lift(
     inner_ctx.addr_size = insn_addr_size(&inner_ctx.insn);
     inner_ctx.operand_size = insn_operand_size(&inner_ctx.insn);
 
-    result->machine_insn_len = inner_ctx.insn.size;
+    CHECK_RETHROW(lift_by_mnemonic(&inner_ctx));
 
-    UNUSED(machine_code_addr);
+    result->machine_insn_len = inner_ctx.insn.size;
 
 cleanup:
     return err;
