@@ -36,4 +36,4 @@ DECLARE_REG_OPERANDS(
     FLAGS_ID
 );
 
-err_t reg_get_operand(u8 reg_index, pis_operand_t* operand);
+err_t distorm_reg_to_operand(u8 reg_index, pis_operand_t* operand);

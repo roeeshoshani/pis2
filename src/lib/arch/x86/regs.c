@@ -114,7 +114,7 @@ DEFINE_REG_OPERAND(FLAGS_VIF, FLAGS_REG_OFFSET + 19, PIS_OPERAND_SIZE_1);
 DEFINE_REG_OPERAND(FLAGS_VIP, FLAGS_REG_OFFSET + 20, PIS_OPERAND_SIZE_1);
 DEFINE_REG_OPERAND(FLAGS_ID, FLAGS_REG_OFFSET + 21, PIS_OPERAND_SIZE_1);
 
-err_t reg_get_operand(u8 reg_index, pis_operand_t* operand) {
+err_t distorm_reg_to_operand(u8 reg_index, pis_operand_t* operand) {
     err_t err = SUCCESS;
     if (reg_index < 16) {
         // 64-bit GPR

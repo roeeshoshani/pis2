@@ -4,6 +4,7 @@
 #include "distorm/include/mnemonics.h"
 #include "except.h"
 #include "pis.h"
+#include "utils.h"
 
 typedef struct {
     _DInst insn;
@@ -25,8 +26,7 @@ static inline pis_operand_size_t insn_addr_size(const _DInst* insn) {
     return distorm_addr_or_operand_size_to_pis(FLAG_GET_ADDRSIZE(insn->flags));
 }
 
-static inline err_t __attribute__((unused))
-distorm_operand_get_size(const _Operand* operand, pis_operand_size_t* result) {
+static inline err_t distorm_operand_get_size(const _Operand* operand, pis_operand_size_t* result) {
     err_t err = SUCCESS;
     CHECK_RETHROW(pis_operand_size_from_bits(operand->size, result));
 cleanup:
@@ -49,16 +49,81 @@ cleanup:
     return err;
 }
 
-static err_t __attribute__((unused))
-read_operand(ctx_t* ctx, const _Operand* operand, pis_operand_t* result) {
+static err_t mem_operand_get_addr(ctx_t* ctx, const _Operand* operand, pis_operand_t* result_addr) {
+    err_t err = SUCCESS;
+
+    pis_operand_t disp = PIS_OPERAND_CONST(
+        ctx->insn.disp & pis_operand_size_max_unsigned_value(ctx->addr_size),
+        ctx->addr_size
+    );
+
+    switch (operand->type) {
+    case O_DISP: {
+        *result_addr = disp;
+        break;
+    }
+    case O_SMEM: {
+        pis_operand_t reg;
+        CHECK_RETHROW(distorm_reg_to_operand(operand->index, &reg));
+
+        pis_operand_t addr_tmp;
+        CHECK_RETHROW(new_tmp(ctx, ctx->addr_size, &addr_tmp));
+
+        PIS_LIFT_RESULT_EMIT(ctx->lift_result, PIS_INSN3(PIS_OPCODE_ADD, addr_tmp, reg, disp));
+
+        *result_addr = addr_tmp;
+        break;
+    }
+    case O_MEM: {
+        pis_operand_t index_reg;
+        CHECK_RETHROW(distorm_reg_to_operand(operand->index, &index_reg));
+
+        pis_operand_t base_reg;
+        CHECK_RETHROW(distorm_reg_to_operand(ctx->insn.base, &base_reg));
+
+        pis_operand_t disp = PIS_OPERAND_CONST(
+            ctx->insn.disp & pis_operand_size_max_unsigned_value(ctx->addr_size),
+            ctx->addr_size
+        );
+
+        pis_operand_t scale = PIS_OPERAND_CONST(ctx->insn.scale, ctx->addr_size);
+
+        pis_operand_t addr_tmp;
+        CHECK_RETHROW(new_tmp(ctx, ctx->addr_size, &addr_tmp));
+
+        // calculate the scaled index
+        PIS_LIFT_RESULT_EMIT(
+            ctx->lift_result,
+            PIS_INSN3(PIS_OPCODE_UNSIGNED_MUL, addr_tmp, index_reg, scale)
+        );
+
+        // add base reg and disp
+        PIS_LIFT_RESULT_EMIT(
+            ctx->lift_result,
+            PIS_INSN3(PIS_OPCODE_ADD, addr_tmp, addr_tmp, base_reg)
+        );
+        PIS_LIFT_RESULT_EMIT(ctx->lift_result, PIS_INSN3(PIS_OPCODE_ADD, addr_tmp, addr_tmp, disp));
+
+        *result_addr = addr_tmp;
+        break;
+    }
+    default:
+        // not a memory operand
+        UNREACHABLE();
+    }
+
+cleanup:
+    return err;
+}
+
+static err_t read_operand(ctx_t* ctx, const _Operand* operand, pis_operand_t* result) {
     err_t err = SUCCESS;
 
     switch (operand->type) {
     case O_NONE:
         UNREACHABLE();
-        break;
     case O_REG:
-        CHECK_RETHROW(reg_get_operand(operand->index, result));
+        CHECK_RETHROW(distorm_reg_to_operand(operand->index, result));
         CHECK(pis_operand_size_to_bits(result->size) == operand->size);
         break;
     case O_IMM: {
@@ -72,29 +137,30 @@ read_operand(ctx_t* ctx, const _Operand* operand, pis_operand_t* result) {
         TODO();
     case O_IMM2:
         TODO();
-    case O_DISP: {
-        pis_operand_t addr = PIS_OPERAND_CONST(
-            ctx->insn.disp & pis_operand_size_max_unsigned_value(ctx->addr_size),
-            ctx->addr_size
-        );
+    case O_DISP:
+        FALLTHROUGH;
+    case O_SMEM:
+        FALLTHROUGH;
+    case O_MEM: {
+        pis_operand_size_t operand_size;
+        CHECK_RETHROW(distorm_operand_get_size(operand, &operand_size));
+
+        pis_operand_t addr;
+        CHECK_RETHROW(mem_operand_get_addr(ctx, operand, &addr));
 
         pis_operand_t load_tmp;
-        CHECK_RETHROW(new_tmp(ctx, ctx->addr_size, &load_tmp));
+        CHECK_RETHROW(new_tmp(ctx, operand_size, &load_tmp));
 
         PIS_LIFT_RESULT_EMIT(ctx->lift_result, PIS_INSN2(PIS_OPCODE_LOAD, load_tmp, addr));
 
         *result = load_tmp;
+
         break;
     }
-    case O_SMEM:
-        break;
-    case O_MEM:
-        break;
     case O_PC:
-        break;
+        TODO();
     case O_PTR:
         TODO();
-        break;
     }
 
 cleanup:
