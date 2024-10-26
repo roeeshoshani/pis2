@@ -120,11 +120,12 @@ static err_t read_operand(ctx_t* ctx, const _Operand* operand, pis_operand_t* re
     err_t err = SUCCESS;
 
     switch (operand->type) {
-    case O_NONE:
-        UNREACHABLE();
     case O_REG:
         CHECK_RETHROW(distorm_reg_to_operand(operand->index, result));
+
+        // sanity
         CHECK(pis_operand_size_to_bits(result->size) == operand->size);
+
         break;
     case O_IMM: {
         *result = PIS_OPERAND_CONST(
@@ -133,10 +134,6 @@ static err_t read_operand(ctx_t* ctx, const _Operand* operand, pis_operand_t* re
         );
         break;
     }
-    case O_IMM1:
-        TODO();
-    case O_IMM2:
-        TODO();
     case O_DISP:
         FALLTHROUGH;
     case O_SMEM:
@@ -157,10 +154,59 @@ static err_t read_operand(ctx_t* ctx, const _Operand* operand, pis_operand_t* re
 
         break;
     }
-    case O_PC:
-        TODO();
-    case O_PTR:
-        TODO();
+    default:
+        UNREACHABLE();
+    }
+
+cleanup:
+    return err;
+}
+
+static err_t write_gpr(ctx_t* ctx, const pis_operand_t* gpr, const pis_operand_t* value) {
+    err_t err = SUCCESS;
+    PIS_LIFT_RESULT_EMIT(ctx->lift_result, PIS_INSN2(PIS_OPCODE_MOVE, *gpr, *value));
+
+    // writes to 32 bit gprs zero out the upper half of the 64 bit gpr.
+    if (gpr->size == PIS_OPERAND_SIZE_4) {
+        pis_operand_t gpr64 = PIS_OPERAND(gpr->addr, PIS_OPERAND_SIZE_8);
+        PIS_LIFT_RESULT_EMIT(ctx->lift_result, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, gpr64, *gpr));
+    }
+cleanup:
+    return err;
+}
+
+static err_t write_operand(ctx_t* ctx, const _Operand* operand, const pis_operand_t* value) {
+    err_t err = SUCCESS;
+
+    switch (operand->type) {
+    case O_REG: {
+        pis_operand_t reg;
+        CHECK_RETHROW(distorm_reg_to_operand(operand->index, &reg));
+
+        // sanity
+        CHECK(pis_operand_size_to_bits(reg.size) == operand->size);
+
+        CHECK_RETHROW(write_gpr(ctx, &reg, value));
+
+        break;
+    }
+    case O_DISP:
+        FALLTHROUGH;
+    case O_SMEM:
+        FALLTHROUGH;
+    case O_MEM: {
+        // verify operand size
+        CHECK(pis_operand_size_to_bits(value->size) == operand->size);
+
+        pis_operand_t addr;
+        CHECK_RETHROW(mem_operand_get_addr(ctx, operand, &addr));
+
+        PIS_LIFT_RESULT_EMIT(ctx->lift_result, PIS_INSN2(PIS_OPCODE_STORE, addr, *value));
+
+        break;
+    }
+    default:
+        UNREACHABLE();
     }
 
 cleanup:
