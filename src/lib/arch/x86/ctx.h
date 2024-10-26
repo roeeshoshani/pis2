@@ -3,12 +3,11 @@
 #include "except.h"
 #include "pis.h"
 #include "types.h"
-#include "distorm/include/distorm.h"
 
 typedef enum {
-    PIS_X86_CPUMODE_16_BIT = Decode16Bits,
-    PIS_X86_CPUMODE_32_BIT = Decode32Bits,
-    PIS_X86_CPUMODE_64_BIT = Decode64Bits,
+    PIS_X86_CPUMODE_16_BIT = 0,
+    PIS_X86_CPUMODE_32_BIT = 1,
+    PIS_X86_CPUMODE_64_BIT = 2,
 } pis_x86_cpumode_t;
 
 typedef struct {

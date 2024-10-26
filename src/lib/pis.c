@@ -97,6 +97,17 @@ u32 pis_operand_size_to_bits(pis_operand_size_t operand_size) {
     return pis_operand_size_to_bytes(operand_size) * 8;
 }
 
+err_t pis_operand_size_from_bits(u32 bits, pis_operand_size_t* operand_size) {
+    err_t err = SUCCESS;
+
+    CHECK(__builtin_popcount(bits) == 1);
+    CHECK(bits <= 64);
+
+    *operand_size = (pis_operand_size_t) (bits / 8);
+cleanup:
+    return err;
+}
+
 u64 pis_operand_size_max_unsigned_value(pis_operand_size_t operand_size) {
     u32 bits = pis_operand_size_to_bits(operand_size);
     if (bits == 64) {

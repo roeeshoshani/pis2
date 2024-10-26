@@ -215,6 +215,8 @@ u32 pis_operand_size_to_bytes(pis_operand_size_t operand_size);
 
 u32 pis_operand_size_to_bits(pis_operand_size_t operand_size);
 
+err_t pis_operand_size_from_bits(u32 bits, pis_operand_size_t* operand_size);
+
 u64 pis_operand_size_max_unsigned_value(pis_operand_size_t operand_size);
 
 u64 pis_const_negate(u64 const_value, u32 operand_size);
