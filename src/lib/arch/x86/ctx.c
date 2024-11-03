@@ -1097,7 +1097,7 @@ cleanup:
 }
 
 /// fetches and immediate of the given size and zero extends it.
-static err_t fetch_imm_of_size_zext(const insn_ctx_t* ctx, op_size_t size, u64* operand) {
+static err_t fetch_imm_of_op_size_zext(const insn_ctx_t* ctx, op_size_t size, u64* operand) {
     err_t err = SUCCESS;
     switch (size) {
     case OP_SIZE_8:
@@ -1119,8 +1119,32 @@ cleanup:
     return err;
 }
 
+/// fetches and immediate of the given size and zero extends it.
+static err_t
+    fetch_imm_of_pis_size_zext(const insn_ctx_t* ctx, pis_operand_size_t size, u64* operand) {
+    err_t err = SUCCESS;
+    switch (size) {
+    case PIS_OPERAND_SIZE_1:
+        *operand = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        break;
+    case PIS_OPERAND_SIZE_2:
+        *operand = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
+        break;
+    case PIS_OPERAND_SIZE_4:
+        *operand = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+        break;
+    case PIS_OPERAND_SIZE_8:
+        *operand = LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx);
+        break;
+    default:
+        UNREACHABLE();
+    }
+cleanup:
+    return err;
+}
+
 /// fetches and immediate of the given size and sign extends it.
-static err_t fetch_imm_of_size_sext(const insn_ctx_t* ctx, op_size_t size, u64* operand) {
+static err_t fetch_imm_of_op_size_sext(const insn_ctx_t* ctx, op_size_t size, u64* operand) {
     err_t err = SUCCESS;
     switch (size) {
     case OP_SIZE_8:
@@ -3221,10 +3245,10 @@ static err_t lift_op(
         u64 imm = 0;
         switch (op_info->imm.extend_kind) {
         case IMM_EXT_SIGN_EXTEND:
-            CHECK_RETHROW(fetch_imm_of_size_sext(ctx, encoded_size, &imm));
+            CHECK_RETHROW(fetch_imm_of_op_size_sext(ctx, encoded_size, &imm));
             break;
         case IMM_EXT_ZERO_EXTEND:
-            CHECK_RETHROW(fetch_imm_of_size_zext(ctx, encoded_size, &imm));
+            CHECK_RETHROW(fetch_imm_of_op_size_zext(ctx, encoded_size, &imm));
             break;
         }
 
@@ -3344,7 +3368,7 @@ static err_t lift_op(
         op_size_t size = calc_size(ctx, op_info->rel.size_info_index);
 
         u64 rel_offset = 0;
-        CHECK_RETHROW(fetch_imm_of_size_sext(ctx, size, &rel_offset));
+        CHECK_RETHROW(fetch_imm_of_op_size_sext(ctx, size, &rel_offset));
 
         u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
         u64 target_addr = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr + rel_offset);
@@ -3357,12 +3381,38 @@ static err_t lift_op(
         break;
     }
     case OP_KIND_MEM_OFFSET: {
+        u64 addr = 0;
+        CHECK_RETHROW(fetch_imm_of_pis_size_zext(ctx, ctx->addr_size, &addr));
+
+        *lifted_operand = (lifted_op_t) {
+            .kind = LIFTED_OP_KIND_MEM,
+            .value = PIS_OPERAND_CONST(addr, ctx->addr_size),
+        };
+
         break;
     }
-    case OP_KIND_IMPLICIT:
+    case OP_KIND_IMPLICIT: {
+        op_size_t size = calc_size(ctx, op_info->implicit.size_info_index);
+
+        // implicit operands are only used to determine the operand size. we pass a constant of zero
+        // with the correct size.
+        *lifted_operand = (lifted_op_t) {
+            .kind = LIFTED_OP_KIND_VALUE,
+            .value = PIS_OPERAND_CONST(0, op_size_to_pis_operand_size(size)),
+        };
         break;
-    case OP_KIND_COND:
+    }
+    case OP_KIND_COND: {
+        pis_operand_t cond = {};
+        CHECK_RETHROW(cond_opcode_decode_and_calc(ctx, last_opcode_byte, &cond));
+
+        *lifted_operand = (lifted_op_t) {
+            .kind = LIFTED_OP_KIND_VALUE,
+            .value = cond,
+        };
+
         break;
+    }
     }
 cleanup:
     return err;
