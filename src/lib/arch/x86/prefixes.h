@@ -67,7 +67,9 @@ typedef struct {
     const prefixes_t* prefixes;
     pis_operand_size_t addr_size;
     effective_operand_sizes_t operand_sizes;
-} post_prefixes_ctx_t;
+    bool has_modrm;
+    uint8_t modrm_byte;
+} insn_ctx_t;
 
 err_t parse_prefixes(lift_ctx_t* ctx, prefixes_t* prefixes);
 

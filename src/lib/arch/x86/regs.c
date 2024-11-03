@@ -131,9 +131,7 @@ pis_operand_t
 }
 
 
-err_t write_gpr(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* gpr, const pis_operand_t* value
-) {
+err_t write_gpr(const insn_ctx_t* ctx, const pis_operand_t* gpr, const pis_operand_t* value) {
     err_t err = SUCCESS;
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *gpr, *value));
 

@@ -30,6 +30,17 @@ typedef struct {
     bool is_negative;
 } x86_cond_t;
 
+typedef enum {
+    LIFTED_OP_KIND_VALUE,
+    LIFTED_OP_KIND_WRITABLE,
+    LIFTED_OP_KIND_MEM,
+} lifted_op_kind_t;
+
+typedef struct {
+    lifted_op_kind_t kind;
+    pis_operand_t value;
+} lifted_op_t;
+
 /// extracts the condition encoding of an opcode which has a condition encoded in its value.
 static u8 opcode_cond_extract(u8 opcode_byte) {
     return opcode_byte & 0b1111;
@@ -55,8 +66,7 @@ cleanup:
 }
 
 /// calculates the given x86 condition type into the given result operand.
-static err_t
-    calc_cond(const post_prefixes_ctx_t* ctx, const x86_cond_t cond, pis_operand_t* result) {
+static err_t calc_cond(const insn_ctx_t* ctx, const x86_cond_t cond, pis_operand_t* result) {
     err_t err = SUCCESS;
 
     pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
@@ -107,9 +117,8 @@ cleanup:
 
 /// decodes an x86 condition encoding from the given opcode and calculates its value into the given
 /// result operand.
-static err_t cond_opcode_decode_and_calc(
-    const post_prefixes_ctx_t* ctx, u8 opcode_byte, pis_operand_t* result
-) {
+static err_t
+    cond_opcode_decode_and_calc(const insn_ctx_t* ctx, u8 opcode_byte, pis_operand_t* result) {
     err_t err = SUCCESS;
 
     x86_cond_t cond = {};
@@ -190,7 +199,7 @@ static pis_operand_size_t
 
 /// calculates the parity flag of the given value into the given result operand.
 static err_t calc_parity_flag_into(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* value, const pis_operand_t* result
+    const insn_ctx_t* ctx, const pis_operand_t* value, const pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -208,8 +217,7 @@ cleanup:
 }
 
 /// calculates the parity flag of the given calculation result into the parity flag register.
-static err_t
-    calc_parity_flag(const post_prefixes_ctx_t* ctx, const pis_operand_t* calculation_result) {
+static err_t calc_parity_flag(const insn_ctx_t* ctx, const pis_operand_t* calculation_result) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(calc_parity_flag_into(ctx, calculation_result, &FLAGS_PF));
@@ -220,7 +228,7 @@ cleanup:
 
 /// calculates the zero flag of the given value into the given result operand.
 static err_t calc_zero_flag_into(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* value, const pis_operand_t* result
+    const insn_ctx_t* ctx, const pis_operand_t* value, const pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -234,8 +242,7 @@ cleanup:
 }
 
 /// calculates the zero flag of the given calculation result into the zero flag register.
-static err_t
-    calc_zero_flag(const post_prefixes_ctx_t* ctx, const pis_operand_t* calculation_result) {
+static err_t calc_zero_flag(const insn_ctx_t* ctx, const pis_operand_t* calculation_result) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(calc_zero_flag_into(ctx, calculation_result, &FLAGS_ZF));
@@ -248,7 +255,7 @@ cleanup:
 /// the output is a 1 byte conditional expression which indicates whether the sign bit of the given
 /// value is enabled.
 static err_t extract_most_significant_bit(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* value, const pis_operand_t* result
+    const insn_ctx_t* ctx, const pis_operand_t* value, const pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -281,7 +288,7 @@ cleanup:
 /// the output is a 1 byte conditional expression which indicates whether the sign bit of the given
 /// value is enabled.
 static err_t extract_least_significant_bit(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* value, const pis_operand_t* result
+    const insn_ctx_t* ctx, const pis_operand_t* value, const pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -301,8 +308,7 @@ cleanup:
 }
 
 /// calculates the sign flag of the given calculation result into the sign flag register.
-static err_t
-    calc_sign_flag(const post_prefixes_ctx_t* ctx, const pis_operand_t* calculation_result) {
+static err_t calc_sign_flag(const insn_ctx_t* ctx, const pis_operand_t* calculation_result) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(extract_most_significant_bit(ctx, calculation_result, &FLAGS_SF));
@@ -313,9 +319,8 @@ cleanup:
 
 /// calculates the parity, zero and sign flags according to the given calculation results and stores
 /// the flag values into their appropriate flag registers.
-static err_t calc_parity_zero_sign_flags(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* calculation_result
-) {
+static err_t
+    calc_parity_zero_sign_flags(const insn_ctx_t* ctx, const pis_operand_t* calculation_result) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(calc_parity_flag(ctx, calculation_result));
@@ -329,10 +334,7 @@ cleanup:
 /// performs an `ADD` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
 static err_t binop_add(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* a,
-    const pis_operand_t* b,
-    pis_operand_t* result
+    const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -361,10 +363,7 @@ cleanup:
 /// performs an `ADC` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
 static err_t binop_adc(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* a,
-    const pis_operand_t* b,
-    pis_operand_t* result
+    const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -422,10 +421,7 @@ cleanup:
 /// performs an `SUB` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
 static err_t binop_sub(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* a,
-    const pis_operand_t* b,
-    pis_operand_t* result
+    const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -453,9 +449,8 @@ cleanup:
 
 /// performs a `DEC` operation on the input operand and returns an operand
 /// containing the result of the operation in `result`.
-static err_t unary_op_dec(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* operand, pis_operand_t* result
-) {
+static err_t
+    unary_op_dec(const insn_ctx_t* ctx, const pis_operand_t* operand, pis_operand_t* result) {
     err_t err = SUCCESS;
 
     pis_operand_size_t operand_size = operand->size;
@@ -479,9 +474,8 @@ cleanup:
 
 /// performs an `INC` operation on the input operand and returns an operand
 /// containing the result of the operation in `result`.
-static err_t unary_op_inc(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* operand, pis_operand_t* result
-) {
+static err_t
+    unary_op_inc(const insn_ctx_t* ctx, const pis_operand_t* operand, pis_operand_t* result) {
     err_t err = SUCCESS;
 
     pis_operand_size_t operand_size = operand->size;
@@ -505,9 +499,8 @@ cleanup:
 
 /// performs a `NEG` operation on the input operand and returns an operand
 /// containing the result of the operation in `result`.
-static err_t unary_op_neg(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* operand, pis_operand_t* result
-) {
+static err_t
+    unary_op_neg(const insn_ctx_t* ctx, const pis_operand_t* operand, pis_operand_t* result) {
     err_t err = SUCCESS;
 
     pis_operand_size_t operand_size = operand->size;
@@ -533,9 +526,8 @@ cleanup:
 
 /// performs a `NOT` operation on the input operand and returns an operand
 /// containing the result of the operation in `result`.
-static err_t unary_op_not(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* operand, pis_operand_t* result
-) {
+static err_t
+    unary_op_not(const insn_ctx_t* ctx, const pis_operand_t* operand, pis_operand_t* result) {
     err_t err = SUCCESS;
 
     pis_operand_size_t operand_size = operand->size;
@@ -553,10 +545,7 @@ cleanup:
 /// performs an `AND` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
 static err_t binop_and(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* a,
-    const pis_operand_t* b,
-    pis_operand_t* result
+    const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -589,10 +578,7 @@ cleanup:
 /// performs an `IMUL` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
 static err_t binop_imul(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* a,
-    const pis_operand_t* b,
-    pis_operand_t* result
+    const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -618,10 +604,7 @@ cleanup:
 /// performs a `XOR` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
 static err_t binop_xor(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* a,
-    const pis_operand_t* b,
-    pis_operand_t* result
+    const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -656,10 +639,7 @@ cleanup:
 /// performs an `OR` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
 static err_t binop_or(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* a,
-    const pis_operand_t* b,
-    pis_operand_t* result
+    const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -694,15 +674,12 @@ cleanup:
 /// the prototype for a binary operation function - that is an operation which takes 2 input
 /// operands and produces a single result, for example an `ADD` operation.
 typedef err_t (*binop_fn_t
-)(const post_prefixes_ctx_t* ctx,
-  const pis_operand_t* a,
-  const pis_operand_t* b,
-  pis_operand_t* result);
+)(const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result);
 
 /// calculates a binary operation with modrm operands as inputs using the given operand size.
 /// returns an operand containing the result of the operation in `result`.
 static err_t calc_binop_modrm_with_size(
-    const post_prefixes_ctx_t* ctx,
+    const insn_ctx_t* ctx,
     binop_fn_t binop,
     pis_operand_size_t operand_size,
     const modrm_operand_t* dst,
@@ -726,7 +703,7 @@ cleanup:
 /// calculates a binary operation with modrm operands as inputs. returns an operand containing the
 /// result of the operation in `result`.
 static err_t calc_binop_modrm(
-    const post_prefixes_ctx_t* ctx,
+    const insn_ctx_t* ctx,
     binop_fn_t binop,
     const modrm_operand_t* dst,
     const modrm_operand_t* src,
@@ -744,7 +721,7 @@ cleanup:
 /// calculates a binary operation with one modrm and one immediate operand as inputs using the given
 /// operand size. returns an operand containing the result of the operation in `result`.
 static err_t calc_binop_modrm_imm_with_size(
-    const post_prefixes_ctx_t* ctx,
+    const insn_ctx_t* ctx,
     binop_fn_t binop,
     pis_operand_size_t operand_size,
     const modrm_operand_t* dst,
@@ -766,7 +743,7 @@ cleanup:
 /// calculates a binary operation with one modrm and one immediate operand as inputs. returns an
 /// operand containing the result of the operation in `result`.
 static err_t calc_binop_modrm_imm(
-    const post_prefixes_ctx_t* ctx,
+    const insn_ctx_t* ctx,
     binop_fn_t binop,
     const modrm_operand_t* dst,
     const pis_operand_t* src_imm,
@@ -784,10 +761,7 @@ cleanup:
 /// calculates a binary operation with modrm operands as inputs, and stores the result of the
 /// operation in the first operand.
 static err_t calc_and_store_binop_modrm(
-    const post_prefixes_ctx_t* ctx,
-    binop_fn_t binop,
-    const modrm_operand_t* dst,
-    const modrm_operand_t* src
+    const insn_ctx_t* ctx, binop_fn_t binop, const modrm_operand_t* dst, const modrm_operand_t* src
 ) {
     err_t err = SUCCESS;
 
@@ -802,7 +776,7 @@ cleanup:
 /// calculates a binary operation with modrm operands as inputs using the given operand size, and
 /// stores the result of the operation in the first operand.
 static err_t calc_and_store_binop_modrm_with_size(
-    const post_prefixes_ctx_t* ctx,
+    const insn_ctx_t* ctx,
     binop_fn_t binop,
     pis_operand_size_t operand_size,
     const modrm_operand_t* dst,
@@ -821,7 +795,7 @@ cleanup:
 /// calculates a binary operation with one modrm and one immediate operand as inputs using the given
 /// operand size, and stores the result of the operation in the first operand.
 static err_t calc_and_store_binop_modrm_imm_with_size(
-    const post_prefixes_ctx_t* ctx,
+    const insn_ctx_t* ctx,
     binop_fn_t binop,
     pis_operand_size_t operand_size,
     const modrm_operand_t* dst,
@@ -840,7 +814,7 @@ cleanup:
 /// calculates a binary operation with one modrm and one immediate operand as inputs, and stores the
 /// result of the operation in the first operand.
 static err_t USED calc_and_store_binop_modrm_imm(
-    const post_prefixes_ctx_t* ctx,
+    const insn_ctx_t* ctx,
     binop_fn_t binop,
     const modrm_operand_t* dst,
     const pis_operand_t* src_imm
@@ -858,7 +832,7 @@ cleanup:
 /// calculates a binary operation with one modrm and one immediate operand as inputs using the given
 /// operand size, and optionally stores the result of the operation in the first operand.
 static err_t calc_and_maybe_store_binop_modrm_imm_with_size(
-    const post_prefixes_ctx_t* ctx,
+    const insn_ctx_t* ctx,
     binop_fn_t binop,
     pis_operand_size_t operand_size,
     bool should_store_result,
@@ -882,7 +856,7 @@ cleanup:
 ///
 /// please not that the operand size is not the size of the displacement immediate. for example, for
 /// an operand size of 8, the displacement is 4 bytes.
-static pis_operand_size_t near_branch_operand_default_operand_size(const post_prefixes_ctx_t* ctx) {
+static pis_operand_size_t near_branch_operand_default_operand_size(const insn_ctx_t* ctx) {
     if (ctx->lift_ctx->pis_x86_ctx->cpumode == PIS_X86_CPUMODE_64_BIT) {
         // from the intel ia-32 spec:
         // "In 64-bit mode the target operand will always be 64-bits because the operand size is
@@ -895,7 +869,7 @@ static pis_operand_size_t near_branch_operand_default_operand_size(const post_pr
 
 /// fetches an immediate of the given operand size and sign extends it to 64 bits.
 static err_t fetch_imm_of_size_and_sign_extend_to_64_bits(
-    const post_prefixes_ctx_t* ctx, pis_operand_size_t operand_size, u64* disp
+    const insn_ctx_t* ctx, pis_operand_size_t operand_size, u64* disp
 ) {
     err_t err = SUCCESS;
     switch (operand_size) {
@@ -925,13 +899,13 @@ cleanup:
 }
 
 /// the instruction points size of a relative jump using a 16/32 bit displacement.
-static pis_operand_size_t rel_jmp_ip_operand_size(const post_prefixes_ctx_t* ctx) {
+static pis_operand_size_t rel_jmp_ip_operand_size(const insn_ctx_t* ctx) {
     return near_branch_operand_default_operand_size(ctx);
 }
 
 /// masks the ip value which is the result of performing a relative jump with a 16/32 bit
 /// displacement.
-static u64 rel_jmp_mask_ip_value(const post_prefixes_ctx_t* ctx, u64 ip_value) {
+static u64 rel_jmp_mask_ip_value(const insn_ctx_t* ctx, u64 ip_value) {
     pis_operand_size_t ip_operand_size = rel_jmp_ip_operand_size(ctx);
     u64 mask = pis_operand_size_max_unsigned_value(ip_operand_size);
     return ip_value & mask;
@@ -940,7 +914,7 @@ static u64 rel_jmp_mask_ip_value(const post_prefixes_ctx_t* ctx, u64 ip_value) {
 /// fetches the displacement and calculates the target address of a relative jump with a 16/32 bit
 /// displacement.
 static err_t rel_jmp_fetch_disp_and_calc_target_addr(
-    const post_prefixes_ctx_t* ctx, pis_operand_size_t operand_size, u64* target
+    const insn_ctx_t* ctx, pis_operand_size_t operand_size, u64* target
 ) {
     err_t err = SUCCESS;
 
@@ -957,7 +931,7 @@ cleanup:
 /// fetches the displacement and calculates the target of a relative jump with a 16/32 bit
 /// displacement.
 static err_t rel_jmp_fetch_disp_and_calc_target(
-    const post_prefixes_ctx_t* ctx, pis_operand_size_t operand_size, pis_operand_t* target
+    const insn_ctx_t* ctx, pis_operand_size_t operand_size, pis_operand_t* target
 ) {
     err_t err = SUCCESS;
 
@@ -972,7 +946,7 @@ cleanup:
 
 /// emits a conditional relative jump with a 16/32bit displacement, using the given condition.
 static err_t do_cond_rel_jmp(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* cond, pis_operand_size_t operand_size
+    const insn_ctx_t* ctx, const pis_operand_t* cond, pis_operand_size_t operand_size
 ) {
     err_t err = SUCCESS;
 
@@ -988,7 +962,7 @@ cleanup:
 
 /// generates a ternary expression.
 static err_t ternary(
-    const post_prefixes_ctx_t* ctx,
+    const insn_ctx_t* ctx,
     const pis_operand_t* cond,
     const pis_operand_t* then_value,
     const pis_operand_t* else_value,
@@ -1037,7 +1011,7 @@ cleanup:
 
 /// implements a `movzx/movsx r, r/m` operation.
 static err_t do_mov_extend_r_rm(
-    const post_prefixes_ctx_t* ctx,
+    const insn_ctx_t* ctx,
     pis_opcode_t extend_opcode,
     pis_operand_size_t reg_size,
     pis_operand_size_t rm_size
@@ -1063,7 +1037,7 @@ cleanup:
 
 /// extracts the register encoding of an opcode which has a register encoded in its value.
 /// this also takes into account the `B` bit of the rex prefix of the instruction.
-static u8 opcode_reg_extract(const post_prefixes_ctx_t* ctx, u8 opcode_byte) {
+static u8 opcode_reg_extract(const insn_ctx_t* ctx, u8 opcode_byte) {
     return apply_rex_bit_to_reg_encoding(opcode_byte & 0b111, ctx->prefixes->rex.b);
 }
 
@@ -1074,7 +1048,7 @@ static u8 opcode_reg_opcode_only(u8 opcode_byte) {
 }
 
 /// pushes the given operand to the stack.
-static err_t push(const post_prefixes_ctx_t* ctx, const pis_operand_t* operand_to_push) {
+static err_t push(const insn_ctx_t* ctx, const pis_operand_t* operand_to_push) {
     err_t err = SUCCESS;
 
     pis_operand_t sp = ctx->lift_ctx->sp;
@@ -1099,7 +1073,7 @@ cleanup:
 
 /// fetches an immediate operand of the given size.
 static err_t fetch_imm_operand_of_size(
-    const post_prefixes_ctx_t* ctx, pis_operand_size_t size, pis_operand_t* operand
+    const insn_ctx_t* ctx, pis_operand_size_t size, pis_operand_t* operand
 ) {
     err_t err = SUCCESS;
     switch (size) {
@@ -1122,8 +1096,8 @@ cleanup:
     return err;
 }
 
-/// fetches an immediate of the given size.
-static err_t fetch_imm_of_size(const post_prefixes_ctx_t* ctx, op_size_t size, u64* operand) {
+/// fetches and immediate of the given size and zero extends it.
+static err_t fetch_imm_of_size_zext(const insn_ctx_t* ctx, op_size_t size, u64* operand) {
     err_t err = SUCCESS;
     switch (size) {
     case OP_SIZE_8:
@@ -1145,9 +1119,32 @@ cleanup:
     return err;
 }
 
+/// fetches and immediate of the given size and sign extends it.
+static err_t fetch_imm_of_size_sext(const insn_ctx_t* ctx, op_size_t size, u64* operand) {
+    err_t err = SUCCESS;
+    switch (size) {
+    case OP_SIZE_8:
+        *operand = (i64) (i8) LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        break;
+    case OP_SIZE_16:
+        *operand = (i64) (i16) LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
+        break;
+    case OP_SIZE_32:
+        *operand = (i64) (i32) LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+        break;
+    case OP_SIZE_64:
+        *operand = LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx);
+        break;
+    default:
+        UNREACHABLE();
+    }
+cleanup:
+    return err;
+}
+
 /// fetches a 16/32 bit immediate operand and sign extends it to the given operand size.
 static err_t fetch_imm_of_size_sign_extended(
-    const post_prefixes_ctx_t* ctx, pis_operand_size_t operand_size, pis_operand_t* operand
+    const insn_ctx_t* ctx, pis_operand_size_t operand_size, pis_operand_t* operand
 ) {
     err_t err = SUCCESS;
 
@@ -1172,7 +1169,7 @@ cleanup:
 
 /// generates a ternary expression with conditional expressions.
 static err_t cond_expr_ternary(
-    const post_prefixes_ctx_t* ctx,
+    const insn_ctx_t* ctx,
     const pis_operand_t* cond,
     const pis_operand_t* then_value,
     const pis_operand_t* else_value,
@@ -1203,7 +1200,7 @@ cleanup:
 /// calculates the carry flag of a `SHL` operation. `to_shift` is the value to be shifted, `count`
 /// is the masked shift count.
 static err_t shl_calc_carry_flag(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* to_shift, const pis_operand_t* count
+    const insn_ctx_t* ctx, const pis_operand_t* to_shift, const pis_operand_t* count
 ) {
     err_t err = SUCCESS;
 
@@ -1250,7 +1247,7 @@ cleanup:
 /// calculates the carry flag of a `SHR` operation. `to_shift` is the value to be shifted, `count`
 /// is the masked shift count.
 static err_t shr_calc_carry_flag(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* to_shift, const pis_operand_t* count
+    const insn_ctx_t* ctx, const pis_operand_t* to_shift, const pis_operand_t* count
 ) {
     err_t err = SUCCESS;
 
@@ -1293,7 +1290,7 @@ cleanup:
 /// this must be called after calculating the `CF` flag accordingly, since its calculation relies on
 /// the `CF` value.
 static err_t shl_calc_overflow_flag(
-    const post_prefixes_ctx_t* ctx,
+    const insn_ctx_t* ctx,
     const pis_operand_t* to_shift,
     const pis_operand_t* count,
     const pis_operand_t* shift_result
@@ -1330,7 +1327,7 @@ cleanup:
 /// calculates the overflow flag of a `SHLD` operation. `to_shift` is the value to be shifted,
 /// `count` is the masked shift count.
 static err_t shld_calc_overflow_flag(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* to_shift, const pis_operand_t* count
+    const insn_ctx_t* ctx, const pis_operand_t* to_shift, const pis_operand_t* count
 ) {
     err_t err = SUCCESS;
 
@@ -1374,7 +1371,7 @@ cleanup:
 /// appropriate flag registers. `count` is the masked shift count, and `shift_result` is the shifted
 /// value.
 static err_t shift_calc_parity_zero_sign_flags(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* count, const pis_operand_t* shift_result
+    const insn_ctx_t* ctx, const pis_operand_t* count, const pis_operand_t* shift_result
 ) {
     err_t err = SUCCESS;
 
@@ -1407,7 +1404,7 @@ cleanup:
 /// masks the `count` operand of a shift operation. in x86, the `count` operand of shift operations
 /// is always first masked before being applied.
 static err_t mask_shift_count(
-    const post_prefixes_ctx_t* ctx,
+    const insn_ctx_t* ctx,
     const pis_operand_t* count,
     const pis_operand_t* masked_count,
     pis_operand_size_t operand_size
@@ -1431,10 +1428,7 @@ cleanup:
 /// performs a `SHL` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
 static err_t binop_shl(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* a,
-    const pis_operand_t* b,
-    pis_operand_t* result
+    const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -1464,7 +1458,7 @@ cleanup:
 
 /// performs a `SHLD` operation.
 static err_t do_shld(
-    const post_prefixes_ctx_t* ctx,
+    const insn_ctx_t* ctx,
     const pis_operand_t* dst,
     const pis_operand_t* src,
     const pis_operand_t* count_operand,
@@ -1522,7 +1516,7 @@ cleanup:
 /// calculates the overflow flag of a `SHR` operation. `to_shift` is the value to be shifted,
 /// `count` is the masked shift count.
 static err_t shr_calc_overflow_flag(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* to_shift, const pis_operand_t* count
+    const insn_ctx_t* ctx, const pis_operand_t* to_shift, const pis_operand_t* count
 ) {
     err_t err = SUCCESS;
 
@@ -1553,7 +1547,7 @@ cleanup:
 /// calculates the overflow flag of a `SAR` operation. `to_shift` is the value to be shifted,
 /// `count` is the masked shift count.
 static err_t sar_calc_overflow_flag(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* to_shift, const pis_operand_t* count
+    const insn_ctx_t* ctx, const pis_operand_t* to_shift, const pis_operand_t* count
 ) {
     err_t err = SUCCESS;
 
@@ -1583,10 +1577,7 @@ cleanup:
 /// performs a `SHR` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
 static err_t binop_shr(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* a,
-    const pis_operand_t* b,
-    pis_operand_t* result
+    const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -1618,10 +1609,7 @@ cleanup:
 /// performs a `SAR` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
 static err_t binop_sar(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* a,
-    const pis_operand_t* b,
-    pis_operand_t* result
+    const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -1653,10 +1641,7 @@ cleanup:
 /// performs a `ROL` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
 static err_t binop_rol(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* a,
-    const pis_operand_t* b,
-    pis_operand_t* result
+    const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -1711,7 +1696,7 @@ cleanup:
 
 /// pushes the current instruction pointer value. this takes into account the effective operand
 /// sizes of the instruction.
-static err_t push_ip(const post_prefixes_ctx_t* ctx) {
+static err_t push_ip(const insn_ctx_t* ctx) {
     err_t err = SUCCESS;
     u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
     u64 push_value = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr);
@@ -1725,7 +1710,7 @@ cleanup:
 /// peforms a division operation that operates on the `ax` and `dx` operands and stores its
 /// results in the `ax` and `dx` operands.
 static err_t do_div_ax_dx(
-    const post_prefixes_ctx_t* ctx, pis_operand_size_t operand_size, const pis_operand_t* divisor
+    const insn_ctx_t* ctx, pis_operand_size_t operand_size, const pis_operand_t* divisor
 ) {
     err_t err = SUCCESS;
 
@@ -1824,9 +1809,8 @@ cleanup:
 
 /// peforms a multiplication operation that operates on the `ax` operand and stores its
 /// result in the `ax` and `dx` operands.
-static err_t do_mul_ax(
-    const post_prefixes_ctx_t* ctx, pis_operand_size_t operand_size, const pis_operand_t* factor
-) {
+static err_t
+    do_mul_ax(const insn_ctx_t* ctx, pis_operand_size_t operand_size, const pis_operand_t* factor) {
     err_t err = SUCCESS;
 
     CHECK(factor->size == operand_size);
@@ -1914,8 +1898,7 @@ cleanup:
 /// calculates the given binary operation with the `ax` register of appropriate size as its first
 /// operand, and an immediate operand of appropriate size as its second operand. returns an operand
 /// containing the result in `result`.
-static err_t
-    calc_binop_ax_imm(const post_prefixes_ctx_t* ctx, binop_fn_t binop, pis_operand_t* result) {
+static err_t calc_binop_ax_imm(const insn_ctx_t* ctx, binop_fn_t binop, pis_operand_t* result) {
     err_t err = SUCCESS;
 
     pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
@@ -1934,7 +1917,7 @@ cleanup:
 /// calculates the given binary operation with the `ax` register of appropriate size as its first
 /// operand, and an immediate operand of appropriate size as its second operand. stores the result
 /// of the operation in the `ax` operand.
-static err_t calc_and_store_binop_ax_imm(const post_prefixes_ctx_t* ctx, binop_fn_t binop) {
+static err_t calc_and_store_binop_ax_imm(const insn_ctx_t* ctx, binop_fn_t binop) {
     err_t err = SUCCESS;
 
     pis_operand_t res = {};
@@ -1949,9 +1932,7 @@ cleanup:
 
 /// performs a `BT` operation with the first operand being a memory operand.
 static err_t do_bt_memory(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* bit_base_addr,
-    const pis_operand_t* bit_offset
+    const insn_ctx_t* ctx, const pis_operand_t* bit_base_addr, const pis_operand_t* bit_offset
 ) {
     err_t err = SUCCESS;
 
@@ -2030,9 +2011,7 @@ cleanup:
 
 /// performs a `BT` operation with the first operand being a register operand.
 static err_t do_bt_reg(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* bit_base_reg,
-    const pis_operand_t* bit_offset
+    const insn_ctx_t* ctx, const pis_operand_t* bit_base_reg, const pis_operand_t* bit_offset
 ) {
     err_t err = SUCCESS;
 
@@ -2054,9 +2033,7 @@ cleanup:
 
 /// performs a `BT` operation with the first operand being an rm operand.
 static err_t do_bt_rm(
-    const post_prefixes_ctx_t* ctx,
-    const modrm_rm_operand_t* bit_base,
-    const pis_operand_t* bit_offset
+    const insn_ctx_t* ctx, const modrm_rm_operand_t* bit_base, const pis_operand_t* bit_offset
 ) {
     err_t err = SUCCESS;
 
@@ -2071,7 +2048,7 @@ cleanup:
 }
 
 /// lift an instruction according to its second opcode byte
-static err_t lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_opcode_byte) {
+static err_t lift_second_opcode_byte(const insn_ctx_t* ctx, u8 second_opcode_byte) {
     err_t err = SUCCESS;
     modrm_operands_t modrm_operands = {};
 
@@ -2207,7 +2184,7 @@ cleanup:
 }
 
 /// lift an instruction according to its first opcode byte
-static err_t lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opcode_byte) {
+static err_t lift_first_opcode_byte(const insn_ctx_t* ctx, u8 first_opcode_byte) {
     err_t err = SUCCESS;
     modrm_operands_t modrm_operands = {};
 
@@ -3018,13 +2995,12 @@ cleanup:
 }
 
 /// returns the group 1 prefix of the current instruction.
-static legacy_prefix_t group1_prefix(const post_prefixes_ctx_t* ctx) {
+static legacy_prefix_t group1_prefix(const insn_ctx_t* ctx) {
     return ctx->prefixes->legacy.by_group[LEGACY_PREFIX_GROUP_1];
 }
 
 /// lift an instruction with a REP or a BND prefix according to its second opcode byte
-static err_t
-    rep_or_bnd_lift_second_opcode_byte(const post_prefixes_ctx_t* ctx, u8 second_opcode_byte) {
+static err_t rep_or_bnd_lift_second_opcode_byte(const insn_ctx_t* ctx, u8 second_opcode_byte) {
     err_t err = SUCCESS;
 
     if (second_opcode_byte == 0x1e) {
@@ -3058,7 +3034,7 @@ typedef struct {
 /// begin implementing a rep loop. this emits the first half of the rep loop which is at the start
 /// of the lifted instruction. after calling this, you should emit your logic for a single iteration
 /// of the loop, and then call the rep end function to emit the second half of the rep loop.
-static err_t rep_begin(const post_prefixes_ctx_t* ctx, rep_ctx_t* rep_ctx) {
+static err_t rep_begin(const insn_ctx_t* ctx, rep_ctx_t* rep_ctx) {
     err_t err = SUCCESS;
 
     // save the instruction index at the start of the loop so that we can jump to it later.
@@ -3095,7 +3071,7 @@ cleanup:
 /// emits the second half of the rep loop, at the end of the instruction. this should be called
 /// after calling the rep begin function and after emitting your code for a single iteration of the
 /// rep loop.
-static err_t rep_end(const post_prefixes_ctx_t* ctx, const rep_ctx_t* rep_ctx) {
+static err_t rep_end(const insn_ctx_t* ctx, const rep_ctx_t* rep_ctx) {
     err_t err = SUCCESS;
 
 
@@ -3117,7 +3093,7 @@ cleanup:
     return err;
 }
 
-static err_t do_movs(const post_prefixes_ctx_t* ctx, pis_operand_size_t operand_size) {
+static err_t do_movs(const insn_ctx_t* ctx, pis_operand_size_t operand_size) {
     err_t err = SUCCESS;
 
     // movs can only be used with a REP prefix, not a REPNE prefix.
@@ -3146,8 +3122,7 @@ cleanup:
 }
 
 /// lift an instruction with a REP or a BND prefix according to its first opcode byte
-static err_t
-    rep_or_bnd_lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opcode_byte) {
+static err_t rep_or_bnd_lift_first_opcode_byte(const insn_ctx_t* ctx, u8 first_opcode_byte) {
     err_t err = SUCCESS;
 
     if (first_opcode_byte == 0x0f) {
@@ -3172,7 +3147,7 @@ cleanup:
     return err;
 }
 
-op_size_t calc_size(const post_prefixes_ctx_t* ctx, size_t size_info_index) {
+op_size_t calc_size(const insn_ctx_t* ctx, size_t size_info_index) {
     const op_size_info_t* size_info = &op_size_infos_table[size_info_index];
     if (ctx->prefixes->rex.w) {
         return size_info->mode_64_with_rex_w;
@@ -3195,6 +3170,10 @@ static u32 op_size_to_bits(op_size_t op_size) {
     return (u32) 1 << ((u32) op_size + 3);
 }
 
+static pis_operand_size_t op_size_to_pis_operand_size(op_size_t op_size) {
+    return (u32) 1 << (u32) op_size;
+}
+
 static u64 op_size_max_unsigned_value(op_size_t op_size) {
     if (op_size == OP_SIZE_64) {
         return UINT64_MAX;
@@ -3203,8 +3182,35 @@ static u64 op_size_max_unsigned_value(op_size_t op_size) {
     }
 }
 
+static err_t get_or_fetch_modrm(insn_ctx_t* ctx, modrm_t* modrm) {
+    err_t err = SUCCESS;
+    if (!ctx->has_modrm) {
+        ctx->modrm_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+    }
+    *modrm = modrm_decode_byte(ctx->modrm_byte);
+cleanup:
+    return err;
+}
+
+static pis_operand_t decode_specific_reg(specific_reg_t reg, op_size_t size) {
+    u8 reg_encoding;
+    switch (reg) {
+    case SPECIFIC_REG_RAX:
+        reg_encoding = 0;
+        break;
+    case SPECIFIC_REG_RCX:
+        reg_encoding = 1;
+        break;
+    case SPECIFIC_REG_RDX:
+        reg_encoding = 2;
+        break;
+    }
+
+    return PIS_OPERAND_REG(reg_encoding * 8, op_size_to_pis_operand_size(size));
+}
+
 static err_t lift_op(
-    const post_prefixes_ctx_t* ctx, const op_info_t* op_info, pis_operand_t* lifted_operand
+    insn_ctx_t* ctx, u8 last_opcode_byte, const op_info_t* op_info, lifted_op_t* lifted_operand
 ) {
     err_t err = SUCCESS;
     switch (op_info->kind) {
@@ -3213,34 +3219,146 @@ static err_t lift_op(
         op_size_t extended_size = calc_size(ctx, op_info->imm.extended_size_info_index);
 
         u64 imm = 0;
-        CHECK_RETHROW(fetch_imm_of_size(ctx, encoded_size, &imm));
+        switch (op_info->imm.extend_kind) {
+        case IMM_EXT_SIGN_EXTEND:
+            CHECK_RETHROW(fetch_imm_of_size_sext(ctx, encoded_size, &imm));
+            break;
+        case IMM_EXT_ZERO_EXTEND:
+            CHECK_RETHROW(fetch_imm_of_size_zext(ctx, encoded_size, &imm));
+            break;
+        }
 
         CHECK(extended_size >= encoded_size);
 
-        if (extended_size > encoded_size && op_info->imm.extend_kind == IMM_EXT_SIGN_EXTEND) {
-            u32 encoded_size_bits = op_size_to_bits(encoded_size);
-            u64 msb = (imm >> (encoded_size_bits - 1)) & 1;
-            if (msb != 0) {
-                u64 added_bits = UINT64_MAX & (!op_size_max_unsigned_value(encoded_size));
-                imm |= added_bits;
-            }
-        }
+        imm &= op_size_max_unsigned_value(extended_size);
+
+        *lifted_operand = (lifted_op_t) {
+            .kind = LIFTED_OP_KIND_VALUE,
+            .value = PIS_OPERAND_CONST(imm, op_size_to_pis_operand_size(extended_size)),
+        };
+
         break;
     }
-    case OP_KIND_SPECIFIC_IMM:
+    case OP_KIND_SPECIFIC_IMM: {
+        u64 imm;
+
+        switch (op_info->specific_imm.value) {
+        case SPECIFIC_IMM_ZERO:
+            imm = 0;
+            break;
+        case SPECIFIC_IMM_ONE:
+            imm = 1;
+            break;
+        }
+
+        op_size_t size = calc_size(ctx, op_info->specific_imm.operand_size_info_index);
+        *lifted_operand = (lifted_op_t) {
+            .kind = LIFTED_OP_KIND_VALUE,
+            .value = PIS_OPERAND_CONST(imm, op_size_to_pis_operand_size(size)),
+        };
+
         break;
-    case OP_KIND_REG:
+    }
+    case OP_KIND_REG: {
+        u8 reg_encoding;
+        switch (op_info->reg.encoding) {
+        case REG_ENC_MODRM: {
+            modrm_t modrm = {};
+            CHECK_RETHROW(get_or_fetch_modrm(ctx, &modrm));
+            reg_encoding = apply_rex_bit_to_reg_encoding(modrm.reg, ctx->prefixes->rex.r);
+            break;
+        }
+        case REG_ENC_OPCODE:
+            reg_encoding = opcode_reg_extract(ctx, last_opcode_byte);
+            break;
+        }
+
+        op_size_t size = calc_size(ctx, op_info->reg.size_info_index);
+
+        *lifted_operand = (lifted_op_t) {
+            .kind = LIFTED_OP_KIND_WRITABLE,
+            .value =
+                reg_get_operand(reg_encoding, op_size_to_pis_operand_size(size), ctx->prefixes),
+        };
+
         break;
-    case OP_KIND_RM:
+    }
+    case OP_KIND_RM: {
+        modrm_t modrm = {};
+        CHECK_RETHROW(get_or_fetch_modrm(ctx, &modrm));
+
+        op_size_t size = calc_size(ctx, op_info->rm.size_info_index);
+
+        modrm_rm_operand_t rm_operand = {};
+        CHECK_RETHROW(
+            modrm_decode_rm_operand(ctx, &modrm, op_size_to_pis_operand_size(size), &rm_operand)
+        );
+
+        *lifted_operand = (lifted_op_t) {
+            .kind = rm_operand.is_memory ? LIFTED_OP_KIND_MEM : LIFTED_OP_KIND_WRITABLE,
+            .value = rm_operand.addr_or_reg,
+        };
+    }
+    case OP_KIND_SPECIFIC_REG: {
+        op_size_t size = calc_size(ctx, op_info->specific_reg.size_info_index);
+
+        *lifted_operand = (lifted_op_t) {
+            .kind = LIFTED_OP_KIND_WRITABLE,
+            .value = decode_specific_reg(op_info->specific_reg.reg, size),
+        };
         break;
-    case OP_KIND_SPECIFIC_REG:
+    }
+    case OP_KIND_ZEXT_SPECIFIC_REG: {
+        op_size_t size = calc_size(ctx, op_info->zext_specific_reg.size_info_index);
+        op_size_t extended_size =
+            calc_size(ctx, op_info->zext_specific_reg.extended_size_info_index);
+
+        pis_operand_t reg_operand = decode_specific_reg(op_info->zext_specific_reg.reg, size);
+
+        if (extended_size > size) {
+            pis_operand_t extended_reg =
+                LIFT_CTX_NEW_TMP(ctx->lift_ctx, op_size_to_pis_operand_size(extended_size));
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, extended_reg, reg_operand)
+            );
+            *lifted_operand = (lifted_op_t) {
+                .kind = LIFTED_OP_KIND_VALUE,
+                .value = extended_reg,
+            };
+        } else {
+            *lifted_operand = (lifted_op_t) {
+                .kind = LIFTED_OP_KIND_VALUE,
+                .value = reg_operand,
+            };
+        }
+
         break;
-    case OP_KIND_ZEXT_SPECIFIC_REG:
+    }
+    case OP_KIND_REL: {
+        // the behvaiour of relative operands with address/operand size override is weird, so don't
+        // allow it.
+        CHECK(!prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_OPERAND_SIZE_OVERRIDE));
+        CHECK(!prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_ADDRESS_SIZE_OVERRIDE));
+
+        op_size_t size = calc_size(ctx, op_info->rel.size_info_index);
+
+        u64 rel_offset = 0;
+        CHECK_RETHROW(fetch_imm_of_size_sext(ctx, size, &rel_offset));
+
+        u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
+        u64 target_addr = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr + rel_offset);
+
+        *lifted_operand = (lifted_op_t) {
+            .kind = LIFTED_OP_KIND_VALUE,
+            .value = PIS_OPERAND_RAM(target_addr, PIS_OPERAND_SIZE_1),
+        };
+
         break;
-    case OP_KIND_REL:
+    }
+    case OP_KIND_MEM_OFFSET: {
         break;
-    case OP_KIND_MEM_OFFSET:
-        break;
+    }
     case OP_KIND_IMPLICIT:
         break;
     case OP_KIND_COND:
@@ -3250,14 +3368,16 @@ cleanup:
     return err;
 }
 
-static err_t lift_regular_insn_info(const post_prefixes_ctx_t* ctx, const insn_info_t* insn_info) {
+static err_t lift_regular_insn_info(
+    insn_ctx_t* ctx, uint8_t last_opcode_byte, const insn_info_t* insn_info
+) {
     err_t err = SUCCESS;
-    pis_operand_t pis_operands[X86_TABLES_INSN_MAX_OPS] = {};
+    lifted_op_t lifted_ops[X86_TABLES_INSN_MAX_OPS] = {};
     const uint8_t* op_info_indexes = &laid_out_ops_infos_table[insn_info->regular.first_op_index];
     for (size_t i = 0; i < X86_TABLES_INSN_MAX_OPS; i++) {
         uint8_t op_info_index = op_info_indexes[i];
         const op_info_t* op_info = &op_infos_table[op_info_index];
-        CHECK_RETHROW(lift_op(ctx, op_info, &pis_operands[i]));
+        CHECK_RETHROW(lift_op(ctx, last_opcode_byte, op_info, &lifted_ops[i]));
     }
     // now what
     TODO();
@@ -3265,21 +3385,21 @@ cleanup:
     return err;
 }
 
-static err_t new_lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opcode_byte) {
+static err_t new_lift_first_opcode_byte(insn_ctx_t* ctx, u8 first_opcode_byte) {
     err_t err = SUCCESS;
     const insn_info_t* insn_info = &first_opcode_byte_table[first_opcode_byte];
     if (insn_info->mnemonic == MNEMONIC_MODRM_REG_OPCODE_EXT) {
         // modrm reg opcode ext
         TODO();
     } else {
-        CHECK_RETHROW(lift_regular_insn_info(ctx, insn_info));
+        CHECK_RETHROW(lift_regular_insn_info(ctx, first_opcode_byte, insn_info));
     }
 cleanup:
     return err;
 }
 
 /// lift the next instruction after processing its prefixes.
-static err_t post_prefixes_lift(const post_prefixes_ctx_t* ctx) {
+static err_t post_prefixes_lift(const insn_ctx_t* ctx) {
     err_t err = SUCCESS;
 
     u8 first_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
@@ -3312,7 +3432,7 @@ static err_t lift(lift_ctx_t* ctx) {
 
     CHECK_RETHROW(parse_prefixes(ctx, &prefixes));
 
-    post_prefixes_ctx_t post_prefixes_ctx = {
+    insn_ctx_t insn_ctx = {
         .lift_ctx = ctx,
         .prefixes = &prefixes,
         .addr_size = get_effective_addr_size(ctx->pis_x86_ctx->cpumode, &prefixes),
@@ -3324,7 +3444,7 @@ static err_t lift(lift_ctx_t* ctx) {
                     get_effective_operand_size(ctx->pis_x86_ctx->cpumode, &prefixes, false),
             },
     };
-    CHECK_RETHROW(post_prefixes_lift(&post_prefixes_ctx));
+    CHECK_RETHROW(post_prefixes_lift(&insn_ctx));
 
 cleanup:
     return err;

@@ -21,9 +21,8 @@ sib_t sib_decode_byte(u8 sib_byte) {
     };
 }
 
-static err_t build_sib_addr_into(
-    const post_prefixes_ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into
-) {
+static err_t
+    build_sib_addr_into(const insn_ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into) {
     err_t err = SUCCESS;
     sib_t sib = sib_decode_byte(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx));
 
@@ -71,7 +70,7 @@ cleanup:
 }
 
 static err_t build_modrm_rm_addr_16_into(
-    const post_prefixes_ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into
+    const insn_ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into
 ) {
     err_t err = SUCCESS;
 
@@ -149,7 +148,7 @@ cleanup:
 }
 
 static err_t build_modrm_rm_addr_32_into(
-    const post_prefixes_ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into
+    const insn_ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into
 ) {
     err_t err = SUCCESS;
 
@@ -205,7 +204,7 @@ cleanup:
 }
 
 static err_t build_modrm_rm_addr_64_into(
-    const post_prefixes_ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into
+    const insn_ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into
 ) {
     err_t err = SUCCESS;
 
@@ -272,7 +271,7 @@ cleanup:
 }
 
 static err_t build_modrm_rm_addr_into(
-    const post_prefixes_ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into
+    const insn_ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into
 ) {
     err_t err = SUCCESS;
 
@@ -297,7 +296,7 @@ cleanup:
 }
 
 err_t modrm_decode_rm_operand(
-    const post_prefixes_ctx_t* ctx,
+    const insn_ctx_t* ctx,
     const modrm_t* modrm,
     pis_operand_size_t operand_size,
     modrm_rm_operand_t* rm_operand
@@ -332,7 +331,7 @@ cleanup:
 }
 
 err_t modrm_fetch_and_process_with_operand_sizes(
-    const post_prefixes_ctx_t* ctx,
+    const insn_ctx_t* ctx,
     modrm_operands_t* operands,
     pis_operand_size_t rm_size,
     pis_operand_size_t reg_size
@@ -365,7 +364,7 @@ cleanup:
     return err;
 }
 
-err_t modrm_fetch_and_process(const post_prefixes_ctx_t* ctx, modrm_operands_t* operands) {
+err_t modrm_fetch_and_process(const insn_ctx_t* ctx, modrm_operands_t* operands) {
     err_t err = SUCCESS;
 
     pis_operand_size_t operand_size = ctx->operand_sizes.insn_default_not_64_bit;
@@ -378,9 +377,7 @@ cleanup:
 }
 
 err_t modrm_rm_write(
-    const post_prefixes_ctx_t* ctx,
-    const modrm_rm_operand_t* rm_operand,
-    const pis_operand_t* to_write
+    const insn_ctx_t* ctx, const modrm_rm_operand_t* rm_operand, const pis_operand_t* to_write
 ) {
     err_t err = SUCCESS;
 
@@ -398,9 +395,7 @@ cleanup:
 }
 
 err_t modrm_rm_read(
-    const post_prefixes_ctx_t* ctx,
-    const pis_operand_t* read_into,
-    const modrm_rm_operand_t* rm_operand
+    const insn_ctx_t* ctx, const pis_operand_t* read_into, const modrm_rm_operand_t* rm_operand
 ) {
     err_t err = SUCCESS;
 
@@ -418,7 +413,7 @@ cleanup:
 }
 
 err_t modrm_operand_read(
-    const post_prefixes_ctx_t* ctx, const pis_operand_t* read_into, const modrm_operand_t* operand
+    const insn_ctx_t* ctx, const pis_operand_t* read_into, const modrm_operand_t* operand
 ) {
     err_t err = SUCCESS;
 
@@ -438,7 +433,7 @@ cleanup:
 }
 
 err_t modrm_operand_write(
-    const post_prefixes_ctx_t* ctx, const modrm_operand_t* operand, const pis_operand_t* to_write
+    const insn_ctx_t* ctx, const modrm_operand_t* operand, const pis_operand_t* to_write
 ) {
     err_t err = SUCCESS;
 
