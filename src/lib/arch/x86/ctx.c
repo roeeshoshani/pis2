@@ -7,6 +7,10 @@
 #include "prefixes.h"
 #include "regs.h"
 
+#include "x86_tables/types.h"
+
+#include "x86_tables/tables.c"
+
 /// the maximum value of a condition encoding.
 #define X86_COND_ENCODING_MAX_VALUE (0xf)
 
@@ -124,8 +128,6 @@ static pis_operand_size_t cpumode_get_operand_size(pis_x86_cpumode_t cpumode) {
         return PIS_OPERAND_SIZE_8;
     case PIS_X86_CPUMODE_32_BIT:
         return PIS_OPERAND_SIZE_4;
-    case PIS_X86_CPUMODE_16_BIT:
-        return PIS_OPERAND_SIZE_2;
     default:
         // unreachable
         return PIS_OPERAND_SIZE_1;
@@ -151,8 +153,6 @@ static pis_operand_size_t get_effective_operand_size(
         prefixes_contain_legacy_prefix(prefixes, LEGACY_PREFIX_OPERAND_SIZE_OVERRIDE);
 
     switch (cpumode) {
-    case PIS_X86_CPUMODE_16_BIT:
-        return has_size_override ? PIS_OPERAND_SIZE_4 : PIS_OPERAND_SIZE_2;
     case PIS_X86_CPUMODE_32_BIT:
         return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
     case PIS_X86_CPUMODE_64_BIT:
@@ -178,8 +178,6 @@ static pis_operand_size_t
         prefixes_contain_legacy_prefix(prefixes, LEGACY_PREFIX_ADDRESS_SIZE_OVERRIDE);
 
     switch (cpumode) {
-    case PIS_X86_CPUMODE_16_BIT:
-        return has_size_override ? PIS_OPERAND_SIZE_4 : PIS_OPERAND_SIZE_2;
     case PIS_X86_CPUMODE_32_BIT:
         return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
     case PIS_X86_CPUMODE_64_BIT:
@@ -1116,6 +1114,29 @@ static err_t fetch_imm_operand_of_size(
         break;
     case PIS_OPERAND_SIZE_8:
         *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_8);
+        break;
+    default:
+        UNREACHABLE();
+    }
+cleanup:
+    return err;
+}
+
+/// fetches an immediate of the given size.
+static err_t fetch_imm_of_size(const post_prefixes_ctx_t* ctx, op_size_t size, u64* operand) {
+    err_t err = SUCCESS;
+    switch (size) {
+    case OP_SIZE_8:
+        *operand = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        break;
+    case OP_SIZE_16:
+        *operand = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
+        break;
+    case OP_SIZE_32:
+        *operand = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+        break;
+    case OP_SIZE_64:
+        *operand = LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx);
         break;
     default:
         UNREACHABLE();
@@ -3146,6 +3167,112 @@ static err_t
             "unsupported first opcode byte with rep or bnd prefix: 0x%x",
             first_opcode_byte
         );
+    }
+cleanup:
+    return err;
+}
+
+op_size_t calc_size(const post_prefixes_ctx_t* ctx, size_t size_info_index) {
+    const op_size_info_t* size_info = &op_size_infos_table[size_info_index];
+    if (ctx->prefixes->rex.w) {
+        return size_info->mode_64_with_rex_w;
+    } else if (prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_OPERAND_SIZE_OVERRIDE)) {
+        return size_info->with_operand_size_override;
+    } else {
+        switch (ctx->lift_ctx->pis_x86_ctx->cpumode) {
+        case PIS_X86_CPUMODE_32_BIT:
+            return size_info->mode_32;
+        case PIS_X86_CPUMODE_64_BIT:
+            return size_info->mode_64;
+        default:
+            // unreachable
+            return OP_SIZE_8;
+        }
+    }
+}
+
+static u32 op_size_to_bits(op_size_t op_size) {
+    return (u32) 1 << ((u32) op_size + 3);
+}
+
+static u64 op_size_max_unsigned_value(op_size_t op_size) {
+    if (op_size == OP_SIZE_64) {
+        return UINT64_MAX;
+    } else {
+        return ((u64) 1 << op_size_to_bits(op_size)) - 1;
+    }
+}
+
+static err_t lift_op(
+    const post_prefixes_ctx_t* ctx, const op_info_t* op_info, pis_operand_t* lifted_operand
+) {
+    err_t err = SUCCESS;
+    switch (op_info->kind) {
+    case OP_KIND_IMM: {
+        op_size_t encoded_size = calc_size(ctx, op_info->imm.encoded_size_info_index);
+        op_size_t extended_size = calc_size(ctx, op_info->imm.extended_size_info_index);
+
+        u64 imm = 0;
+        CHECK_RETHROW(fetch_imm_of_size(ctx, encoded_size, &imm));
+
+        CHECK(extended_size >= encoded_size);
+
+        if (extended_size > encoded_size && op_info->imm.extend_kind == IMM_EXT_SIGN_EXTEND) {
+            u32 encoded_size_bits = op_size_to_bits(encoded_size);
+            u64 msb = (imm >> (encoded_size_bits - 1)) & 1;
+            if (msb != 0) {
+                u64 added_bits = UINT64_MAX & (!op_size_max_unsigned_value(encoded_size));
+                imm |= added_bits;
+            }
+        }
+        break;
+    }
+    case OP_KIND_SPECIFIC_IMM:
+        break;
+    case OP_KIND_REG:
+        break;
+    case OP_KIND_RM:
+        break;
+    case OP_KIND_SPECIFIC_REG:
+        break;
+    case OP_KIND_ZEXT_SPECIFIC_REG:
+        break;
+    case OP_KIND_REL:
+        break;
+    case OP_KIND_MEM_OFFSET:
+        break;
+    case OP_KIND_IMPLICIT:
+        break;
+    case OP_KIND_COND:
+        break;
+    }
+cleanup:
+    return err;
+}
+
+static err_t lift_regular_insn_info(const post_prefixes_ctx_t* ctx, const insn_info_t* insn_info) {
+    err_t err = SUCCESS;
+    pis_operand_t pis_operands[X86_TABLES_INSN_MAX_OPS] = {};
+    const uint8_t* op_info_indexes = &laid_out_ops_infos_table[insn_info->regular.first_op_index];
+    for (size_t i = 0; i < X86_TABLES_INSN_MAX_OPS; i++) {
+        uint8_t op_info_index = op_info_indexes[i];
+        const op_info_t* op_info = &op_infos_table[op_info_index];
+        CHECK_RETHROW(lift_op(ctx, op_info, &pis_operands[i]));
+    }
+    // now what
+    TODO();
+cleanup:
+    return err;
+}
+
+static err_t new_lift_first_opcode_byte(const post_prefixes_ctx_t* ctx, u8 first_opcode_byte) {
+    err_t err = SUCCESS;
+    const insn_info_t* insn_info = &first_opcode_byte_table[first_opcode_byte];
+    if (insn_info->mnemonic == MNEMONIC_MODRM_REG_OPCODE_EXT) {
+        // modrm reg opcode ext
+        TODO();
+    } else {
+        CHECK_RETHROW(lift_regular_insn_info(ctx, insn_info));
     }
 cleanup:
     return err;

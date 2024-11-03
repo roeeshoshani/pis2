@@ -50,6 +50,9 @@ build/%.elf:
 # shellcode support
 include makefiles/test_shellcodes.mk
 
+# x86 tables codegen
+include makefiles/x86_tables.mk
+
 # binaries
 $(TESTS_BIN): $(LIB_OBJS) $(TESTS_OBJS) $(SHELLCODE_BINS)
 $(EXAMPLE_BIN): $(LIB_OBJS) $(EXAMPLE_OBJS)
