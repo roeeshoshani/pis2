@@ -32,14 +32,24 @@ typedef struct {
 
 typedef enum {
     LIFTED_OP_KIND_VALUE,
-    LIFTED_OP_KIND_WRITABLE,
+    LIFTED_OP_KIND_WRITABLE_VALUE,
     LIFTED_OP_KIND_MEM,
 } lifted_op_kind_t;
 
 typedef struct {
+    pis_operand_t addr;
+    pis_operand_size_t size;
+} lifted_op_mem_t;
+
+typedef struct {
     lifted_op_kind_t kind;
-    pis_operand_t value;
+    union {
+        pis_operand_t value;
+        lifted_op_mem_t mem;
+    };
 } lifted_op_t;
+
+typedef err_t (*mnemonic_handler_t)(insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount);
 
 /// extracts the condition encoding of an opcode which has a condition encoded in its value.
 static u8 opcode_cond_extract(u8 opcode_byte) {
@@ -3300,7 +3310,7 @@ static err_t lift_op(
         op_size_t size = calc_size(ctx, op_info->reg.size_info_index);
 
         *lifted_operand = (lifted_op_t) {
-            .kind = LIFTED_OP_KIND_WRITABLE,
+            .kind = LIFTED_OP_KIND_WRITABLE_VALUE,
             .value =
                 reg_get_operand(reg_encoding, op_size_to_pis_operand_size(size), ctx->prefixes),
         };
@@ -3312,22 +3322,32 @@ static err_t lift_op(
         CHECK_RETHROW(get_or_fetch_modrm(ctx, &modrm));
 
         op_size_t size = calc_size(ctx, op_info->rm.size_info_index);
+        pis_operand_size_t pis_operand_size = op_size_to_pis_operand_size(size);
 
         modrm_rm_operand_t rm_operand = {};
-        CHECK_RETHROW(
-            modrm_decode_rm_operand(ctx, &modrm, op_size_to_pis_operand_size(size), &rm_operand)
-        );
+        CHECK_RETHROW(modrm_decode_rm_operand(ctx, &modrm, pis_operand_size, &rm_operand));
 
-        *lifted_operand = (lifted_op_t) {
-            .kind = rm_operand.is_memory ? LIFTED_OP_KIND_MEM : LIFTED_OP_KIND_WRITABLE,
-            .value = rm_operand.addr_or_reg,
-        };
+        if (rm_operand.is_memory) {
+            *lifted_operand = (lifted_op_t) {
+                .kind = LIFTED_OP_KIND_MEM,
+                .mem =
+                    (lifted_op_mem_t) {
+                        .addr = rm_operand.addr_or_reg,
+                        .size = pis_operand_size,
+                    },
+            };
+        } else {
+            *lifted_operand = (lifted_op_t) {
+                .kind = LIFTED_OP_KIND_WRITABLE_VALUE,
+                .value = rm_operand.addr_or_reg,
+            };
+        }
     }
     case OP_KIND_SPECIFIC_REG: {
         op_size_t size = calc_size(ctx, op_info->specific_reg.size_info_index);
 
         *lifted_operand = (lifted_op_t) {
-            .kind = LIFTED_OP_KIND_WRITABLE,
+            .kind = LIFTED_OP_KIND_WRITABLE_VALUE,
             .value = decode_specific_reg(op_info->specific_reg.reg, size),
         };
         break;
@@ -3414,6 +3434,58 @@ static err_t lift_op(
         break;
     }
     }
+cleanup:
+    return err;
+}
+
+static err_t lifted_op_read(insn_ctx_t* ctx, const lifted_op_t* op, pis_operand_t* value) {
+    err_t err = SUCCESS;
+    switch (op->kind) {
+    case LIFTED_OP_KIND_MEM: {
+        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, op->mem.size);
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_LOAD, tmp, op->mem.addr));
+        break;
+    case LIFTED_OP_KIND_VALUE:
+    case LIFTED_OP_KIND_WRITABLE_VALUE:
+        *value = op->value;
+        break;
+    }
+    }
+cleanup:
+    return err;
+}
+
+static err_t lifted_op_write(insn_ctx_t* ctx, const lifted_op_t* op, const pis_operand_t* value) {
+    err_t err = SUCCESS;
+    switch (op->kind) {
+    case LIFTED_OP_KIND_MEM: {
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_STORE, op->mem.addr, *value));
+        break;
+    case LIFTED_OP_KIND_VALUE:
+    case LIFTED_OP_KIND_WRITABLE_VALUE:
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, op->value, *value));
+        break;
+    }
+    }
+cleanup:
+    return err;
+}
+
+static err_t handle_mnemonic_add(insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 2);
+
+    pis_operand_t lhs = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &lhs));
+
+    pis_operand_t rhs = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &rhs));
+
+    pis_operand_t res = LIFT_CTX_NEW_TMP(ctx->lift_ctx, lhs.size);
+
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, res, lhs, rhs));
+
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &res));
 cleanup:
     return err;
 }
