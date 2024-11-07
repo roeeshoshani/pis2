@@ -3346,6 +3346,7 @@ static err_t lift_op(
                 .value = rm_operand.addr_or_reg,
             };
         }
+        break;
     }
     case OP_KIND_SPECIFIC_REG: {
         op_size_t size = calc_size(ctx, op_info->specific_reg.size_info_index);
