@@ -3495,21 +3495,44 @@ cleanup:
     return err;
 }
 
-static err_t handle_mnemonic_add(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+#define DEFINE_BINOP_MNEMONIC_HANDLER(NAME)                                                        \
+    static err_t handle_mnemonic_##NAME(                                                           \
+        const insn_ctx_t* ctx,                                                                     \
+        const lifted_op_t* ops,                                                                    \
+        size_t ops_amount                                                                          \
+    ) {                                                                                            \
+        err_t err = SUCCESS;                                                                       \
+        CHECK_RETHROW(handle_mnemonic_binop(ctx, ops, ops_amount, binop_##NAME));                  \
+    cleanup:                                                                                       \
+        return err;                                                                                \
+    }
+
+DEFINE_BINOP_MNEMONIC_HANDLER(add);
+DEFINE_BINOP_MNEMONIC_HANDLER(sub);
+DEFINE_BINOP_MNEMONIC_HANDLER(shr);
+DEFINE_BINOP_MNEMONIC_HANDLER(xor);
+DEFINE_BINOP_MNEMONIC_HANDLER(or);
+
+static err_t handle_mnemonic_mov(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
-    CHECK_RETHROW(handle_mnemonic_binop(ctx, ops, ops_amount, binop_add));
+    CHECK(ops_amount == 2);
+
+    pis_operand_t rhs = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &rhs));
+
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &rhs));
 cleanup:
     return err;
 }
 
 static const mnemonic_handler_t mnemonic_handler_table[] = {
-    [MNEMONIC_SHR] = NULL,
+    [MNEMONIC_SHR] = handle_mnemonic_shr,
     [MNEMONIC_STOS] = NULL,
     [MNEMONIC_LEA] = NULL,
     [MNEMONIC_RCR] = NULL,
     [MNEMONIC_CALL] = NULL,
     [MNEMONIC_LODS] = NULL,
-    [MNEMONIC_XOR] = NULL,
+    [MNEMONIC_XOR] = handle_mnemonic_xor,
     [MNEMONIC_CMPS] = NULL,
     [MNEMONIC_RET] = NULL,
     [MNEMONIC_JMP] = NULL,
@@ -3542,13 +3565,13 @@ static const mnemonic_handler_t mnemonic_handler_table[] = {
     [MNEMONIC_MOVSZ] = NULL,
     [MNEMONIC_NEG] = NULL,
     [MNEMONIC_POP] = NULL,
-    [MNEMONIC_SUB] = NULL,
+    [MNEMONIC_SUB] = handle_mnemonic_sub,
     [MNEMONIC_RCL] = NULL,
     [MNEMONIC_DIV] = NULL,
-    [MNEMONIC_OR] = NULL,
+    [MNEMONIC_OR] = handle_mnemonic_or,
     [MNEMONIC_UNSUPPORTED] = NULL,
     [MNEMONIC_XCHG] = NULL,
-    [MNEMONIC_MOV] = NULL,
+    [MNEMONIC_MOV] = handle_mnemonic_mov,
     [MNEMONIC_NOT] = NULL,
     [MNEMONIC_INC] = NULL,
     [MNEMONIC_MOVS] = NULL,
