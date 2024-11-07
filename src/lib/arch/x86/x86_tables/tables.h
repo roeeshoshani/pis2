@@ -1,15 +1,9 @@
 const op_size_info_t op_size_infos_table[] = {
     {
         .with_operand_size_override = OP_SIZE_8,
-        .mode_32 = OP_SIZE_16,
-        .mode_64 = OP_SIZE_16,
-        .mode_64_with_rex_w = OP_SIZE_32,
-    },
-    {
-        .with_operand_size_override = OP_SIZE_16,
-        .mode_32 = OP_SIZE_32,
-        .mode_64 = OP_SIZE_32,
-        .mode_64_with_rex_w = OP_SIZE_32,
+        .mode_32 = OP_SIZE_8,
+        .mode_64 = OP_SIZE_8,
+        .mode_64_with_rex_w = OP_SIZE_8,
     },
     {
         .with_operand_size_override = OP_SIZE_16,
@@ -24,24 +18,46 @@ const op_size_info_t op_size_infos_table[] = {
         .mode_64_with_rex_w = OP_SIZE_64,
     },
     {
+        .with_operand_size_override = OP_SIZE_16,
+        .mode_32 = OP_SIZE_32,
+        .mode_64 = OP_SIZE_32,
+        .mode_64_with_rex_w = OP_SIZE_32,
+    },
+    {
         .with_operand_size_override = OP_SIZE_8,
-        .mode_32 = OP_SIZE_8,
-        .mode_64 = OP_SIZE_8,
-        .mode_64_with_rex_w = OP_SIZE_8,
+        .mode_32 = OP_SIZE_16,
+        .mode_64 = OP_SIZE_16,
+        .mode_64_with_rex_w = OP_SIZE_32,
     },
 };
 const op_info_t op_infos_table[] = {
     {
-        .cond =
+        .rm =
             {
-                .kind = OP_KIND_COND,
+                .kind = OP_KIND_RM,
+                .size_info_index = 0,
             },
     },
     {
         .reg =
             {
                 .kind = OP_KIND_REG,
-                .size_info_index = 3,
+                .size_info_index = 0,
+                .encoding = REG_ENC_MODRM,
+            },
+    },
+    {
+        .rm =
+            {
+                .kind = OP_KIND_RM,
+                .size_info_index = 2,
+            },
+    },
+    {
+        .reg =
+            {
+                .kind = OP_KIND_REG,
+                .size_info_index = 2,
                 .encoding = REG_ENC_MODRM,
             },
     },
@@ -49,9 +65,33 @@ const op_info_t op_infos_table[] = {
         .imm =
             {
                 .kind = OP_KIND_IMM,
-                .encoded_size_info_index = 4,
-                .extended_size_info_index = 4,
+                .encoded_size_info_index = 0,
+                .extended_size_info_index = 0,
+                .extend_kind = IMM_EXT_SIGN_EXTEND,
+            },
+    },
+    {
+        .rel =
+            {
+                .kind = OP_KIND_REL,
+                .size_info_index = 0,
+            },
+    },
+    {
+        .imm =
+            {
+                .kind = OP_KIND_IMM,
+                .encoded_size_info_index = 0,
+                .extended_size_info_index = 0,
                 .extend_kind = IMM_EXT_ZERO_EXTEND,
+            },
+    },
+    {
+        .reg =
+            {
+                .kind = OP_KIND_REG,
+                .size_info_index = 1,
+                .encoding = REG_ENC_OPCODE,
             },
     },
     {
@@ -66,8 +106,118 @@ const op_info_t op_infos_table[] = {
         .imm =
             {
                 .kind = OP_KIND_IMM,
+                .encoded_size_info_index = 0,
+                .extended_size_info_index = 0,
+                .extend_kind = IMM_EXT_SIGN_EXTEND,
+            },
+    },
+    {
+        .specific_reg =
+            {
+                .kind = OP_KIND_SPECIFIC_REG,
+                .size_info_index = 2,
+                .reg = SPECIFIC_REG_RAX,
+            },
+    },
+    {
+        .imm =
+            {
+                .kind = OP_KIND_IMM,
                 .encoded_size_info_index = 3,
                 .extended_size_info_index = 3,
+                .extend_kind = IMM_EXT_SIGN_EXTEND,
+            },
+    },
+    {
+        .imm =
+            {
+                .kind = OP_KIND_IMM,
+                .encoded_size_info_index = 3,
+                .extended_size_info_index = 3,
+                .extend_kind = IMM_EXT_SIGN_EXTEND,
+            },
+    },
+    {
+        .zext_specific_reg =
+            {
+                .kind = OP_KIND_ZEXT_SPECIFIC_REG,
+                .size_info_index = 0,
+                .extended_size_info_index = 2,
+                .reg = SPECIFIC_REG_RCX,
+            },
+    },
+    {
+        .implicit =
+            {
+                .kind = OP_KIND_IMPLICIT,
+                .size_info_index = 2,
+            },
+    },
+    {
+        .implicit =
+            {
+                .kind = OP_KIND_IMPLICIT,
+                .size_info_index = 0,
+            },
+    },
+    {
+        .mem_offset =
+            {
+                .kind = OP_KIND_MEM_OFFSET,
+                .mem_operand_size_info_index = 2,
+            },
+    },
+    {
+        .cond =
+            {
+                .kind = OP_KIND_COND,
+            },
+    },
+    {
+        .mem_offset =
+            {
+                .kind = OP_KIND_MEM_OFFSET,
+                .mem_operand_size_info_index = 0,
+            },
+    },
+    {
+        .reg =
+            {
+                .kind = OP_KIND_REG,
+                .size_info_index = 2,
+                .encoding = REG_ENC_OPCODE,
+            },
+    },
+    {
+        .specific_imm =
+            {
+                .kind = OP_KIND_SPECIFIC_IMM,
+                .operand_size_info_index = 0,
+                .value = SPECIFIC_IMM_ONE,
+            },
+    },
+    {
+        .rel =
+            {
+                .kind = OP_KIND_REL,
+                .size_info_index = 1,
+            },
+    },
+    {
+        .imm =
+            {
+                .kind = OP_KIND_IMM,
+                .encoded_size_info_index = 0,
+                .extended_size_info_index = 0,
+                .extend_kind = IMM_EXT_SIGN_EXTEND,
+            },
+    },
+    {
+        .imm =
+            {
+                .kind = OP_KIND_IMM,
+                .encoded_size_info_index = 2,
+                .extended_size_info_index = 2,
                 .extend_kind = IMM_EXT_ZERO_EXTEND,
             },
     },
@@ -75,204 +225,54 @@ const op_info_t op_infos_table[] = {
         .specific_reg =
             {
                 .kind = OP_KIND_SPECIFIC_REG,
-                .size_info_index = 3,
-                .reg = SPECIFIC_REG_RAX,
-            },
-    },
-    {
-        .implicit =
-            {
-                .kind = OP_KIND_IMPLICIT,
-                .size_info_index = 4,
-            },
-    },
-    {
-        .imm =
-            {
-                .kind = OP_KIND_IMM,
-                .encoded_size_info_index = 4,
-                .extended_size_info_index = 4,
-                .extend_kind = IMM_EXT_SIGN_EXTEND,
-            },
-    },
-    {
-        .rel =
-            {
-                .kind = OP_KIND_REL,
-                .size_info_index = 4,
-            },
-    },
-    {
-        .reg =
-            {
-                .kind = OP_KIND_REG,
-                .size_info_index = 2,
-                .encoding = REG_ENC_OPCODE,
-            },
-    },
-    {
-        .rm =
-            {
-                .kind = OP_KIND_RM,
-                .size_info_index = 4,
-            },
-    },
-    {
-        .rm =
-            {
-                .kind = OP_KIND_RM,
-                .size_info_index = 3,
-            },
-    },
-    {
-        .reg =
-            {
-                .kind = OP_KIND_REG,
-                .size_info_index = 3,
-                .encoding = REG_ENC_OPCODE,
-            },
-    },
-    {
-        .zext_specific_reg =
-            {
-                .kind = OP_KIND_ZEXT_SPECIFIC_REG,
-                .size_info_index = 4,
-                .extended_size_info_index = 3,
-                .reg = SPECIFIC_REG_RCX,
-            },
-    },
-    {
-        .imm =
-            {
-                .kind = OP_KIND_IMM,
-                .encoded_size_info_index = 4,
-                .extended_size_info_index = 4,
-                .extend_kind = IMM_EXT_SIGN_EXTEND,
-            },
-    },
-    {
-        .imm =
-            {
-                .kind = OP_KIND_IMM,
-                .encoded_size_info_index = 1,
-                .extended_size_info_index = 1,
-                .extend_kind = IMM_EXT_SIGN_EXTEND,
-            },
-    },
-    {
-        .rm =
-            {
-                .kind = OP_KIND_RM,
-                .size_info_index = 2,
-            },
-    },
-    {
-        .specific_reg =
-            {
-                .kind = OP_KIND_SPECIFIC_REG,
                 .size_info_index = 4,
                 .reg = SPECIFIC_REG_RAX,
-            },
-    },
-    {
-        .mem_offset =
-            {
-                .kind = OP_KIND_MEM_OFFSET,
-                .mem_operand_size_info_index = 3,
-            },
-    },
-    {
-        .reg =
-            {
-                .kind = OP_KIND_REG,
-                .size_info_index = 4,
-                .encoding = REG_ENC_MODRM,
             },
     },
     {
         .specific_imm =
             {
                 .kind = OP_KIND_SPECIFIC_IMM,
-                .operand_size_info_index = 3,
+                .operand_size_info_index = 2,
                 .value = SPECIFIC_IMM_ONE,
-            },
-    },
-    {
-        .imm =
-            {
-                .kind = OP_KIND_IMM,
-                .encoded_size_info_index = 4,
-                .extended_size_info_index = 4,
-                .extend_kind = IMM_EXT_SIGN_EXTEND,
-            },
-    },
-    {
-        .mem_offset =
-            {
-                .kind = OP_KIND_MEM_OFFSET,
-                .mem_operand_size_info_index = 4,
-            },
-    },
-    {
-        .imm =
-            {
-                .kind = OP_KIND_IMM,
-                .encoded_size_info_index = 1,
-                .extended_size_info_index = 1,
-                .extend_kind = IMM_EXT_SIGN_EXTEND,
             },
     },
     {
         .specific_reg =
             {
                 .kind = OP_KIND_SPECIFIC_REG,
-                .size_info_index = 3,
+                .size_info_index = 2,
                 .reg = SPECIFIC_REG_RDX,
             },
     },
     {
-        .rel =
+        .reg =
             {
-                .kind = OP_KIND_REL,
-                .size_info_index = 2,
+                .kind = OP_KIND_REG,
+                .size_info_index = 0,
+                .encoding = REG_ENC_OPCODE,
             },
     },
     {
-        .implicit =
+        .rm =
             {
-                .kind = OP_KIND_IMPLICIT,
-                .size_info_index = 3,
-            },
-    },
-    {
-        .specific_imm =
-            {
-                .kind = OP_KIND_SPECIFIC_IMM,
-                .operand_size_info_index = 4,
-                .value = SPECIFIC_IMM_ONE,
+                .kind = OP_KIND_RM,
+                .size_info_index = 1,
             },
     },
     {
         .specific_reg =
             {
                 .kind = OP_KIND_SPECIFIC_REG,
-                .size_info_index = 4,
+                .size_info_index = 0,
                 .reg = SPECIFIC_REG_RCX,
-            },
-    },
-    {
-        .reg =
-            {
-                .kind = OP_KIND_REG,
-                .size_info_index = 4,
-                .encoding = REG_ENC_OPCODE,
             },
     },
 };
 const uint8_t laid_out_ops_infos_table[] = {
-    19, 10, 18, 5,  10, 21, 10, 10, 27, 8,  17, 22, 11, 20, 5,  12, 11, 1,  11, 13, 16, 12,
-    4,  25, 1,  11, 9,  26, 0,  8,  1,  11, 15, 17, 21, 6,  23, 11, 2,  29, 21, 10, 28, 12,
-    5,  15, 7,  5,  18, 11, 11, 14, 1,  11, 14, 10, 19, 24, 5,  22, 17, 5,  3,  11, 15,
+    0,  1,  2,  3,  1,  0,  3, 2,  8,  9, 10, 11, 2,  13, 14, 15, 16, 10, 18, 8,  0,  9,
+    10, 16, 8,  18, 26, 10, 0, 29, 27, 9, 19, 23, 2,  11, 0,  2,  2,  4,  17, 5,  10, 24,
+    2,  25, 10, 19, 7,  2,  6, 19, 21, 0, 20, 28, 12, 3,  2,  4,  22, 3,  2,  11, 5,
 };
 const insn_info_t
     first_opcode_byte_table[] =
@@ -281,22 +281,6 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_ADD,
-                        .first_op_index = 55,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_ADD,
-                        .first_op_index = 16,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_ADD,
                         .first_op_index = 0,
                         .ops_amount = 2,
                     },
@@ -305,7 +289,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_ADD,
-                        .first_op_index = 24,
+                        .first_op_index = 2,
                         .ops_amount = 2,
                     },
             },
@@ -313,7 +297,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_ADD,
-                        .first_op_index = 33,
+                        .first_op_index = 4,
                         .ops_amount = 2,
                     },
             },
@@ -321,7 +305,23 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_ADD,
-                        .first_op_index = 44,
+                        .first_op_index = 6,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_ADD,
+                        .first_op_index = 8,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_ADD,
+                        .first_op_index = 10,
                         .ops_amount = 2,
                     },
             },
@@ -329,7 +329,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -337,7 +337,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -345,22 +345,6 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_OR,
-                        .first_op_index = 55,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_OR,
-                        .first_op_index = 16,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_OR,
                         .first_op_index = 0,
                         .ops_amount = 2,
                     },
@@ -369,7 +353,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_OR,
-                        .first_op_index = 24,
+                        .first_op_index = 2,
                         .ops_amount = 2,
                     },
             },
@@ -377,7 +361,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_OR,
-                        .first_op_index = 33,
+                        .first_op_index = 4,
                         .ops_amount = 2,
                     },
             },
@@ -385,7 +369,23 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_OR,
-                        .first_op_index = 44,
+                        .first_op_index = 6,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_OR,
+                        .first_op_index = 8,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_OR,
+                        .first_op_index = 10,
                         .ops_amount = 2,
                     },
             },
@@ -393,7 +393,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -401,24 +401,8 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_ADC,
-                        .first_op_index = 55,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_ADC,
-                        .first_op_index = 16,
-                        .ops_amount = 2,
                     },
             },
             {
@@ -433,7 +417,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_ADC,
-                        .first_op_index = 24,
+                        .first_op_index = 2,
                         .ops_amount = 2,
                     },
             },
@@ -441,7 +425,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_ADC,
-                        .first_op_index = 33,
+                        .first_op_index = 4,
                         .ops_amount = 2,
                     },
             },
@@ -449,7 +433,23 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_ADC,
-                        .first_op_index = 44,
+                        .first_op_index = 6,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_ADC,
+                        .first_op_index = 8,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_ADC,
+                        .first_op_index = 10,
                         .ops_amount = 2,
                     },
             },
@@ -457,7 +457,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -465,24 +465,8 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_SBB,
-                        .first_op_index = 55,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_SBB,
-                        .first_op_index = 16,
-                        .ops_amount = 2,
                     },
             },
             {
@@ -497,7 +481,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_SBB,
-                        .first_op_index = 24,
+                        .first_op_index = 2,
                         .ops_amount = 2,
                     },
             },
@@ -505,7 +489,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_SBB,
-                        .first_op_index = 33,
+                        .first_op_index = 4,
                         .ops_amount = 2,
                     },
             },
@@ -513,7 +497,23 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_SBB,
-                        .first_op_index = 44,
+                        .first_op_index = 6,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_SBB,
+                        .first_op_index = 8,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_SBB,
+                        .first_op_index = 10,
                         .ops_amount = 2,
                     },
             },
@@ -521,7 +521,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -529,24 +529,8 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_AND,
-                        .first_op_index = 55,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_AND,
-                        .first_op_index = 16,
-                        .ops_amount = 2,
                     },
             },
             {
@@ -561,7 +545,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_AND,
-                        .first_op_index = 24,
+                        .first_op_index = 2,
                         .ops_amount = 2,
                     },
             },
@@ -569,7 +553,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_AND,
-                        .first_op_index = 33,
+                        .first_op_index = 4,
                         .ops_amount = 2,
                     },
             },
@@ -577,7 +561,23 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_AND,
-                        .first_op_index = 44,
+                        .first_op_index = 6,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_AND,
+                        .first_op_index = 8,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_AND,
+                        .first_op_index = 10,
                         .ops_amount = 2,
                     },
             },
@@ -585,7 +585,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -593,24 +593,8 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_SUB,
-                        .first_op_index = 55,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_SUB,
-                        .first_op_index = 16,
-                        .ops_amount = 2,
                     },
             },
             {
@@ -625,7 +609,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_SUB,
-                        .first_op_index = 24,
+                        .first_op_index = 2,
                         .ops_amount = 2,
                     },
             },
@@ -633,7 +617,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_SUB,
-                        .first_op_index = 33,
+                        .first_op_index = 4,
                         .ops_amount = 2,
                     },
             },
@@ -641,7 +625,23 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_SUB,
-                        .first_op_index = 44,
+                        .first_op_index = 6,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_SUB,
+                        .first_op_index = 8,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_SUB,
+                        .first_op_index = 10,
                         .ops_amount = 2,
                     },
             },
@@ -649,7 +649,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -657,24 +657,8 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_XOR,
-                        .first_op_index = 55,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_XOR,
-                        .first_op_index = 16,
-                        .ops_amount = 2,
                     },
             },
             {
@@ -689,7 +673,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_XOR,
-                        .first_op_index = 24,
+                        .first_op_index = 2,
                         .ops_amount = 2,
                     },
             },
@@ -697,7 +681,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_XOR,
-                        .first_op_index = 33,
+                        .first_op_index = 4,
                         .ops_amount = 2,
                     },
             },
@@ -705,7 +689,23 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_XOR,
-                        .first_op_index = 44,
+                        .first_op_index = 6,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_XOR,
+                        .first_op_index = 8,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_XOR,
+                        .first_op_index = 10,
                         .ops_amount = 2,
                     },
             },
@@ -713,7 +713,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -721,24 +721,8 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_CMP,
-                        .first_op_index = 55,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_CMP,
-                        .first_op_index = 16,
-                        .ops_amount = 2,
                     },
             },
             {
@@ -753,7 +737,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_CMP,
-                        .first_op_index = 24,
+                        .first_op_index = 2,
                         .ops_amount = 2,
                     },
             },
@@ -761,7 +745,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_CMP,
-                        .first_op_index = 33,
+                        .first_op_index = 4,
                         .ops_amount = 2,
                     },
             },
@@ -769,7 +753,23 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_CMP,
-                        .first_op_index = 44,
+                        .first_op_index = 6,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_CMP,
+                        .first_op_index = 8,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_CMP,
+                        .first_op_index = 10,
                         .ops_amount = 2,
                     },
             },
@@ -777,7 +777,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -785,7 +785,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -793,7 +793,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_INC,
-                        .first_op_index = 43,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -801,7 +801,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_INC,
-                        .first_op_index = 43,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -809,7 +809,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_INC,
-                        .first_op_index = 43,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -817,7 +817,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_INC,
-                        .first_op_index = 43,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -825,7 +825,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_INC,
-                        .first_op_index = 43,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -833,7 +833,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_INC,
-                        .first_op_index = 43,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -841,7 +841,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_INC,
-                        .first_op_index = 43,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -849,7 +849,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_INC,
-                        .first_op_index = 43,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -857,7 +857,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_DEC,
-                        .first_op_index = 43,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -865,7 +865,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_DEC,
-                        .first_op_index = 43,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -873,7 +873,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_DEC,
-                        .first_op_index = 43,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -881,7 +881,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_DEC,
-                        .first_op_index = 43,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -889,7 +889,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_DEC,
-                        .first_op_index = 43,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -897,7 +897,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_DEC,
-                        .first_op_index = 43,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -905,7 +905,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_DEC,
-                        .first_op_index = 43,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -913,7 +913,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_DEC,
-                        .first_op_index = 43,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -921,7 +921,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 26,
+                        .first_op_index = 48,
                         .ops_amount = 1,
                     },
             },
@@ -929,7 +929,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 26,
+                        .first_op_index = 48,
                         .ops_amount = 1,
                     },
             },
@@ -937,7 +937,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 26,
+                        .first_op_index = 48,
                         .ops_amount = 1,
                     },
             },
@@ -945,7 +945,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 26,
+                        .first_op_index = 48,
                         .ops_amount = 1,
                     },
             },
@@ -953,7 +953,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 26,
+                        .first_op_index = 48,
                         .ops_amount = 1,
                     },
             },
@@ -961,7 +961,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 26,
+                        .first_op_index = 48,
                         .ops_amount = 1,
                     },
             },
@@ -969,7 +969,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 26,
+                        .first_op_index = 48,
                         .ops_amount = 1,
                     },
             },
@@ -977,7 +977,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 26,
+                        .first_op_index = 48,
                         .ops_amount = 1,
                     },
             },
@@ -985,7 +985,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_POP,
-                        .first_op_index = 26,
+                        .first_op_index = 48,
                         .ops_amount = 1,
                     },
             },
@@ -993,7 +993,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_POP,
-                        .first_op_index = 26,
+                        .first_op_index = 48,
                         .ops_amount = 1,
                     },
             },
@@ -1001,7 +1001,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_POP,
-                        .first_op_index = 26,
+                        .first_op_index = 48,
                         .ops_amount = 1,
                     },
             },
@@ -1009,7 +1009,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_POP,
-                        .first_op_index = 26,
+                        .first_op_index = 48,
                         .ops_amount = 1,
                     },
             },
@@ -1017,7 +1017,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_POP,
-                        .first_op_index = 26,
+                        .first_op_index = 48,
                         .ops_amount = 1,
                     },
             },
@@ -1025,7 +1025,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_POP,
-                        .first_op_index = 26,
+                        .first_op_index = 48,
                         .ops_amount = 1,
                     },
             },
@@ -1033,7 +1033,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_POP,
-                        .first_op_index = 26,
+                        .first_op_index = 48,
                         .ops_amount = 1,
                     },
             },
@@ -1041,7 +1041,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_POP,
-                        .first_op_index = 26,
+                        .first_op_index = 48,
                         .ops_amount = 1,
                     },
             },
@@ -1049,7 +1049,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1057,7 +1057,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1065,7 +1065,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1073,7 +1073,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1081,7 +1081,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1089,7 +1089,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1097,7 +1097,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1105,7 +1105,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1113,7 +1113,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 36,
+                        .first_op_index = 56,
                         .ops_amount = 1,
                     },
             },
@@ -1121,7 +1121,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_IMUL,
-                        .first_op_index = 30,
+                        .first_op_index = 61,
                         .ops_amount = 3,
                     },
             },
@@ -1129,7 +1129,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 46,
+                        .first_op_index = 60,
                         .ops_amount = 1,
                     },
             },
@@ -1137,7 +1137,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_IMUL,
-                        .first_op_index = 52,
+                        .first_op_index = 57,
                         .ops_amount = 3,
                     },
             },
@@ -1145,7 +1145,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1153,7 +1153,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1161,7 +1161,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1169,7 +1169,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1177,7 +1177,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JCC,
-                        .first_op_index = 28,
+                        .first_op_index = 40,
                         .ops_amount = 2,
                     },
             },
@@ -1185,7 +1185,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JCC,
-                        .first_op_index = 28,
+                        .first_op_index = 40,
                         .ops_amount = 2,
                     },
             },
@@ -1193,7 +1193,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JCC,
-                        .first_op_index = 28,
+                        .first_op_index = 40,
                         .ops_amount = 2,
                     },
             },
@@ -1201,7 +1201,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JCC,
-                        .first_op_index = 28,
+                        .first_op_index = 40,
                         .ops_amount = 2,
                     },
             },
@@ -1209,7 +1209,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JCC,
-                        .first_op_index = 28,
+                        .first_op_index = 40,
                         .ops_amount = 2,
                     },
             },
@@ -1217,7 +1217,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JCC,
-                        .first_op_index = 28,
+                        .first_op_index = 40,
                         .ops_amount = 2,
                     },
             },
@@ -1225,7 +1225,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JCC,
-                        .first_op_index = 28,
+                        .first_op_index = 40,
                         .ops_amount = 2,
                     },
             },
@@ -1233,7 +1233,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JCC,
-                        .first_op_index = 28,
+                        .first_op_index = 40,
                         .ops_amount = 2,
                     },
             },
@@ -1241,7 +1241,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JCC,
-                        .first_op_index = 28,
+                        .first_op_index = 40,
                         .ops_amount = 2,
                     },
             },
@@ -1249,7 +1249,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JCC,
-                        .first_op_index = 28,
+                        .first_op_index = 40,
                         .ops_amount = 2,
                     },
             },
@@ -1257,7 +1257,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JCC,
-                        .first_op_index = 28,
+                        .first_op_index = 40,
                         .ops_amount = 2,
                     },
             },
@@ -1265,7 +1265,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JCC,
-                        .first_op_index = 28,
+                        .first_op_index = 40,
                         .ops_amount = 2,
                     },
             },
@@ -1273,7 +1273,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JCC,
-                        .first_op_index = 28,
+                        .first_op_index = 40,
                         .ops_amount = 2,
                     },
             },
@@ -1281,7 +1281,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JCC,
-                        .first_op_index = 28,
+                        .first_op_index = 40,
                         .ops_amount = 2,
                     },
             },
@@ -1289,7 +1289,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JCC,
-                        .first_op_index = 28,
+                        .first_op_index = 40,
                         .ops_amount = 2,
                     },
             },
@@ -1297,7 +1297,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JCC,
-                        .first_op_index = 28,
+                        .first_op_index = 40,
                         .ops_amount = 2,
                     },
             },
@@ -1305,117 +1305,7 @@ const insn_info_t
                 .modrm_reg_opcode_ext =
                     {
                         .mnemonic = MNEMONIC_MODRM_REG_OPCODE_EXT,
-                        .modrm_reg_table_index = 10,
-                    },
-            },
-            {
-                .modrm_reg_opcode_ext =
-                    {
-                        .mnemonic = MNEMONIC_MODRM_REG_OPCODE_EXT,
-                        .modrm_reg_table_index = 14,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
-                        .ops_amount = 0,
-                    },
-            },
-            {
-                .modrm_reg_opcode_ext =
-                    {
-                        .mnemonic = MNEMONIC_MODRM_REG_OPCODE_EXT,
-                        .modrm_reg_table_index = 5,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_TEST,
-                        .first_op_index = 55,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_TEST,
-                        .first_op_index = 16,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_XCHG,
-                        .first_op_index = 55,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_XCHG,
-                        .first_op_index = 16,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 55,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 16,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 0,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 24,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
-                        .ops_amount = 0,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_LEA,
-                        .first_op_index = 24,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
-                        .ops_amount = 0,
+                        .modrm_reg_table_index = 0,
                     },
             },
             {
@@ -1428,144 +1318,47 @@ const insn_info_t
             {
                 .regular =
                     {
-                        .mnemonic = MNEMONIC_NOP,
-                        .first_op_index = 7,
-                        .ops_amount = 0,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_XCHG,
-                        .first_op_index = 14,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_XCHG,
-                        .first_op_index = 14,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_XCHG,
-                        .first_op_index = 14,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_XCHG,
-                        .first_op_index = 14,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_XCHG,
-                        .first_op_index = 14,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_XCHG,
-                        .first_op_index = 14,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_XCHG,
-                        .first_op_index = 14,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_XCHG,
-                        .first_op_index = 14,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOVSZ,
-                        .first_op_index = 61,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_CWD,
-                        .first_op_index = 57,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
+                    },
+            },
+            {
+                .modrm_reg_opcode_ext =
+                    {
+                        .mnemonic = MNEMONIC_MODRM_REG_OPCODE_EXT,
+                        .modrm_reg_table_index = 2,
                     },
             },
             {
                 .regular =
                     {
-                        .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
-                        .ops_amount = 0,
+                        .mnemonic = MNEMONIC_TEST,
+                        .first_op_index = 0,
+                        .ops_amount = 2,
                     },
             },
             {
                 .regular =
                     {
-                        .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
-                        .ops_amount = 0,
+                        .mnemonic = MNEMONIC_TEST,
+                        .first_op_index = 2,
+                        .ops_amount = 2,
                     },
             },
             {
                 .regular =
                     {
-                        .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
-                        .ops_amount = 0,
+                        .mnemonic = MNEMONIC_XCHG,
+                        .first_op_index = 0,
+                        .ops_amount = 2,
                     },
             },
             {
                 .regular =
                     {
-                        .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
-                        .ops_amount = 0,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
-                        .ops_amount = 0,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 10,
+                        .mnemonic = MNEMONIC_XCHG,
+                        .first_op_index = 2,
                         .ops_amount = 2,
                     },
             },
@@ -1573,15 +1366,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 47,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 59,
+                        .first_op_index = 0,
                         .ops_amount = 2,
                     },
             },
@@ -1596,104 +1381,8 @@ const insn_info_t
             {
                 .regular =
                     {
-                        .mnemonic = MNEMONIC_MOVS,
-                        .first_op_index = 35,
-                        .ops_amount = 1,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOVS,
-                        .first_op_index = 27,
-                        .ops_amount = 1,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_CMPS,
-                        .first_op_index = 35,
-                        .ops_amount = 1,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_CMPS,
-                        .first_op_index = 27,
-                        .ops_amount = 1,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_TEST,
-                        .first_op_index = 33,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_TEST,
-                        .first_op_index = 44,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_STOS,
-                        .first_op_index = 35,
-                        .ops_amount = 1,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_STOS,
-                        .first_op_index = 27,
-                        .ops_amount = 1,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_LODS,
-                        .first_op_index = 35,
-                        .ops_amount = 1,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_LODS,
-                        .first_op_index = 27,
-                        .ops_amount = 1,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_SCAS,
-                        .first_op_index = 35,
-                        .ops_amount = 1,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_SCAS,
-                        .first_op_index = 27,
-                        .ops_amount = 1,
-                    },
-            },
-            {
-                .regular =
-                    {
                         .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 39,
+                        .first_op_index = 4,
                         .ops_amount = 2,
                     },
             },
@@ -1701,120 +1390,32 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 39,
+                        .first_op_index = 6,
                         .ops_amount = 2,
                     },
             },
             {
                 .regular =
                     {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 39,
+                        .mnemonic = MNEMONIC_UNSUPPORTED,
+                        .first_op_index = 12,
+                        .ops_amount = 0,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_LEA,
+                        .first_op_index = 6,
                         .ops_amount = 2,
                     },
             },
             {
                 .regular =
                     {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 39,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 39,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 39,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 39,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 39,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 21,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 21,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 21,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 21,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 21,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 21,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 21,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 21,
-                        .ops_amount = 2,
+                        .mnemonic = MNEMONIC_UNSUPPORTED,
+                        .first_op_index = 12,
+                        .ops_amount = 0,
                     },
             },
             {
@@ -1825,6 +1426,398 @@ const insn_info_t
                     },
             },
             {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_NOP,
+                        .first_op_index = 12,
+                        .ops_amount = 0,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_XCHG,
+                        .first_op_index = 46,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_XCHG,
+                        .first_op_index = 46,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_XCHG,
+                        .first_op_index = 46,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_XCHG,
+                        .first_op_index = 46,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_XCHG,
+                        .first_op_index = 46,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_XCHG,
+                        .first_op_index = 46,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_XCHG,
+                        .first_op_index = 46,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_XCHG,
+                        .first_op_index = 46,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOVSZ,
+                        .first_op_index = 42,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_CWD,
+                        .first_op_index = 26,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_UNSUPPORTED,
+                        .first_op_index = 12,
+                        .ops_amount = 0,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_UNSUPPORTED,
+                        .first_op_index = 12,
+                        .ops_amount = 0,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_UNSUPPORTED,
+                        .first_op_index = 12,
+                        .ops_amount = 0,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_UNSUPPORTED,
+                        .first_op_index = 12,
+                        .ops_amount = 0,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_UNSUPPORTED,
+                        .first_op_index = 12,
+                        .ops_amount = 0,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_UNSUPPORTED,
+                        .first_op_index = 12,
+                        .ops_amount = 0,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 24,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 22,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 18,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 16,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOVS,
+                        .first_op_index = 15,
+                        .ops_amount = 1,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOVS,
+                        .first_op_index = 14,
+                        .ops_amount = 1,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_CMPS,
+                        .first_op_index = 15,
+                        .ops_amount = 1,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_CMPS,
+                        .first_op_index = 14,
+                        .ops_amount = 1,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_TEST,
+                        .first_op_index = 8,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_TEST,
+                        .first_op_index = 10,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_STOS,
+                        .first_op_index = 15,
+                        .ops_amount = 1,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_STOS,
+                        .first_op_index = 14,
+                        .ops_amount = 1,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_LODS,
+                        .first_op_index = 15,
+                        .ops_amount = 1,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_LODS,
+                        .first_op_index = 14,
+                        .ops_amount = 1,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_SCAS,
+                        .first_op_index = 15,
+                        .ops_amount = 1,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_SCAS,
+                        .first_op_index = 14,
+                        .ops_amount = 1,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 30,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 30,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 30,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 30,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 30,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 30,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 30,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 30,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 32,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 32,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 32,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 32,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 32,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 32,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 32,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 32,
+                        .ops_amount = 2,
+                    },
+            },
+            {
                 .modrm_reg_opcode_ext =
                     {
                         .mnemonic = MNEMONIC_MODRM_REG_OPCODE_EXT,
@@ -1832,10 +1825,17 @@ const insn_info_t
                     },
             },
             {
+                .modrm_reg_opcode_ext =
+                    {
+                        .mnemonic = MNEMONIC_MODRM_REG_OPCODE_EXT,
+                        .modrm_reg_table_index = 5,
+                    },
+            },
+            {
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1843,7 +1843,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_RET,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1851,7 +1851,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1859,7 +1859,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1867,21 +1867,21 @@ const insn_info_t
                 .modrm_reg_opcode_ext =
                     {
                         .mnemonic = MNEMONIC_MODRM_REG_OPCODE_EXT,
-                        .modrm_reg_table_index = 2,
+                        .modrm_reg_table_index = 6,
                     },
             },
             {
                 .modrm_reg_opcode_ext =
                     {
                         .mnemonic = MNEMONIC_MODRM_REG_OPCODE_EXT,
-                        .modrm_reg_table_index = 11,
+                        .modrm_reg_table_index = 7,
                     },
             },
             {
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1889,7 +1889,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1897,7 +1897,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1905,7 +1905,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1913,7 +1913,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1921,7 +1921,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1929,7 +1929,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1937,7 +1937,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1945,7 +1945,7 @@ const insn_info_t
                 .modrm_reg_opcode_ext =
                     {
                         .mnemonic = MNEMONIC_MODRM_REG_OPCODE_EXT,
-                        .modrm_reg_table_index = 0,
+                        .modrm_reg_table_index = 8,
                     },
             },
             {
@@ -1959,21 +1959,21 @@ const insn_info_t
                 .modrm_reg_opcode_ext =
                     {
                         .mnemonic = MNEMONIC_MODRM_REG_OPCODE_EXT,
-                        .modrm_reg_table_index = 7,
+                        .modrm_reg_table_index = 10,
                     },
             },
             {
                 .modrm_reg_opcode_ext =
                     {
                         .mnemonic = MNEMONIC_MODRM_REG_OPCODE_EXT,
-                        .modrm_reg_table_index = 8,
+                        .modrm_reg_table_index = 11,
                     },
             },
             {
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1981,7 +1981,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1989,7 +1989,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -1997,7 +1997,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2005,7 +2005,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2013,7 +2013,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2021,7 +2021,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2029,7 +2029,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2037,7 +2037,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2045,7 +2045,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2053,7 +2053,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2061,7 +2061,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2069,7 +2069,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2077,7 +2077,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2085,7 +2085,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2093,7 +2093,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2101,7 +2101,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2109,7 +2109,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2117,7 +2117,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2125,7 +2125,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2133,7 +2133,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_CALL,
-                        .first_op_index = 23,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -2141,7 +2141,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JMP,
-                        .first_op_index = 23,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -2149,7 +2149,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2157,7 +2157,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JMP,
-                        .first_op_index = 9,
+                        .first_op_index = 64,
                         .ops_amount = 1,
                     },
             },
@@ -2165,7 +2165,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2173,7 +2173,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2181,7 +2181,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2189,7 +2189,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2197,7 +2197,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2205,7 +2205,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2213,7 +2213,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2221,7 +2221,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2229,7 +2229,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_HLT,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2237,69 +2237,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_CMC,
-                        .first_op_index = 7,
-                        .ops_amount = 0,
-                    },
-            },
-            {
-                .modrm_reg_opcode_ext =
-                    {
-                        .mnemonic = MNEMONIC_MODRM_REG_OPCODE_EXT,
-                        .modrm_reg_table_index = 13,
-                    },
-            },
-            {
-                .modrm_reg_opcode_ext =
-                    {
-                        .mnemonic = MNEMONIC_MODRM_REG_OPCODE_EXT,
-                        .modrm_reg_table_index = 15,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_CLC,
-                        .first_op_index = 7,
-                        .ops_amount = 0,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_STC,
-                        .first_op_index = 7,
-                        .ops_amount = 0,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_CLI,
-                        .first_op_index = 7,
-                        .ops_amount = 0,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_STI,
-                        .first_op_index = 7,
-                        .ops_amount = 0,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_CLD,
-                        .first_op_index = 7,
-                        .ops_amount = 0,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_STD,
-                        .first_op_index = 7,
+                        .first_op_index = 12,
                         .ops_amount = 0,
                     },
             },
@@ -2314,7 +2252,69 @@ const insn_info_t
                 .modrm_reg_opcode_ext =
                     {
                         .mnemonic = MNEMONIC_MODRM_REG_OPCODE_EXT,
-                        .modrm_reg_table_index = 6,
+                        .modrm_reg_table_index = 13,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_CLC,
+                        .first_op_index = 12,
+                        .ops_amount = 0,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_STC,
+                        .first_op_index = 12,
+                        .ops_amount = 0,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_CLI,
+                        .first_op_index = 12,
+                        .ops_amount = 0,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_STI,
+                        .first_op_index = 12,
+                        .ops_amount = 0,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_CLD,
+                        .first_op_index = 12,
+                        .ops_amount = 0,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_STD,
+                        .first_op_index = 12,
+                        .ops_amount = 0,
+                    },
+            },
+            {
+                .modrm_reg_opcode_ext =
+                    {
+                        .mnemonic = MNEMONIC_MODRM_REG_OPCODE_EXT,
+                        .modrm_reg_table_index = 14,
+                    },
+            },
+            {
+                .modrm_reg_opcode_ext =
+                    {
+                        .mnemonic = MNEMONIC_MODRM_REG_OPCODE_EXT,
+                        .modrm_reg_table_index = 15,
                     },
             },
 };
