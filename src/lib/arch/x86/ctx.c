@@ -3223,6 +3223,7 @@ static err_t get_or_fetch_modrm(insn_ctx_t* ctx, modrm_t* modrm) {
     err_t err = SUCCESS;
     if (!ctx->has_modrm) {
         ctx->modrm_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        ctx->has_modrm = true;
     }
     *modrm = modrm_decode_byte(ctx->modrm_byte);
 cleanup:
