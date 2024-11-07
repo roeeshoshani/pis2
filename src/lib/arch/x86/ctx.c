@@ -3449,6 +3449,7 @@ static err_t lifted_op_read(const insn_ctx_t* ctx, const lifted_op_t* op, pis_op
     case LIFTED_OP_KIND_MEM: {
         pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, op->mem.size);
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_LOAD, tmp, op->mem.addr));
+        *value = tmp;
         break;
     case LIFTED_OP_KIND_VALUE:
     case LIFTED_OP_KIND_WRITABLE_VALUE:
