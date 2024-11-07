@@ -3596,6 +3596,7 @@ static err_t lift_regular_insn_info(
         CHECK_RETHROW(lift_op(ctx, last_opcode_byte, op_info, &lifted_ops[i]));
     }
     mnemonic_handler_t mnemonic_handler = mnemonic_handler_table[insn_info->mnemonic];
+    CHECK_CODE(mnemonic_handler != NULL, PIS_ERR_UNSUPPORTED_INSN);
     CHECK_RETHROW(mnemonic_handler(ctx, lifted_ops, ops_amount));
 cleanup:
     return err;
