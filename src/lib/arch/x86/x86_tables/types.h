@@ -44,15 +44,15 @@ typedef enum {
     MNEMONIC_PUSH,
     MNEMONIC_POP,
     MNEMONIC_CMPS,
-    MNEMONIC_SCAS,
-    MNEMONIC_SHR,
     MNEMONIC_LODS,
+    MNEMONIC_SHR,
     MNEMONIC_RET,
+    MNEMONIC_SCAS,
     MNEMONIC_NOP,
     MNEMONIC_CMP,
     MNEMONIC_LEA,
-    MNEMONIC_STOS,
     MNEMONIC_MOVS,
+    MNEMONIC_STOS,
     MNEMONIC_MODRM_REG_OPCODE_EXT,
 } mnemonic_t;
 typedef union __attribute__((packed)) {

@@ -8,13 +8,13 @@ const op_size_info_t op_size_infos_table[] = {
     {
         .with_operand_size_override = OP_SIZE_16,
         .mode_32 = OP_SIZE_32,
-        .mode_64 = OP_SIZE_64,
+        .mode_64 = OP_SIZE_32,
         .mode_64_with_rex_w = OP_SIZE_64,
     },
     {
         .with_operand_size_override = OP_SIZE_16,
         .mode_32 = OP_SIZE_32,
-        .mode_64 = OP_SIZE_32,
+        .mode_64 = OP_SIZE_64,
         .mode_64_with_rex_w = OP_SIZE_64,
     },
     {
@@ -50,14 +50,14 @@ const op_info_t op_infos_table[] = {
         .rm =
             {
                 .kind = OP_KIND_RM,
-                .size_info_index = 2,
+                .size_info_index = 1,
             },
     },
     {
         .reg =
             {
                 .kind = OP_KIND_REG,
-                .size_info_index = 2,
+                .size_info_index = 1,
                 .encoding = REG_ENC_MODRM,
             },
     },
@@ -83,15 +83,15 @@ const op_info_t op_infos_table[] = {
                 .kind = OP_KIND_IMM,
                 .encoded_size_info_index = 0,
                 .extended_size_info_index = 0,
-                .extend_kind = IMM_EXT_ZERO_EXTEND,
+                .extend_kind = IMM_EXT_SIGN_EXTEND,
             },
     },
     {
-        .reg =
+        .specific_imm =
             {
-                .kind = OP_KIND_REG,
-                .size_info_index = 1,
-                .encoding = REG_ENC_OPCODE,
+                .kind = OP_KIND_SPECIFIC_IMM,
+                .operand_size_info_index = 0,
+                .value = SPECIFIC_IMM_ONE,
             },
     },
     {
@@ -115,7 +115,7 @@ const op_info_t op_infos_table[] = {
         .specific_reg =
             {
                 .kind = OP_KIND_SPECIFIC_REG,
-                .size_info_index = 2,
+                .size_info_index = 1,
                 .reg = SPECIFIC_REG_RAX,
             },
     },
@@ -129,12 +129,11 @@ const op_info_t op_infos_table[] = {
             },
     },
     {
-        .imm =
+        .reg =
             {
-                .kind = OP_KIND_IMM,
-                .encoded_size_info_index = 3,
-                .extended_size_info_index = 3,
-                .extend_kind = IMM_EXT_SIGN_EXTEND,
+                .kind = OP_KIND_REG,
+                .size_info_index = 1,
+                .encoding = REG_ENC_OPCODE,
             },
     },
     {
@@ -142,7 +141,7 @@ const op_info_t op_infos_table[] = {
             {
                 .kind = OP_KIND_ZEXT_SPECIFIC_REG,
                 .size_info_index = 0,
-                .extended_size_info_index = 2,
+                .extended_size_info_index = 1,
                 .reg = SPECIFIC_REG_RCX,
             },
     },
@@ -150,7 +149,7 @@ const op_info_t op_infos_table[] = {
         .implicit =
             {
                 .kind = OP_KIND_IMPLICIT,
-                .size_info_index = 2,
+                .size_info_index = 1,
             },
     },
     {
@@ -164,7 +163,7 @@ const op_info_t op_infos_table[] = {
         .mem_offset =
             {
                 .kind = OP_KIND_MEM_OFFSET,
-                .mem_operand_size_info_index = 2,
+                .mem_operand_size_info_index = 1,
             },
     },
     {
@@ -189,35 +188,35 @@ const op_info_t op_infos_table[] = {
             },
     },
     {
-        .specific_imm =
-            {
-                .kind = OP_KIND_SPECIFIC_IMM,
-                .operand_size_info_index = 0,
-                .value = SPECIFIC_IMM_ONE,
-            },
-    },
-    {
-        .rel =
-            {
-                .kind = OP_KIND_REL,
-                .size_info_index = 1,
-            },
-    },
-    {
         .imm =
             {
                 .kind = OP_KIND_IMM,
-                .encoded_size_info_index = 0,
-                .extended_size_info_index = 0,
+                .encoded_size_info_index = 3,
+                .extended_size_info_index = 3,
                 .extend_kind = IMM_EXT_SIGN_EXTEND,
             },
     },
     {
+        .specific_imm =
+            {
+                .kind = OP_KIND_SPECIFIC_IMM,
+                .operand_size_info_index = 1,
+                .value = SPECIFIC_IMM_ONE,
+            },
+    },
+    {
+        .rm =
+            {
+                .kind = OP_KIND_RM,
+                .size_info_index = 2,
+            },
+    },
+    {
         .imm =
             {
                 .kind = OP_KIND_IMM,
-                .encoded_size_info_index = 2,
-                .extended_size_info_index = 2,
+                .encoded_size_info_index = 1,
+                .extended_size_info_index = 1,
                 .extend_kind = IMM_EXT_ZERO_EXTEND,
             },
     },
@@ -230,18 +229,17 @@ const op_info_t op_infos_table[] = {
             },
     },
     {
-        .specific_imm =
+        .rel =
             {
-                .kind = OP_KIND_SPECIFIC_IMM,
-                .operand_size_info_index = 2,
-                .value = SPECIFIC_IMM_ONE,
+                .kind = OP_KIND_REL,
+                .size_info_index = 2,
             },
     },
     {
         .specific_reg =
             {
                 .kind = OP_KIND_SPECIFIC_REG,
-                .size_info_index = 2,
+                .size_info_index = 1,
                 .reg = SPECIFIC_REG_RDX,
             },
     },
@@ -254,10 +252,12 @@ const op_info_t op_infos_table[] = {
             },
     },
     {
-        .rm =
+        .imm =
             {
-                .kind = OP_KIND_RM,
-                .size_info_index = 1,
+                .kind = OP_KIND_IMM,
+                .encoded_size_info_index = 0,
+                .extended_size_info_index = 0,
+                .extend_kind = IMM_EXT_ZERO_EXTEND,
             },
     },
     {
@@ -270,9 +270,9 @@ const op_info_t op_infos_table[] = {
     },
 };
 const uint8_t laid_out_ops_infos_table[] = {
-    0,  1,  2,  3,  1,  0,  3, 2,  8,  9, 10, 11, 2,  13, 14, 15, 16, 10, 18, 8,  0,  9,
-    10, 16, 8,  18, 26, 10, 0, 29, 27, 9, 19, 23, 2,  11, 0,  2,  2,  4,  17, 5,  10, 24,
-    2,  25, 10, 19, 7,  2,  6, 19, 21, 0, 20, 28, 12, 3,  2,  4,  22, 3,  2,  11, 5,
+    0,  1,  2,  3,  1,  0,  3, 2,  8,  9,  10, 11, 2,  13, 14, 15, 16, 10, 18, 8,  0,  9,
+    10, 16, 8,  18, 26, 10, 0, 29, 12, 23, 0,  2,  11, 2,  27, 9,  2,  6,  17, 5,  10, 24,
+    2,  21, 10, 12, 3,  2,  6, 19, 12, 2,  28, 22, 25, 0,  7,  4,  3,  2,  11, 20, 5,
 };
 const insn_info_t
     first_opcode_byte_table[] =
@@ -793,7 +793,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_INC,
-                        .first_op_index = 51,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -801,7 +801,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_INC,
-                        .first_op_index = 51,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -809,7 +809,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_INC,
-                        .first_op_index = 51,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -817,7 +817,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_INC,
-                        .first_op_index = 51,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -825,7 +825,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_INC,
-                        .first_op_index = 51,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -833,7 +833,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_INC,
-                        .first_op_index = 51,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -841,7 +841,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_INC,
-                        .first_op_index = 51,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -849,7 +849,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_INC,
-                        .first_op_index = 51,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -857,7 +857,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_DEC,
-                        .first_op_index = 51,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -865,7 +865,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_DEC,
-                        .first_op_index = 51,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -873,7 +873,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_DEC,
-                        .first_op_index = 51,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -881,7 +881,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_DEC,
-                        .first_op_index = 51,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -889,7 +889,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_DEC,
-                        .first_op_index = 51,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -897,7 +897,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_DEC,
-                        .first_op_index = 51,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -905,7 +905,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_DEC,
-                        .first_op_index = 51,
+                        .first_op_index = 52,
                         .ops_amount = 1,
                     },
             },
@@ -913,6 +913,14 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_DEC,
+                        .first_op_index = 52,
+                        .ops_amount = 1,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_PUSH,
                         .first_op_index = 51,
                         .ops_amount = 1,
                     },
@@ -921,7 +929,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 48,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -929,7 +937,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 48,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -937,7 +945,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 48,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -945,7 +953,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 48,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -953,7 +961,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 48,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -961,7 +969,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 48,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -969,15 +977,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 48,
-                        .ops_amount = 1,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 48,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -985,7 +985,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_POP,
-                        .first_op_index = 48,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -993,7 +993,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_POP,
-                        .first_op_index = 48,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -1001,7 +1001,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_POP,
-                        .first_op_index = 48,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -1009,7 +1009,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_POP,
-                        .first_op_index = 48,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -1017,7 +1017,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_POP,
-                        .first_op_index = 48,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -1025,7 +1025,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_POP,
-                        .first_op_index = 48,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -1033,7 +1033,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_POP,
-                        .first_op_index = 48,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -1041,7 +1041,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_POP,
-                        .first_op_index = 48,
+                        .first_op_index = 51,
                         .ops_amount = 1,
                     },
             },
@@ -1113,7 +1113,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 56,
+                        .first_op_index = 63,
                         .ops_amount = 1,
                     },
             },
@@ -1121,7 +1121,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_IMUL,
-                        .first_op_index = 61,
+                        .first_op_index = 60,
                         .ops_amount = 3,
                     },
             },
@@ -1129,7 +1129,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_PUSH,
-                        .first_op_index = 60,
+                        .first_op_index = 59,
                         .ops_amount = 1,
                     },
             },
@@ -1137,7 +1137,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_IMUL,
-                        .first_op_index = 57,
+                        .first_op_index = 48,
                         .ops_amount = 3,
                     },
             },
@@ -1492,14 +1492,6 @@ const insn_info_t
             {
                 .regular =
                     {
-                        .mnemonic = MNEMONIC_XCHG,
-                        .first_op_index = 46,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
                         .mnemonic = MNEMONIC_MOVSZ,
                         .first_op_index = 42,
                         .ops_amount = 2,
@@ -1693,7 +1685,63 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 30,
+                        .first_op_index = 36,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 36,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 36,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 36,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 36,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 36,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 36,
+                        .ops_amount = 2,
+                    },
+            },
+            {
+                .regular =
+                    {
+                        .mnemonic = MNEMONIC_MOV,
+                        .first_op_index = 36,
                         .ops_amount = 2,
                     },
             },
@@ -1757,63 +1805,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 32,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 32,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 32,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 32,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 32,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 32,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 32,
-                        .ops_amount = 2,
-                    },
-            },
-            {
-                .regular =
-                    {
-                        .mnemonic = MNEMONIC_MOV,
-                        .first_op_index = 32,
+                        .first_op_index = 30,
                         .ops_amount = 2,
                     },
             },
@@ -2133,7 +2125,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_CALL,
-                        .first_op_index = 52,
+                        .first_op_index = 56,
                         .ops_amount = 1,
                     },
             },
@@ -2141,7 +2133,7 @@ const insn_info_t
                 .regular =
                     {
                         .mnemonic = MNEMONIC_JMP,
-                        .first_op_index = 52,
+                        .first_op_index = 56,
                         .ops_amount = 1,
                     },
             },
