@@ -10,6 +10,7 @@ SHELLCODE_CFLAGS += -O3
 
 SHELLCODE_LDFLAGS ?=
 SHELLCODE_LDFLAGS += -Tsrc/test_shellcodes/shellcode.lds
+SHELLCODE_LDFLAGS += -Wl,--build-id=none
 
 .PRECIOUS: build/test_shellcodes/%.shellcode.bin
 build/test_shellcodes/%.shellcode.bin: build/test_shellcodes/%.shellcode.elf
@@ -31,5 +32,5 @@ endef
 
 $(foreach ARCH,$(ARCHS),$(eval $(SHELLCODE_IMPL_ARCH)))
 
-SHELLCODE_BINS := $(SHELLCODE_ELFS:build/%.shellcode.elf=build/%.shellcode.o)
+SHELLCODE_ELFS := $(SHELLCODE_ELFS:build/%.shellcode.elf=build/%.shellcode.o)
 
