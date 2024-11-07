@@ -25,14 +25,15 @@ CFLAGS += -Isrc/lib
 CFLAGS += -Wall -Wextra
 CFLAGS += -Werror
 CFLAGS += -mno-sse -mno-avx
-CFLAGS += -O3
+CFLAGS += -flto
+CFLAGS += -Oz
 
 .phony: all
 all: $(EXAMPLE_BIN) $(TESTS_BIN) $(OBJS)
 
 .phony: example
 example: $(EXAMPLE_BIN)
-	$(EXAMPLE_BIN) build/lib/pis.o
+	$(EXAMPLE_BIN) build/example.elf
 
 .phony: test
 test: $(TESTS_BIN)

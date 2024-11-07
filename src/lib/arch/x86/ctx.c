@@ -9,7 +9,7 @@
 
 #include "x86_tables/types.h"
 
-#include "x86_tables/tables.c"
+#include "x86_tables/tables.h"
 
 /// the maximum value of a condition encoding.
 #define X86_COND_ENCODING_MAX_VALUE (0xf)
@@ -49,7 +49,8 @@ typedef struct {
     };
 } lifted_op_t;
 
-typedef err_t (*mnemonic_handler_t)(insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount);
+typedef err_t (*mnemonic_handler_t
+)(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount);
 
 /// extracts the condition encoding of an opcode which has a condition encoded in its value.
 static u8 opcode_cond_extract(u8 opcode_byte) {
@@ -2218,7 +2219,8 @@ cleanup:
 }
 
 /// lift an instruction according to its first opcode byte
-static err_t lift_first_opcode_byte(const insn_ctx_t* ctx, u8 first_opcode_byte) {
+static err_t __attribute__((unused))
+old_lift_first_opcode_byte(const insn_ctx_t* ctx, u8 first_opcode_byte) {
     err_t err = SUCCESS;
     modrm_operands_t modrm_operands = {};
 
@@ -3156,7 +3158,8 @@ cleanup:
 }
 
 /// lift an instruction with a REP or a BND prefix according to its first opcode byte
-static err_t rep_or_bnd_lift_first_opcode_byte(const insn_ctx_t* ctx, u8 first_opcode_byte) {
+static err_t __attribute__((unused))
+rep_or_bnd_lift_first_opcode_byte(const insn_ctx_t* ctx, u8 first_opcode_byte) {
     err_t err = SUCCESS;
 
     if (first_opcode_byte == 0x0f) {
@@ -3438,7 +3441,7 @@ cleanup:
     return err;
 }
 
-static err_t lifted_op_read(insn_ctx_t* ctx, const lifted_op_t* op, pis_operand_t* value) {
+static err_t lifted_op_read(const insn_ctx_t* ctx, const lifted_op_t* op, pis_operand_t* value) {
     err_t err = SUCCESS;
     switch (op->kind) {
     case LIFTED_OP_KIND_MEM: {
@@ -3455,7 +3458,8 @@ cleanup:
     return err;
 }
 
-static err_t lifted_op_write(insn_ctx_t* ctx, const lifted_op_t* op, const pis_operand_t* value) {
+static err_t
+    lifted_op_write(const insn_ctx_t* ctx, const lifted_op_t* op, const pis_operand_t* value) {
     err_t err = SUCCESS;
     switch (op->kind) {
     case LIFTED_OP_KIND_MEM: {
@@ -3471,7 +3475,9 @@ cleanup:
     return err;
 }
 
-static err_t handle_mnemonic_add(insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+static err_t handle_mnemonic_binop(
+    const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount, binop_fn_t binop
+) {
     err_t err = SUCCESS;
     CHECK(ops_amount == 2);
 
@@ -3481,14 +3487,75 @@ static err_t handle_mnemonic_add(insn_ctx_t* ctx, const lifted_op_t* ops, size_t
     pis_operand_t rhs = {};
     CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &rhs));
 
-    pis_operand_t res = LIFT_CTX_NEW_TMP(ctx->lift_ctx, lhs.size);
-
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, res, lhs, rhs));
+    pis_operand_t res = {};
+    CHECK_RETHROW(binop(ctx, &lhs, &rhs, &res));
 
     CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &res));
 cleanup:
     return err;
 }
+
+static err_t handle_mnemonic_add(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW(handle_mnemonic_binop(ctx, ops, ops_amount, binop_add));
+cleanup:
+    return err;
+}
+
+static const mnemonic_handler_t mnemonic_handler_table[] = {
+    [MNEMONIC_SHR] = NULL,
+    [MNEMONIC_STOS] = NULL,
+    [MNEMONIC_LEA] = NULL,
+    [MNEMONIC_RCR] = NULL,
+    [MNEMONIC_CALL] = NULL,
+    [MNEMONIC_LODS] = NULL,
+    [MNEMONIC_XOR] = NULL,
+    [MNEMONIC_CMPS] = NULL,
+    [MNEMONIC_RET] = NULL,
+    [MNEMONIC_JMP] = NULL,
+    [MNEMONIC_IDIV] = NULL,
+    [MNEMONIC_NOP] = NULL,
+    [MNEMONIC_ADD] = handle_mnemonic_add,
+    [MNEMONIC_PUSH] = NULL,
+    [MNEMONIC_ROR] = NULL,
+    [MNEMONIC_HLT] = NULL,
+    [MNEMONIC_CMC] = NULL,
+    [MNEMONIC_TEST] = NULL,
+    [MNEMONIC_SHL] = NULL,
+    [MNEMONIC_STI] = NULL,
+    [MNEMONIC_CLD] = NULL,
+    [MNEMONIC_ROL] = NULL,
+    [MNEMONIC_CLC] = NULL,
+    [MNEMONIC_CLI] = NULL,
+    [MNEMONIC_DEC] = NULL,
+    [MNEMONIC_MUL] = NULL,
+    [MNEMONIC_JCC] = NULL,
+    [MNEMONIC_SBB] = NULL,
+    [MNEMONIC_CWD] = NULL,
+    [MNEMONIC_CMD] = NULL,
+    [MNEMONIC_ADC] = NULL,
+    [MNEMONIC_CMP] = NULL,
+    [MNEMONIC_IMUL] = NULL,
+    [MNEMONIC_AND] = NULL,
+    [MNEMONIC_SCAS] = NULL,
+    [MNEMONIC_SAR] = NULL,
+    [MNEMONIC_MOVSZ] = NULL,
+    [MNEMONIC_NEG] = NULL,
+    [MNEMONIC_POP] = NULL,
+    [MNEMONIC_SUB] = NULL,
+    [MNEMONIC_RCL] = NULL,
+    [MNEMONIC_DIV] = NULL,
+    [MNEMONIC_OR] = NULL,
+    [MNEMONIC_UNSUPPORTED] = NULL,
+    [MNEMONIC_XCHG] = NULL,
+    [MNEMONIC_MOV] = NULL,
+    [MNEMONIC_NOT] = NULL,
+    [MNEMONIC_INC] = NULL,
+    [MNEMONIC_MOVS] = NULL,
+    [MNEMONIC_STD] = NULL,
+    [MNEMONIC_STC] = NULL,
+    [MNEMONIC_MODRM_REG_OPCODE_EXT] = NULL,
+};
 
 static err_t lift_regular_insn_info(
     insn_ctx_t* ctx, uint8_t last_opcode_byte, const insn_info_t* insn_info
@@ -3496,18 +3563,19 @@ static err_t lift_regular_insn_info(
     err_t err = SUCCESS;
     lifted_op_t lifted_ops[X86_TABLES_INSN_MAX_OPS] = {};
     const uint8_t* op_info_indexes = &laid_out_ops_infos_table[insn_info->regular.first_op_index];
-    for (size_t i = 0; i < X86_TABLES_INSN_MAX_OPS; i++) {
+    u8 ops_amount = insn_info->regular.ops_amount;
+    for (size_t i = 0; i < ops_amount; i++) {
         uint8_t op_info_index = op_info_indexes[i];
         const op_info_t* op_info = &op_infos_table[op_info_index];
         CHECK_RETHROW(lift_op(ctx, last_opcode_byte, op_info, &lifted_ops[i]));
     }
-    // now what
-    TODO();
+    mnemonic_handler_t mnemonic_handler = mnemonic_handler_table[insn_info->mnemonic];
+    CHECK_RETHROW(mnemonic_handler(ctx, lifted_ops, ops_amount));
 cleanup:
     return err;
 }
 
-static err_t new_lift_first_opcode_byte(insn_ctx_t* ctx, u8 first_opcode_byte) {
+static err_t lift_first_opcode_byte(insn_ctx_t* ctx, u8 first_opcode_byte) {
     err_t err = SUCCESS;
     const insn_info_t* insn_info = &first_opcode_byte_table[first_opcode_byte];
     if (insn_info->mnemonic == MNEMONIC_MODRM_REG_OPCODE_EXT) {
@@ -3521,7 +3589,7 @@ cleanup:
 }
 
 /// lift the next instruction after processing its prefixes.
-static err_t post_prefixes_lift(const insn_ctx_t* ctx) {
+static err_t post_prefixes_lift(insn_ctx_t* ctx) {
     err_t err = SUCCESS;
 
     u8 first_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
@@ -3533,7 +3601,8 @@ static err_t post_prefixes_lift(const insn_ctx_t* ctx) {
         UNREACHABLE();
     case LEGACY_PREFIX_REPNZ_OR_BND:
     case LEGACY_PREFIX_REPZ_OR_REP:
-        CHECK_RETHROW(rep_or_bnd_lift_first_opcode_byte(ctx, first_opcode_byte));
+        // CHECK_RETHROW(rep_or_bnd_lift_first_opcode_byte(ctx, first_opcode_byte));
+        TODO();
         break;
     case LEGACY_PREFIX_INVALID:
         // no group-1 prefix, regular opcode
