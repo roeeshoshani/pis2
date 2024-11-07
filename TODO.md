@@ -10,4 +10,3 @@ notes about stuff that needs to be done.
 - in the `calc_binop*` functions, instead of having `*_with_size` variants, maybe take the size from the `reg` operand of the
   modrm instead of using the default operand size?
 - emulate the shellcode as part of the tests
-- use relative includes instead of -I to make integration and IDE life easier
