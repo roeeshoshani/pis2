@@ -3590,13 +3590,19 @@ static err_t lift_regular_insn_info(
     lifted_op_t lifted_ops[X86_TABLES_INSN_MAX_OPS] = {};
     const uint8_t* op_info_indexes = &laid_out_ops_infos_table[insn_info->regular.first_op_index];
     u8 ops_amount = insn_info->regular.ops_amount;
+    u8 mnemonic = insn_info->mnemonic;
     for (size_t i = 0; i < ops_amount; i++) {
         uint8_t op_info_index = op_info_indexes[i];
         const op_info_t* op_info = &op_infos_table[op_info_index];
         CHECK_RETHROW(lift_op(ctx, last_opcode_byte, op_info, &lifted_ops[i]));
     }
-    mnemonic_handler_t mnemonic_handler = mnemonic_handler_table[insn_info->mnemonic];
-    CHECK_CODE(mnemonic_handler != NULL, PIS_ERR_UNSUPPORTED_INSN);
+    mnemonic_handler_t mnemonic_handler = mnemonic_handler_table[mnemonic];
+    CHECK_TRACE_CODE(
+        mnemonic_handler != NULL,
+        PIS_ERR_UNSUPPORTED_INSN,
+        "unsupported mnemonic %d",
+        mnemonic
+    );
     CHECK_RETHROW(mnemonic_handler(ctx, lifted_ops, ops_amount));
 cleanup:
     return err;
@@ -3605,7 +3611,13 @@ cleanup:
 static err_t lift_first_opcode_byte(insn_ctx_t* ctx, u8 first_opcode_byte) {
     err_t err = SUCCESS;
     const insn_info_t* insn_info = &first_opcode_byte_table[first_opcode_byte];
-    if (insn_info->mnemonic == MNEMONIC_MODRM_REG_OPCODE_EXT) {
+    if (insn_info->mnemonic == MNEMONIC_UNSUPPORTED) {
+        CHECK_FAIL_TRACE_CODE(
+            PIS_ERR_UNSUPPORTED_INSN,
+            "unsupported first opcode byte 0x%x",
+            first_opcode_byte
+        );
+    } else if (insn_info->mnemonic == MNEMONIC_MODRM_REG_OPCODE_EXT) {
         // modrm reg opcode ext
         TODO();
     } else {

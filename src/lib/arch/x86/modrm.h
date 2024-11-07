@@ -1,8 +1,8 @@
 #pragma once
 
 #include "../../pis.h"
-#include "prefixes.h"
 #include "../../types.h"
+#include "prefixes.h"
 
 typedef struct {
     u8 mod;
