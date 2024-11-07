@@ -13,6 +13,7 @@ OBJCOPY := llvm-objcopy
 
 CFLAGS ?=
 CFLAGS += -Wall -Wextra
+CFLAGS += -Wimplicit-fallthrough
 CFLAGS += -Werror
 CFLAGS += -mno-sse -mno-avx
 CFLAGS += -flto
