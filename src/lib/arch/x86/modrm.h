@@ -66,15 +66,11 @@ err_t modrm_fetch_and_process_with_operand_sizes(
 err_t modrm_fetch_and_process(const insn_ctx_t* ctx, modrm_operands_t* operands);
 
 err_t modrm_rm_write(
-    const insn_ctx_t* ctx,
-    const modrm_rm_operand_t* rm_operand,
-    const pis_operand_t* to_write
+    const insn_ctx_t* ctx, const modrm_rm_operand_t* rm_operand, const pis_operand_t* to_write
 );
 
 err_t modrm_rm_read(
-    const insn_ctx_t* ctx,
-    const pis_operand_t* read_into,
-    const modrm_rm_operand_t* rm_operand
+    const insn_ctx_t* ctx, const pis_operand_t* read_into, const modrm_rm_operand_t* rm_operand
 );
 
 err_t modrm_operand_read(
