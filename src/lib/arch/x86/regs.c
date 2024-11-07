@@ -1,5 +1,5 @@
 #include "regs.h"
-#include "pis.h"
+#include "../../pis.h"
 
 #define FLAGS_REG_OFFSET (0x1000)
 

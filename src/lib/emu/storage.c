@@ -1,8 +1,8 @@
 #include "storage.h"
-#include "errors.h"
-#include "except.h"
-#include "pis.h"
-#include "utils.h"
+#include "../errors.h"
+#include "../except.h"
+#include "../pis.h"
+#include "../utils.h"
 
 err_t pis_emu_storage_allocate_slot(pis_emu_storage_t* storage, pis_emu_storage_slot_t** slot) {
     err_t err = SUCCESS;

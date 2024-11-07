@@ -1,11 +1,11 @@
 #include "shellcodes.h"
-#include "arch/x86/ctx.h"
-#include "arch/x86/regs.h"
-#include "emu.h"
-#include "except.h"
-#include "pis.h"
+#include "../lib/arch/x86/ctx.h"
+#include "../lib/arch/x86/regs.h"
+#include "../lib/emu.h"
+#include "../lib/except.h"
+#include "../lib/pis.h"
+#include "../lib/utils.h"
 #include "test_utils.h"
-#include "utils.h"
 
 #define INITIAL_STACK_POINTER_VALUE 0x20000000
 #define SHELLCODE_FINISH_ADDR 0x13371337

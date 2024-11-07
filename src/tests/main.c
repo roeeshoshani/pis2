@@ -1,10 +1,10 @@
-#include "emu.h"
-#include "errors.h"
-#include "except.h"
-#include "pis.h"
+#include "../lib/emu.h"
+#include "../lib/errors.h"
+#include "../lib/except.h"
+#include "../lib/pis.h"
+#include "../lib/utils.h"
 #include "shellcodes.h"
 #include "test_utils.h"
-#include "utils.h"
 #include <stdarg.h>
 #include <stdio.h>
 

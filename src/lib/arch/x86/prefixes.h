@@ -1,9 +1,9 @@
 #pragma once
 
-#include "except.h"
+#include "../../except.h"
+#include "../../pis.h"
+#include "../../types.h"
 #include "lift_ctx.h"
-#include "pis.h"
-#include "types.h"
 
 typedef enum {
     // group 1

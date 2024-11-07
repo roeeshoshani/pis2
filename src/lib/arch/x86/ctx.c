@@ -1,9 +1,9 @@
 #include "ctx.h"
-#include "errors.h"
-#include "except.h"
+#include "../../errors.h"
+#include "../../except.h"
+#include "../../pis.h"
 #include "lift_ctx.h"
 #include "modrm.h"
-#include "pis.h"
 #include "prefixes.h"
 #include "regs.h"
 

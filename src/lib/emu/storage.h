@@ -1,6 +1,6 @@
 #pragma once
 
-#include "pis.h"
+#include "../pis.h"
 
 #define EMU_STORAGE_SLOTS_AMOUNT (8192)
 

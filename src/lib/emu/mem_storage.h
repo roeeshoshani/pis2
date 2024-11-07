@@ -1,7 +1,7 @@
 #pragma once
 
-#include "errors.h"
-#include "types.h"
+#include "../errors.h"
+#include "../types.h"
 
 #define EMU_MEM_STORAGE_SLOTS_AMOUNT (8192)
 

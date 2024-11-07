@@ -1,7 +1,7 @@
 #include "modrm.h"
-#include "except.h"
+#include "../../except.h"
+#include "../../pis.h"
 #include "lift_ctx.h"
-#include "pis.h"
 #include "prefixes.h"
 #include "regs.h"
 

@@ -12,7 +12,6 @@ CC := clang
 OBJCOPY := llvm-objcopy
 
 CFLAGS ?=
-CFLAGS += -Isrc/lib
 CFLAGS += -Wall -Wextra
 CFLAGS += -Werror
 CFLAGS += -mno-sse -mno-avx

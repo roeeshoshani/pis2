@@ -1,8 +1,8 @@
 #pragma once
 
-#include "except.h"
-#include "pis.h"
-#include "types.h"
+#include "../../except.h"
+#include "../../pis.h"
+#include "../../types.h"
 
 typedef enum {
     PIS_X86_CPUMODE_32_BIT,

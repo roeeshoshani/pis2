@@ -1,7 +1,7 @@
 #pragma once
 
-#include "types.h"
-#include "utils.h"
+#include "../lib/types.h"
+#include "../lib/utils.h"
 
 typedef struct {
     u8* code;

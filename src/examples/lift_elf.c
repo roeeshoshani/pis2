@@ -1,6 +1,6 @@
-#include "arch/x86/ctx.h"
-#include "except.h"
-#include "pis.h"
+#include "../lib/arch/x86/ctx.h"
+#include "../lib/except.h"
+#include "../lib/pis.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>

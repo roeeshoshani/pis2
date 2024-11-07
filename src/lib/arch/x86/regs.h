@@ -1,6 +1,6 @@
 #pragma once
 
-#include "pis.h"
+#include "../../pis.h"
 #include "prefixes.h"
 
 DECLARE_REG_OPERANDS(RAX, RCX, RDX, RBX, RSP, RBP, RSI, RDI, R8, R9, R10, R11, R12, R13, R14, R15);
