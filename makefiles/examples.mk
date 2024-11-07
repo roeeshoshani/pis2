@@ -1,4 +1,4 @@
-EXAMPLE_SRCS := $(shell find src/example -type f -name "*.c")
+EXAMPLE_SRCS := $(shell find src/examples -type f -name "*.c")
 EXAMPLE_OBJS := $(EXAMPLE_SRCS:src/%.c=build/%.o)
 EXAMPLE_ELFS := $(EXAMPLE_SRCS:src/%.c=build/%.elf)
 
