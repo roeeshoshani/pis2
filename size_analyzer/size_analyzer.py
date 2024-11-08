@@ -3,10 +3,19 @@
 from elftools.elf.elffile import ELFFile
 from pathlib import Path
 import fire
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
 def analyze_elf(elf: ELFFile):
     fn_sizes = {}
+
+    size_shdr_names = ['.text', '.rodata', '.data']
+    total_size = 0
+    for size_shdr_name in size_shdr_names:
+        shdr = elf.get_section_by_name(size_shdr_name)
+        total_size += shdr.data_size
+
+    total_kb = total_size // 1024
+
     for symtab_section in elf.iter_sections(type='SHT_SYMTAB'):
         for symbol in symtab_section.iter_symbols():
             if symbol.entry.st_size == 0:
@@ -16,11 +25,12 @@ def analyze_elf(elf: ELFFile):
     labels = list(fn_sizes.keys())
     sizes = list(fn_sizes.values())
 
-    # Plot the pie chart
-    plt.figure(figsize=(8, 8))
-    plt.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=140)
-    plt.title("Function Size Distribution in Binary")
-    plt.show()
+    fig = go.Figure(data=[go.Pie(labels=labels, values=sizes, hoverinfo="label+value+percent", textinfo="none")])
+    fig.update_layout(
+        title_text=f"Function Size Distribution in Binary (Total {total_kb}k)",
+        template="plotly_dark",
+    )
+    fig.show()
 
 def size_analyzer(elf_file_path: str):
     with open(elf_file_path, 'rb') as raw_file:
