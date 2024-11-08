@@ -14,11 +14,12 @@ OBJCOPY := llvm-objcopy
 CFLAGS ?=
 CFLAGS += -Wall -Wextra
 CFLAGS += -Wimplicit-fallthrough
+CFLAGS += -Wno-packed-bitfield-compat
 CFLAGS += -Werror
 CFLAGS += -mno-sse -mno-avx
 CFLAGS += -flto -fuse-linker-plugin
 CFLAGS += -Os
-CFLAGS += -DPIS_MINI
+# CFLAGS += -DPIS_MINI
 CFLAGS += -g
 
 LDFLAGS ?=
