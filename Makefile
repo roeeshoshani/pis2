@@ -19,6 +19,7 @@ CFLAGS += -mno-sse -mno-avx
 CFLAGS += -flto
 CFLAGS += -Oz
 CFLAGS += -DPIS_MINI
+CFLAGS += -g
 
 LDFLAGS ?=
 
