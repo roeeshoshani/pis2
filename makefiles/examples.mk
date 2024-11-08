@@ -14,3 +14,7 @@ all: $(EXAMPLE_ELFS)
 .phony: example
 example: build/examples/lift_elf.elf
 	./build/examples/lift_elf.elf ./build/examples/lift_elf.elf
+
+.phony: dump_example
+dump_example: build/examples/lift_elf.elf
+	objdump -Mintel -j.text -d $^
