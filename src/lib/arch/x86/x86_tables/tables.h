@@ -282,6 +282,773 @@ const uint8_t laid_out_ops_infos_table[] = {
     2,  13, 18, 2,  20, 22, 12, 18, 10, 26, 10, 21, 11, 10, 24, 8,  16, 9,  12, 6,
     21, 10, 0,  6,  2,  3,  2,  20, 15, 3,  2,  7,  4,  25, 12, 3,  2,  19, 5,
 };
+const modrm_reg_opcode_ext_table_t modrm_reg_opcode_ext_tables[] = {
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_ADD,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_OR,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_ADC,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SBB,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_AND,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SUB,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_XOR,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_CMD,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+            },
+    },
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_ADD,
+                    .first_op_index = 20,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_OR,
+                    .first_op_index = 20,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_ADC,
+                    .first_op_index = 20,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SBB,
+                    .first_op_index = 20,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_AND,
+                    .first_op_index = 20,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SUB,
+                    .first_op_index = 20,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_XOR,
+                    .first_op_index = 20,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_CMD,
+                    .first_op_index = 20,
+                    .ops_amount = 2,
+                },
+            },
+    },
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_ADD,
+                    .first_op_index = 43,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_OR,
+                    .first_op_index = 43,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_ADC,
+                    .first_op_index = 43,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SBB,
+                    .first_op_index = 43,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_AND,
+                    .first_op_index = 43,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SUB,
+                    .first_op_index = 43,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_XOR,
+                    .first_op_index = 43,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_CMD,
+                    .first_op_index = 43,
+                    .ops_amount = 2,
+                },
+            },
+    },
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_POP,
+                    .first_op_index = 45,
+                    .ops_amount = 1,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+            },
+    },
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_ROL,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_ROR,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_RCL,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_RCR,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SHL,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SHR,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SAR,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+            },
+    },
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_ROL,
+                    .first_op_index = 36,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_ROR,
+                    .first_op_index = 36,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_RCL,
+                    .first_op_index = 36,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_RCR,
+                    .first_op_index = 36,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SHL,
+                    .first_op_index = 36,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SHR,
+                    .first_op_index = 36,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 36,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SAR,
+                    .first_op_index = 36,
+                    .ops_amount = 2,
+                },
+            },
+    },
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_MOV,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+            },
+    },
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_MOV,
+                    .first_op_index = 20,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+            },
+    },
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_ROL,
+                    .first_op_index = 22,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_ROR,
+                    .first_op_index = 22,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_RCL,
+                    .first_op_index = 22,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_RCR,
+                    .first_op_index = 22,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SHL,
+                    .first_op_index = 22,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SHR,
+                    .first_op_index = 22,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 22,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SAR,
+                    .first_op_index = 22,
+                    .ops_amount = 2,
+                },
+            },
+    },
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_ROL,
+                    .first_op_index = 28,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_ROR,
+                    .first_op_index = 28,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_RCL,
+                    .first_op_index = 28,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_RCR,
+                    .first_op_index = 28,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SHL,
+                    .first_op_index = 28,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SHR,
+                    .first_op_index = 28,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 28,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SAR,
+                    .first_op_index = 28,
+                    .ops_amount = 2,
+                },
+            },
+    },
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_ROL,
+                    .first_op_index = 38,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_ROR,
+                    .first_op_index = 38,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_RCL,
+                    .first_op_index = 38,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_RCR,
+                    .first_op_index = 38,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SHL,
+                    .first_op_index = 38,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SHR,
+                    .first_op_index = 38,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 38,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SAR,
+                    .first_op_index = 38,
+                    .ops_amount = 2,
+                },
+            },
+    },
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_ROL,
+                    .first_op_index = 40,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_ROR,
+                    .first_op_index = 40,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_RCL,
+                    .first_op_index = 40,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_RCR,
+                    .first_op_index = 40,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SHL,
+                    .first_op_index = 40,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SHR,
+                    .first_op_index = 40,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 40,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_SAR,
+                    .first_op_index = 40,
+                    .ops_amount = 2,
+                },
+            },
+    },
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_TEST,
+                    .first_op_index = 24,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_NOT,
+                    .first_op_index = 62,
+                    .ops_amount = 1,
+                },
+                {
+                    .mnemonic = MNEMONIC_NEG,
+                    .first_op_index = 62,
+                    .ops_amount = 1,
+                },
+                {
+                    .mnemonic = MNEMONIC_MUL,
+                    .first_op_index = 62,
+                    .ops_amount = 1,
+                },
+                {
+                    .mnemonic = MNEMONIC_IMUL,
+                    .first_op_index = 62,
+                    .ops_amount = 1,
+                },
+                {
+                    .mnemonic = MNEMONIC_DIV,
+                    .first_op_index = 62,
+                    .ops_amount = 1,
+                },
+                {
+                    .mnemonic = MNEMONIC_IDIV,
+                    .first_op_index = 62,
+                    .ops_amount = 1,
+                },
+            },
+    },
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_TEST,
+                    .first_op_index = 20,
+                    .ops_amount = 2,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_NOT,
+                    .first_op_index = 64,
+                    .ops_amount = 1,
+                },
+                {
+                    .mnemonic = MNEMONIC_NEG,
+                    .first_op_index = 64,
+                    .ops_amount = 1,
+                },
+                {
+                    .mnemonic = MNEMONIC_MUL,
+                    .first_op_index = 64,
+                    .ops_amount = 1,
+                },
+                {
+                    .mnemonic = MNEMONIC_IMUL,
+                    .first_op_index = 64,
+                    .ops_amount = 1,
+                },
+                {
+                    .mnemonic = MNEMONIC_DIV,
+                    .first_op_index = 64,
+                    .ops_amount = 1,
+                },
+                {
+                    .mnemonic = MNEMONIC_IDIV,
+                    .first_op_index = 64,
+                    .ops_amount = 1,
+                },
+            },
+    },
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_INC,
+                    .first_op_index = 62,
+                    .ops_amount = 1,
+                },
+                {
+                    .mnemonic = MNEMONIC_DEC,
+                    .first_op_index = 62,
+                    .ops_amount = 1,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+            },
+    },
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_INC,
+                    .first_op_index = 64,
+                    .ops_amount = 1,
+                },
+                {
+                    .mnemonic = MNEMONIC_DEC,
+                    .first_op_index = 64,
+                    .ops_amount = 1,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+            },
+    },
+    {
+        .by_reg_value =
+            {
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_UNSUPPORTED,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+                {
+                    .mnemonic = MNEMONIC_ENDBR,
+                    .first_op_index = 12,
+                    .ops_amount = 0,
+                },
+            },
+    },
+};
 const insn_info_t
     first_opcode_byte_table[] =
         {

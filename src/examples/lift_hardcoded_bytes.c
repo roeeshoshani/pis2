@@ -18,7 +18,7 @@ int main() {
     pis_x86_ctx_t ctx = {
         .cpumode = PIS_X86_CPUMODE_64_BIT,
     };
-    const u8 code[] = {0xa0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    const u8 code[] = {0xF3, 0x0F, 0x1E, 0xFB};
     pis_lift_result_t result = {};
     CHECK_RETHROW(pis_x86_lift(&ctx, code, ARRAY_SIZE(code), 0, &result));
     for (size_t i = 0; i < result.insns_amount; i++) {

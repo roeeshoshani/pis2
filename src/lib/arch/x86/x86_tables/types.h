@@ -60,13 +60,14 @@ typedef enum {
     MNEMONIC_CLC,
     MNEMONIC_MODRM_REG_OPCODE_EXT,
 } mnemonic_t;
+typedef struct __attribute__((packed)) {
+    uint8_t mnemonic : 6;
+    uint8_t first_op_index : 7;
+    uint8_t ops_amount : 2;
+} regular_insn_info_t;
 typedef union __attribute__((packed)) {
     uint8_t mnemonic : 6;
-    struct __attribute__((packed)) {
-        uint8_t mnemonic : 6;
-        uint8_t first_op_index : 7;
-        uint8_t ops_amount : 2;
-    } regular;
+    regular_insn_info_t regular;
     struct __attribute__((packed)) {
         uint8_t mnemonic : 6;
         uint8_t modrm_reg_table_index : 5;
@@ -162,3 +163,6 @@ typedef union __attribute__((packed)) {
         uint8_t kind : 4;
     } cond;
 } op_info_t;
+typedef struct __attribute__((packed)) {
+    regular_insn_info_t by_reg_value[8];
+} modrm_reg_opcode_ext_table_t;
