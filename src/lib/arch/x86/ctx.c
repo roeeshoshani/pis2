@@ -3636,8 +3636,11 @@ static err_t post_prefixes_lift(insn_ctx_t* ctx) {
         // 2 or 3 byte opcode
         u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
         if (second_opcode_byte == 0x38 || second_opcode_byte == 0x3a) {
-            // 3 byte opcode, currently not supported
-            TODO();
+            // 3 byte opcode
+            CHECK_FAIL_TRACE_CODE(
+                PIS_ERR_UNSUPPORTED_INSN,
+                "3 byte opcodes are currently not supported"
+            );
         } else {
             // 2 byte opcode
             CHECK_RETHROW(lift_opcode_byte(ctx, second_opcode_byte, second_opcode_byte_table));
