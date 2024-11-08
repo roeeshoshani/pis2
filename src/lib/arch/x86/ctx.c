@@ -3528,6 +3528,15 @@ cleanup:
     return err;
 }
 
+static err_t
+    handle_mnemonic_endbr(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    // endbr is a nop
+    UNUSED(ctx);
+    UNUSED(ops);
+    UNUSED(ops_amount);
+    return SUCCESS;
+}
+
 static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_SHR] = handle_mnemonic_shr,
     [MNEMONIC_XOR] = handle_mnemonic_xor,
@@ -3535,6 +3544,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_SUB] = handle_mnemonic_sub,
     [MNEMONIC_OR] = handle_mnemonic_or,
     [MNEMONIC_MOV] = handle_mnemonic_mov,
+    [MNEMONIC_ENDBR] = handle_mnemonic_endbr,
 };
 
 static err_t lift_regular_insn_info(
