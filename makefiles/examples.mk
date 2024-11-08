@@ -10,3 +10,7 @@ endef
 $(foreach EXAMPLE_ELF,$(EXAMPLE_ELFS),$(eval $(EXAMPLE_ELF_IMPL)))
 
 all: $(EXAMPLE_ELFS)
+
+.phony: example
+example: build/examples/lift_elf.elf
+	./build/examples/lift_elf.elf ./build/examples/lift_elf.elf
