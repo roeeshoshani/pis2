@@ -6,14 +6,24 @@
 
 #define SUCCESS (PIS_ERR_SUCCESS)
 
-#define CHECK_TRACE_CODE(EXPR, CODE, FMT, ...)                                                     \
-    do {                                                                                           \
-        if (!(EXPR)) {                                                                             \
-            err = CODE;                                                                            \
-            TRACE_WITH_INFO(FMT, ##__VA_ARGS__);                                                   \
-            goto cleanup;                                                                          \
-        }                                                                                          \
-    } while (0)
+#if defined(PIS_MINI)
+#    define CHECK_TRACE_CODE(EXPR, CODE, FMT, ...)                                                 \
+        do {                                                                                       \
+            if (!(EXPR)) {                                                                         \
+                err = CODE;                                                                        \
+                goto cleanup;                                                                      \
+            }                                                                                      \
+        } while (0)
+#else // defined(PIS_MINI)
+#    define CHECK_TRACE_CODE(EXPR, CODE, FMT, ...)                                                 \
+        do {                                                                                       \
+            if (!(EXPR)) {                                                                         \
+                err = CODE;                                                                        \
+                TRACE_WITH_INFO(FMT, ##__VA_ARGS__);                                               \
+                goto cleanup;                                                                      \
+            }                                                                                      \
+        } while (0)
+#endif // defined(PIS_MINI)
 
 #define CHECK_TRACE(EXPR, FMT, ...) CHECK_TRACE_CODE(EXPR, PIS_ERR_GENERIC, FMT, ##__VA_ARGS__)
 #define CHECK_CODE(EXPR, CODE) CHECK_TRACE_CODE(EXPR, CODE, "error")
