@@ -13,3 +13,4 @@
 #define MIN(A, B) ((A) <= (B) ? (A) : (B))
 
 #define USED __attribute__((used))
+#define UNUSED_ATTR __attribute__((unused))

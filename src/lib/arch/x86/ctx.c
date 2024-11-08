@@ -824,7 +824,7 @@ cleanup:
 
 /// calculates a binary operation with one modrm and one immediate operand as inputs, and stores the
 /// result of the operation in the first operand.
-static err_t USED calc_and_store_binop_modrm_imm(
+static err_t UNUSED_ATTR calc_and_store_binop_modrm_imm(
     const insn_ctx_t* ctx,
     binop_fn_t binop,
     const modrm_operand_t* dst,
