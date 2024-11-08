@@ -59,6 +59,7 @@ typedef enum {
     MNEMONIC_CALL,
     MNEMONIC_CLC,
     MNEMONIC_MODRM_REG_OPCODE_EXT,
+    MNEMONIC_MAX = MNEMONIC_MODRM_REG_OPCODE_EXT,
 } mnemonic_t;
 typedef struct __attribute__((packed)) {
     uint8_t mnemonic : 6;
@@ -78,6 +79,7 @@ typedef enum {
     OP_SIZE_16,
     OP_SIZE_32,
     OP_SIZE_64,
+    OP_SIZE_MAX = OP_SIZE_64,
 } op_size_t;
 typedef struct __attribute__((packed)) {
     uint8_t with_operand_size_override : 2;
@@ -96,23 +98,28 @@ typedef enum {
     OP_KIND_MEM_OFFSET,
     OP_KIND_IMPLICIT,
     OP_KIND_COND,
+    OP_KIND_MAX = OP_KIND_COND,
 } op_kind_t;
 typedef enum {
     IMM_EXT_SIGN_EXTEND,
     IMM_EXT_ZERO_EXTEND,
+    IMM_EXT_MAX = IMM_EXT_ZERO_EXTEND,
 } imm_ext_kind_t;
 typedef enum {
     REG_ENC_MODRM,
     REG_ENC_OPCODE,
+    REG_ENC_MAX = REG_ENC_OPCODE,
 } reg_encoding_t;
 typedef enum {
     SPECIFIC_REG_RAX,
     SPECIFIC_REG_RDX,
     SPECIFIC_REG_RCX,
+    SPECIFIC_REG_MAX = SPECIFIC_REG_RCX,
 } specific_reg_t;
 typedef enum {
     SPECIFIC_IMM_ZERO,
     SPECIFIC_IMM_ONE,
+    SPECIFIC_IMM_MAX = SPECIFIC_IMM_ONE,
 } specific_imm_t;
 typedef union __attribute__((packed)) {
     uint8_t kind : 4;
