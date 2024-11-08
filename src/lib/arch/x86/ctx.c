@@ -3248,7 +3248,7 @@ static pis_operand_t decode_specific_reg(specific_reg_t reg, op_size_t size) {
 }
 
 static err_t lift_op(
-    insn_ctx_t* ctx, u8 last_opcode_byte, const op_info_t* op_info, lifted_op_t* lifted_operand
+    insn_ctx_t* ctx, u8 opcode_byte, const op_info_t* op_info, lifted_op_t* lifted_operand
 ) {
     err_t err = SUCCESS;
     switch (op_info->kind) {
@@ -3307,7 +3307,7 @@ static err_t lift_op(
             break;
         }
         case REG_ENC_OPCODE:
-            reg_encoding = opcode_reg_extract(ctx, last_opcode_byte);
+            reg_encoding = opcode_reg_extract(ctx, opcode_byte);
             break;
         }
 
@@ -3429,7 +3429,7 @@ static err_t lift_op(
     }
     case OP_KIND_COND: {
         pis_operand_t cond = {};
-        CHECK_RETHROW(cond_opcode_decode_and_calc(ctx, last_opcode_byte, &cond));
+        CHECK_RETHROW(cond_opcode_decode_and_calc(ctx, opcode_byte, &cond));
 
         *lifted_operand = (lifted_op_t) {
             .kind = LIFTED_OP_KIND_VALUE,
@@ -3583,9 +3583,8 @@ static const mnemonic_handler_t mnemonic_handler_table[] = {
     [MNEMONIC_MODRM_REG_OPCODE_EXT] = NULL,
 };
 
-static err_t lift_regular_insn_info(
-    insn_ctx_t* ctx, uint8_t last_opcode_byte, const insn_info_t* insn_info
-) {
+static err_t
+    lift_regular_insn_info(insn_ctx_t* ctx, uint8_t opcode_byte, const insn_info_t* insn_info) {
     err_t err = SUCCESS;
     lifted_op_t lifted_ops[X86_TABLES_INSN_MAX_OPS] = {};
     const uint8_t* op_info_indexes = &laid_out_ops_infos_table[insn_info->regular.first_op_index];
@@ -3594,7 +3593,7 @@ static err_t lift_regular_insn_info(
     for (size_t i = 0; i < ops_amount; i++) {
         uint8_t op_info_index = op_info_indexes[i];
         const op_info_t* op_info = &op_infos_table[op_info_index];
-        CHECK_RETHROW(lift_op(ctx, last_opcode_byte, op_info, &lifted_ops[i]));
+        CHECK_RETHROW(lift_op(ctx, opcode_byte, op_info, &lifted_ops[i]));
     }
     mnemonic_handler_t mnemonic_handler = mnemonic_handler_table[mnemonic];
     CHECK_TRACE_CODE(
@@ -3608,20 +3607,21 @@ cleanup:
     return err;
 }
 
-static err_t lift_first_opcode_byte(insn_ctx_t* ctx, u8 first_opcode_byte) {
+static err_t
+    lift_opcode_byte(insn_ctx_t* ctx, u8 opcode_byte, const insn_info_t* opcode_byte_table) {
     err_t err = SUCCESS;
-    const insn_info_t* insn_info = &first_opcode_byte_table[first_opcode_byte];
+    const insn_info_t* insn_info = &opcode_byte_table[opcode_byte];
     if (insn_info->mnemonic == MNEMONIC_UNSUPPORTED) {
         CHECK_FAIL_TRACE_CODE(
             PIS_ERR_UNSUPPORTED_INSN,
-            "unsupported first opcode byte 0x%x",
-            first_opcode_byte
+            "unsupported opcode byte 0x%x",
+            opcode_byte
         );
     } else if (insn_info->mnemonic == MNEMONIC_MODRM_REG_OPCODE_EXT) {
         // modrm reg opcode ext
         TODO();
     } else {
-        CHECK_RETHROW(lift_regular_insn_info(ctx, first_opcode_byte, insn_info));
+        CHECK_RETHROW(lift_regular_insn_info(ctx, opcode_byte, insn_info));
     }
 cleanup:
     return err;
@@ -3632,23 +3632,18 @@ static err_t post_prefixes_lift(insn_ctx_t* ctx) {
     err_t err = SUCCESS;
 
     u8 first_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-
-    // decide how to lift based on the group 1 prefix. group 1 prefixes completely change the
-    // behaviour of the instruction, so we want different lifting logic for each group 1 prefix.
-    switch (group1_prefix(ctx)) {
-    case LEGACY_PREFIX_LOCK:
-        UNREACHABLE();
-    case LEGACY_PREFIX_REPNZ_OR_BND:
-    case LEGACY_PREFIX_REPZ_OR_REP:
-        // CHECK_RETHROW(rep_or_bnd_lift_first_opcode_byte(ctx, first_opcode_byte));
-        TODO();
-        break;
-    case LEGACY_PREFIX_INVALID:
-        // no group-1 prefix, regular opcode
-        CHECK_RETHROW(lift_first_opcode_byte(ctx, first_opcode_byte));
-        break;
-    default:
-        UNREACHABLE();
+    if (first_opcode_byte == 0x0f) {
+        // 2 or 3 byte opcode
+        u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        if (second_opcode_byte == 0x38 || second_opcode_byte == 0x3a) {
+            // 3 byte opcode, currently not supported
+            TODO();
+        } else {
+            // 2 byte opcode
+            CHECK_RETHROW(lift_opcode_byte(ctx, second_opcode_byte, second_opcode_byte_table));
+        }
+    } else {
+        CHECK_RETHROW(lift_opcode_byte(ctx, first_opcode_byte, first_opcode_byte_table));
     }
 
 cleanup:
