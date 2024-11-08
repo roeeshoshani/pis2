@@ -2,6 +2,7 @@ BITS 64
 
 global main
 main:
-db 0x48, 0xff, 0xc8
+db 0x66, 0x58
+pop rax
 shit:
 nop

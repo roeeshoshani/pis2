@@ -3443,6 +3443,16 @@ cleanup:
     return err;
 }
 
+static pis_operand_size_t lifted_op_size(const lifted_op_t* op) {
+    switch (op->kind) {
+    case LIFTED_OP_KIND_MEM:
+        return op->mem.size;
+    case LIFTED_OP_KIND_VALUE:
+    case LIFTED_OP_KIND_WRITABLE_VALUE:
+        return op->value.size;
+    }
+}
+
 static err_t lifted_op_read(const insn_ctx_t* ctx, const lifted_op_t* op, pis_operand_t* value) {
     err_t err = SUCCESS;
     switch (op->kind) {
@@ -3451,11 +3461,11 @@ static err_t lifted_op_read(const insn_ctx_t* ctx, const lifted_op_t* op, pis_op
         LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_LOAD, tmp, op->mem.addr));
         *value = tmp;
         break;
+    }
     case LIFTED_OP_KIND_VALUE:
     case LIFTED_OP_KIND_WRITABLE_VALUE:
         *value = op->value;
         break;
-    }
     }
 cleanup:
     return err;
@@ -3537,6 +3547,28 @@ static err_t
     return SUCCESS;
 }
 
+static err_t handle_mnemonic_pop(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 1);
+
+    pis_operand_size_t operand_size = lifted_op_size(&ops[0]);
+    pis_operand_t sp = ctx->lift_ctx->sp;
+    u64 operand_size_bytes = pis_operand_size_to_bytes(operand_size);
+
+    pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_LOAD, tmp, sp));
+
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_ADD, sp, sp, PIS_OPERAND_CONST(operand_size_bytes, sp.size))
+    );
+
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &tmp));
+cleanup:
+    return err;
+}
+
 static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_SHR] = handle_mnemonic_shr,
     [MNEMONIC_XOR] = handle_mnemonic_xor,
@@ -3545,6 +3577,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_OR] = handle_mnemonic_or,
     [MNEMONIC_MOV] = handle_mnemonic_mov,
     [MNEMONIC_ENDBR] = handle_mnemonic_endbr,
+    [MNEMONIC_POP] = handle_mnemonic_pop,
 };
 
 static err_t lift_regular_insn_info(
