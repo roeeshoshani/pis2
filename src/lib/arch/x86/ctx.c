@@ -3583,12 +3583,13 @@ static const mnemonic_handler_t mnemonic_handler_table[] = {
     [MNEMONIC_MODRM_REG_OPCODE_EXT] = NULL,
 };
 
-static err_t
-    lift_regular_insn_info(insn_ctx_t* ctx, uint8_t opcode_byte, const insn_info_t* insn_info) {
+static err_t lift_regular_insn_info(
+    insn_ctx_t* ctx, uint8_t opcode_byte, const regular_insn_info_t* insn_info
+) {
     err_t err = SUCCESS;
     lifted_op_t lifted_ops[X86_TABLES_INSN_MAX_OPS] = {};
-    const uint8_t* op_info_indexes = &laid_out_ops_infos_table[insn_info->regular.first_op_index];
-    u8 ops_amount = insn_info->regular.ops_amount;
+    const uint8_t* op_info_indexes = &laid_out_ops_infos_table[insn_info->first_op_index];
+    u8 ops_amount = insn_info->ops_amount;
     u8 mnemonic = insn_info->mnemonic;
     for (size_t i = 0; i < ops_amount; i++) {
         uint8_t op_info_index = op_info_indexes[i];
@@ -3607,6 +3608,20 @@ cleanup:
     return err;
 }
 
+static err_t lift_modrm_reg_opcode_ext_insn_info(
+    insn_ctx_t* ctx, u8 opcode_byte, const modrm_reg_opcode_ext_table_t* table
+) {
+    err_t err = SUCCESS;
+
+    modrm_t modrm = {};
+    CHECK_RETHROW(get_or_fetch_modrm(ctx, &modrm));
+
+    CHECK_RETHROW(lift_regular_insn_info(ctx, opcode_byte, &table->by_reg_value[modrm.reg]));
+
+cleanup:
+    return err;
+}
+
 static err_t
     lift_opcode_byte(insn_ctx_t* ctx, u8 opcode_byte, const insn_info_t* opcode_byte_table) {
     err_t err = SUCCESS;
@@ -3619,9 +3634,13 @@ static err_t
         );
     } else if (insn_info->mnemonic == MNEMONIC_MODRM_REG_OPCODE_EXT) {
         // modrm reg opcode ext
-        TODO();
+        CHECK_RETHROW(lift_modrm_reg_opcode_ext_insn_info(
+            ctx,
+            opcode_byte,
+            &modrm_reg_opcode_ext_tables[insn_info->modrm_reg_opcode_ext.modrm_reg_table_index]
+        ));
     } else {
-        CHECK_RETHROW(lift_regular_insn_info(ctx, opcode_byte, insn_info));
+        CHECK_RETHROW(lift_regular_insn_info(ctx, opcode_byte, &insn_info->regular));
     }
 cleanup:
     return err;
