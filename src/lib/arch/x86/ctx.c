@@ -3521,6 +3521,7 @@ cleanup:
     }
 
 DEFINE_BINOP_MNEMONIC_HANDLER(add);
+DEFINE_BINOP_MNEMONIC_HANDLER(and);
 DEFINE_BINOP_MNEMONIC_HANDLER(sub);
 DEFINE_BINOP_MNEMONIC_HANDLER(shr);
 DEFINE_BINOP_MNEMONIC_HANDLER(xor);
@@ -3573,6 +3574,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_SHR] = handle_mnemonic_shr,
     [MNEMONIC_XOR] = handle_mnemonic_xor,
     [MNEMONIC_ADD] = handle_mnemonic_add,
+    [MNEMONIC_AND] = handle_mnemonic_and,
     [MNEMONIC_SUB] = handle_mnemonic_sub,
     [MNEMONIC_OR] = handle_mnemonic_or,
     [MNEMONIC_MOV] = handle_mnemonic_mov,
