@@ -3248,6 +3248,10 @@ static pis_operand_t decode_specific_reg(specific_reg_t reg, op_size_t size) {
         case SPECIFIC_REG_RDX:
             reg_encoding = 2;
             break;
+        default:
+            // unreachable
+            reg_encoding = 0;
+            break;
     }
 
     return PIS_OPERAND_REG(reg_encoding * 8, op_size_to_pis_operand_size(size));
@@ -3460,6 +3464,9 @@ static pis_operand_size_t lifted_op_size(const lifted_op_t* op) {
         case LIFTED_OP_KIND_VALUE:
         case LIFTED_OP_KIND_WRITABLE_VALUE:
             return op->value.size;
+        default:
+            // unreachable
+            return PIS_OPERAND_SIZE_1;
     }
 }
 

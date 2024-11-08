@@ -44,9 +44,15 @@
         .operands_amount = 4,                                                                      \
     })
 
-#define PIS_ADDR(SPACE, OFFSET) ((pis_addr_t) {.space = (SPACE), .offset = (OFFSET)})
+#define PIS_ADDR_INIT(SPACE, OFFSET)                                                               \
+    { .space = SPACE, .offset = OFFSET }
 
-#define PIS_OPERAND(ADDR, SIZE) ((pis_operand_t) {.addr = (ADDR), .size = (SIZE)})
+#define PIS_ADDR(SPACE, OFFSET) ((pis_addr_t) PIS_ADDR_INIT(SPACE, OFFSET))
+
+#define PIS_OPERAND_INIT(ADDR, SIZE)                                                               \
+    { .addr = ADDR, .size = SIZE }
+
+#define PIS_OPERAND(ADDR, SIZE) ((pis_operand_t) PIS_OPERAND_INIT(ADDR, SIZE))
 
 #define PIS_OPERAND_REG(OFFSET, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_REG, OFFSET), SIZE))
 
@@ -67,7 +73,7 @@
 #define DECLARE_REG_OPERANDS(...) MAP(DECLARE_REG_OPERAND, ##__VA_ARGS__)
 
 #define DEFINE_REG_OPERAND(NAME, OFFSET, SIZE)                                                     \
-    const pis_operand_t NAME = PIS_OPERAND_REG(OFFSET, SIZE)
+    const pis_operand_t NAME = PIS_OPERAND_INIT(PIS_ADDR_INIT(PIS_SPACE_REG, OFFSET), SIZE)
 
 #define DEFINE_REG_OPERANDS(                                                                       \
     START_OFFSET,                                                                                  \

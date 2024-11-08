@@ -8,7 +8,7 @@ DEPS := $(OBJS:%.o=%.d)
 
 ARCHS := x86_64 i386
 
-CC := clang
+CC := gcc
 OBJCOPY := llvm-objcopy
 
 CFLAGS ?=
@@ -16,8 +16,8 @@ CFLAGS += -Wall -Wextra
 CFLAGS += -Wimplicit-fallthrough
 CFLAGS += -Werror
 CFLAGS += -mno-sse -mno-avx
-CFLAGS += -flto
-CFLAGS += -Oz
+CFLAGS += -flto -fuse-linker-plugin
+CFLAGS += -Os
 CFLAGS += -DPIS_MINI
 CFLAGS += -g
 
