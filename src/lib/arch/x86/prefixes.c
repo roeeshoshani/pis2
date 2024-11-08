@@ -9,24 +9,24 @@
 /// if the provided value is not a valid legacy prefix, returns `LEGACY_PREFIX_GROUP_INVALID`.
 static legacy_prefix_group_t legacy_prefix_get_group(legacy_prefix_t prefix) {
     switch (prefix) {
-    case LEGACY_PREFIX_LOCK:
-    case LEGACY_PREFIX_REPNZ_OR_BND:
-    case LEGACY_PREFIX_REPZ_OR_REP:
-        return LEGACY_PREFIX_GROUP_1;
+        case LEGACY_PREFIX_LOCK:
+        case LEGACY_PREFIX_REPNZ_OR_BND:
+        case LEGACY_PREFIX_REPZ_OR_REP:
+            return LEGACY_PREFIX_GROUP_1;
 
-    case LEGACY_PREFIX_CS_SEGMENT_OR_BRANCH_NOT_TAKEN:
-    case LEGACY_PREFIX_SS_SEGMENT:
-    case LEGACY_PREFIX_DS_SEGMENT_OR_BRANCH_TAKEN:
-    case LEGACY_PREFIX_ES_SEGMENT:
-    case LEGACY_PREFIX_FS_SEGMENT:
-    case LEGACY_PREFIX_GS_SEGMENT:
-        return LEGACY_PREFIX_GROUP_2;
-    case LEGACY_PREFIX_OPERAND_SIZE_OVERRIDE:
-        return LEGACY_PREFIX_GROUP_3;
-    case LEGACY_PREFIX_ADDRESS_SIZE_OVERRIDE:
-        return LEGACY_PREFIX_GROUP_4;
-    default:
-        return LEGACY_PREFIX_GROUP_INVALID;
+        case LEGACY_PREFIX_CS_SEGMENT_OR_BRANCH_NOT_TAKEN:
+        case LEGACY_PREFIX_SS_SEGMENT:
+        case LEGACY_PREFIX_DS_SEGMENT_OR_BRANCH_TAKEN:
+        case LEGACY_PREFIX_ES_SEGMENT:
+        case LEGACY_PREFIX_FS_SEGMENT:
+        case LEGACY_PREFIX_GS_SEGMENT:
+            return LEGACY_PREFIX_GROUP_2;
+        case LEGACY_PREFIX_OPERAND_SIZE_OVERRIDE:
+            return LEGACY_PREFIX_GROUP_3;
+        case LEGACY_PREFIX_ADDRESS_SIZE_OVERRIDE:
+            return LEGACY_PREFIX_GROUP_4;
+        default:
+            return LEGACY_PREFIX_GROUP_INVALID;
     }
 }
 

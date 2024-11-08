@@ -14,8 +14,8 @@
     const char* NAME##_to_str(NAME##_t value) {                                                    \
         switch (value) {                                                                           \
             FIELDS_FN(STR_ENUM_IMPL_FIELDS_CALLBACK)                                               \
-        default:                                                                                   \
-            return "invalid " STRINGIFY(NAME##_t) " value>";                                       \
+            default:                                                                               \
+                return "invalid " STRINGIFY(NAME##_t) " value>";                                   \
         }                                                                                          \
     }
 

@@ -83,35 +83,35 @@ static err_t calc_cond(const insn_ctx_t* ctx, const x86_cond_t cond, pis_operand
     pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
 
     switch (cond.kind) {
-    case X86_COND_CLASS_OVERFLOW:
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_OF));
-        break;
-    case X86_COND_CLASS_BELOW:
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_CF));
-        break;
-    case X86_COND_CLASS_EQUALS:
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_ZF));
-        break;
-    case X86_COND_CLASS_BELOW_EQUAL:
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, tmp, FLAGS_ZF, FLAGS_CF));
-        break;
-    case X86_COND_CLASS_SIGN:
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_SF));
-        break;
-    case X86_COND_CLASS_PARITY:
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_PF));
-        break;
-    case X86_COND_CLASS_LOWER:
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_XOR, tmp, FLAGS_SF, FLAGS_OF));
-        break;
-    case X86_COND_CLASS_LOWER_EQUAL: {
-        pis_operand_t inner_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_XOR, inner_tmp, FLAGS_SF, FLAGS_OF));
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, tmp, inner_tmp, FLAGS_ZF));
-        break;
-    }
-    default:
-        UNREACHABLE();
+        case X86_COND_CLASS_OVERFLOW:
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_OF));
+            break;
+        case X86_COND_CLASS_BELOW:
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_CF));
+            break;
+        case X86_COND_CLASS_EQUALS:
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_ZF));
+            break;
+        case X86_COND_CLASS_BELOW_EQUAL:
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, tmp, FLAGS_ZF, FLAGS_CF));
+            break;
+        case X86_COND_CLASS_SIGN:
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_SF));
+            break;
+        case X86_COND_CLASS_PARITY:
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_PF));
+            break;
+        case X86_COND_CLASS_LOWER:
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_XOR, tmp, FLAGS_SF, FLAGS_OF));
+            break;
+        case X86_COND_CLASS_LOWER_EQUAL: {
+            pis_operand_t inner_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_XOR, inner_tmp, FLAGS_SF, FLAGS_OF));
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, tmp, inner_tmp, FLAGS_ZF));
+            break;
+        }
+        default:
+            UNREACHABLE();
     }
 
     if (cond.is_negative) {
@@ -144,13 +144,13 @@ cleanup:
 /// returns the operand size corresponding to the given cpumode.
 static pis_operand_size_t cpumode_get_operand_size(pis_x86_cpumode_t cpumode) {
     switch (cpumode) {
-    case PIS_X86_CPUMODE_64_BIT:
-        return PIS_OPERAND_SIZE_8;
-    case PIS_X86_CPUMODE_32_BIT:
-        return PIS_OPERAND_SIZE_4;
-    default:
-        // unreachable
-        return PIS_OPERAND_SIZE_1;
+        case PIS_X86_CPUMODE_64_BIT:
+            return PIS_OPERAND_SIZE_8;
+        case PIS_X86_CPUMODE_32_BIT:
+            return PIS_OPERAND_SIZE_4;
+        default:
+            // unreachable
+            return PIS_OPERAND_SIZE_1;
     }
 }
 
@@ -173,21 +173,21 @@ static pis_operand_size_t get_effective_operand_size(
         prefixes_contain_legacy_prefix(prefixes, LEGACY_PREFIX_OPERAND_SIZE_OVERRIDE);
 
     switch (cpumode) {
-    case PIS_X86_CPUMODE_32_BIT:
-        return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
-    case PIS_X86_CPUMODE_64_BIT:
-        if (prefixes->rex.w) {
-            return PIS_OPERAND_SIZE_8;
-        } else {
-            if (default_to_64_bit) {
-                return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_8;
+        case PIS_X86_CPUMODE_32_BIT:
+            return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
+        case PIS_X86_CPUMODE_64_BIT:
+            if (prefixes->rex.w) {
+                return PIS_OPERAND_SIZE_8;
             } else {
-                return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
+                if (default_to_64_bit) {
+                    return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_8;
+                } else {
+                    return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
+                }
             }
-        }
-    default:
-        // unreachable
-        return PIS_OPERAND_SIZE_1;
+        default:
+            // unreachable
+            return PIS_OPERAND_SIZE_1;
     }
 }
 
@@ -198,13 +198,13 @@ static pis_operand_size_t
         prefixes_contain_legacy_prefix(prefixes, LEGACY_PREFIX_ADDRESS_SIZE_OVERRIDE);
 
     switch (cpumode) {
-    case PIS_X86_CPUMODE_32_BIT:
-        return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
-    case PIS_X86_CPUMODE_64_BIT:
-        return has_size_override ? PIS_OPERAND_SIZE_4 : PIS_OPERAND_SIZE_8;
-    default:
-        // unreachable
-        return PIS_OPERAND_SIZE_1;
+        case PIS_X86_CPUMODE_32_BIT:
+            return has_size_override ? PIS_OPERAND_SIZE_2 : PIS_OPERAND_SIZE_4;
+        case PIS_X86_CPUMODE_64_BIT:
+            return has_size_override ? PIS_OPERAND_SIZE_4 : PIS_OPERAND_SIZE_8;
+        default:
+            // unreachable
+            return PIS_OPERAND_SIZE_1;
     }
 }
 
@@ -884,26 +884,26 @@ static err_t fetch_imm_of_size_and_sign_extend_to_64_bits(
 ) {
     err_t err = SUCCESS;
     switch (operand_size) {
-    case PIS_OPERAND_SIZE_8: {
-        i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
-        *disp = (i64) disp32;
-        break;
-    }
-    case PIS_OPERAND_SIZE_4: {
-        i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
-        *disp = (i64) disp32;
-        break;
-    }
-    case PIS_OPERAND_SIZE_2: {
-        i16 disp16 = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
-        *disp = (i64) disp16;
-        break;
-    }
-    case PIS_OPERAND_SIZE_1: {
-        i8 disp8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-        *disp = (i64) disp8;
-        break;
-    }
+        case PIS_OPERAND_SIZE_8: {
+            i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+            *disp = (i64) disp32;
+            break;
+        }
+        case PIS_OPERAND_SIZE_4: {
+            i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+            *disp = (i64) disp32;
+            break;
+        }
+        case PIS_OPERAND_SIZE_2: {
+            i16 disp16 = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
+            *disp = (i64) disp16;
+            break;
+        }
+        case PIS_OPERAND_SIZE_1: {
+            i8 disp8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+            *disp = (i64) disp8;
+            break;
+        }
     }
 cleanup:
     return err;
@@ -1088,20 +1088,20 @@ static err_t fetch_imm_operand_of_size(
 ) {
     err_t err = SUCCESS;
     switch (size) {
-    case PIS_OPERAND_SIZE_1:
-        *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_1);
-        break;
-    case PIS_OPERAND_SIZE_2:
-        *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_2);
-        break;
-    case PIS_OPERAND_SIZE_4:
-        *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_4);
-        break;
-    case PIS_OPERAND_SIZE_8:
-        *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_8);
-        break;
-    default:
-        UNREACHABLE();
+        case PIS_OPERAND_SIZE_1:
+            *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_1);
+            break;
+        case PIS_OPERAND_SIZE_2:
+            *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_2);
+            break;
+        case PIS_OPERAND_SIZE_4:
+            *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_4);
+            break;
+        case PIS_OPERAND_SIZE_8:
+            *operand = PIS_OPERAND_CONST(LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx), PIS_OPERAND_SIZE_8);
+            break;
+        default:
+            UNREACHABLE();
     }
 cleanup:
     return err;
@@ -1111,20 +1111,20 @@ cleanup:
 static err_t fetch_imm_of_op_size_zext(const insn_ctx_t* ctx, op_size_t size, u64* operand) {
     err_t err = SUCCESS;
     switch (size) {
-    case OP_SIZE_8:
-        *operand = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-        break;
-    case OP_SIZE_16:
-        *operand = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
-        break;
-    case OP_SIZE_32:
-        *operand = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
-        break;
-    case OP_SIZE_64:
-        *operand = LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx);
-        break;
-    default:
-        UNREACHABLE();
+        case OP_SIZE_8:
+            *operand = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+            break;
+        case OP_SIZE_16:
+            *operand = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
+            break;
+        case OP_SIZE_32:
+            *operand = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+            break;
+        case OP_SIZE_64:
+            *operand = LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx);
+            break;
+        default:
+            UNREACHABLE();
     }
 cleanup:
     return err;
@@ -1135,20 +1135,20 @@ static err_t
     fetch_imm_of_pis_size_zext(const insn_ctx_t* ctx, pis_operand_size_t size, u64* operand) {
     err_t err = SUCCESS;
     switch (size) {
-    case PIS_OPERAND_SIZE_1:
-        *operand = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-        break;
-    case PIS_OPERAND_SIZE_2:
-        *operand = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
-        break;
-    case PIS_OPERAND_SIZE_4:
-        *operand = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
-        break;
-    case PIS_OPERAND_SIZE_8:
-        *operand = LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx);
-        break;
-    default:
-        UNREACHABLE();
+        case PIS_OPERAND_SIZE_1:
+            *operand = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+            break;
+        case PIS_OPERAND_SIZE_2:
+            *operand = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
+            break;
+        case PIS_OPERAND_SIZE_4:
+            *operand = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+            break;
+        case PIS_OPERAND_SIZE_8:
+            *operand = LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx);
+            break;
+        default:
+            UNREACHABLE();
     }
 cleanup:
     return err;
@@ -1158,20 +1158,20 @@ cleanup:
 static err_t fetch_imm_of_op_size_sext(const insn_ctx_t* ctx, op_size_t size, u64* operand) {
     err_t err = SUCCESS;
     switch (size) {
-    case OP_SIZE_8:
-        *operand = (i64) (i8) LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-        break;
-    case OP_SIZE_16:
-        *operand = (i64) (i16) LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
-        break;
-    case OP_SIZE_32:
-        *operand = (i64) (i32) LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
-        break;
-    case OP_SIZE_64:
-        *operand = LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx);
-        break;
-    default:
-        UNREACHABLE();
+        case OP_SIZE_8:
+            *operand = (i64) (i8) LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+            break;
+        case OP_SIZE_16:
+            *operand = (i64) (i16) LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
+            break;
+        case OP_SIZE_32:
+            *operand = (i64) (i32) LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+            break;
+        case OP_SIZE_64:
+            *operand = LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx);
+            break;
+        default:
+            UNREACHABLE();
     }
 cleanup:
     return err;
@@ -2179,21 +2179,24 @@ static err_t lift_second_opcode_byte(const insn_ctx_t* ctx, u8 second_opcode_byt
         // determine the rhs operand according to the opcode
         pis_operand_t shift_count = {};
         switch (second_opcode_byte) {
-        case 0xa4: {
-            // shld r/m, r, imm8
-            u8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-            shift_count = PIS_OPERAND_CONST(imm8, operand_size);
-            break;
-        }
-        case 0xa5: {
-            // shld r/m, r, cl
-            pis_operand_t cl_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, cl_zero_extended, CL));
-            shift_count = cl_zero_extended;
-            break;
-        }
-        default:
-            UNREACHABLE();
+            case 0xa4: {
+                // shld r/m, r, imm8
+                u8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+                shift_count = PIS_OPERAND_CONST(imm8, operand_size);
+                break;
+            }
+            case 0xa5: {
+                // shld r/m, r, cl
+                pis_operand_t cl_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+                LIFT_CTX_EMIT(
+                    ctx->lift_ctx,
+                    PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, cl_zero_extended, CL)
+                );
+                shift_count = cl_zero_extended;
+                break;
+            }
+            default:
+                UNREACHABLE();
         }
 
         pis_operand_t rm_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
@@ -2605,25 +2608,25 @@ old_lift_first_opcode_byte(const insn_ctx_t* ctx, u8 first_opcode_byte) {
         // calculate the appropriate immediate operand according to the opcode
         pis_operand_t imm_operand = {};
         switch (first_opcode_byte) {
-        case 0x80: {
-            // xxx r/m8, imm8
-            u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-            imm_operand = PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1);
-            break;
-        }
-        case 0x81:
-            // xxx r/m, imm
-            CHECK_RETHROW(fetch_imm_of_size_sign_extended(ctx, operand_size, &imm_operand));
-            break;
-        case 0x83: {
-            // xxx r/m, imm8
-            i8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-            u64 imm64 = pis_sign_extend_byte(imm8, operand_size);
-            imm_operand = PIS_OPERAND_CONST(imm64, operand_size);
-            break;
-        }
-        default:
-            UNREACHABLE();
+            case 0x80: {
+                // xxx r/m8, imm8
+                u8 imm = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+                imm_operand = PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_1);
+                break;
+            }
+            case 0x81:
+                // xxx r/m, imm
+                CHECK_RETHROW(fetch_imm_of_size_sign_extended(ctx, operand_size, &imm_operand));
+                break;
+            case 0x83: {
+                // xxx r/m, imm8
+                i8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+                u64 imm64 = pis_sign_extend_byte(imm8, operand_size);
+                imm_operand = PIS_OPERAND_CONST(imm64, operand_size);
+                break;
+            }
+            default:
+                UNREACHABLE();
         }
 
         // determine the kind of binary operation according to the modrm `reg` value.
@@ -2960,27 +2963,30 @@ old_lift_first_opcode_byte(const insn_ctx_t* ctx, u8 first_opcode_byte) {
         // determine the rhs operand according to the opcode
         pis_operand_t rhs_operand = {};
         switch (first_opcode_byte) {
-        case 0xc0:
-        case 0xc1: {
-            // shift r/m[8], imm8
-            u8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-            rhs_operand = PIS_OPERAND_CONST(imm8, operand_size);
-            break;
-        }
-        case 0xd0:
-        case 0xd1:
-            // shift r/m[8], 1
-            rhs_operand = PIS_OPERAND_CONST(1, operand_size);
-            break;
-        case 0xd3: {
-            // shift r/m, cl
-            pis_operand_t cl_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, cl_zero_extended, CL));
-            rhs_operand = cl_zero_extended;
-            break;
-        }
-        default:
-            UNREACHABLE();
+            case 0xc0:
+            case 0xc1: {
+                // shift r/m[8], imm8
+                u8 imm8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+                rhs_operand = PIS_OPERAND_CONST(imm8, operand_size);
+                break;
+            }
+            case 0xd0:
+            case 0xd1:
+                // shift r/m[8], 1
+                rhs_operand = PIS_OPERAND_CONST(1, operand_size);
+                break;
+            case 0xd3: {
+                // shift r/m, cl
+                pis_operand_t cl_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+                LIFT_CTX_EMIT(
+                    ctx->lift_ctx,
+                    PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, cl_zero_extended, CL)
+                );
+                rhs_operand = cl_zero_extended;
+                break;
+            }
+            default:
+                UNREACHABLE();
         }
 
         // determine the kind of binary operation according to the modrm `reg` value.
@@ -3192,13 +3198,13 @@ op_size_t calc_size(const insn_ctx_t* ctx, size_t size_info_index) {
         return size_info->with_operand_size_override;
     } else {
         switch (ctx->lift_ctx->pis_x86_ctx->cpumode) {
-        case PIS_X86_CPUMODE_32_BIT:
-            return size_info->mode_32;
-        case PIS_X86_CPUMODE_64_BIT:
-            return size_info->mode_64;
-        default:
-            // unreachable
-            return OP_SIZE_8;
+            case PIS_X86_CPUMODE_32_BIT:
+                return size_info->mode_32;
+            case PIS_X86_CPUMODE_64_BIT:
+                return size_info->mode_64;
+            default:
+                // unreachable
+                return OP_SIZE_8;
         }
     }
 }
@@ -3233,15 +3239,15 @@ cleanup:
 static pis_operand_t decode_specific_reg(specific_reg_t reg, op_size_t size) {
     u8 reg_encoding;
     switch (reg) {
-    case SPECIFIC_REG_RAX:
-        reg_encoding = 0;
-        break;
-    case SPECIFIC_REG_RCX:
-        reg_encoding = 1;
-        break;
-    case SPECIFIC_REG_RDX:
-        reg_encoding = 2;
-        break;
+        case SPECIFIC_REG_RAX:
+            reg_encoding = 0;
+            break;
+        case SPECIFIC_REG_RCX:
+            reg_encoding = 1;
+            break;
+        case SPECIFIC_REG_RDX:
+            reg_encoding = 2;
+            break;
     }
 
     return PIS_OPERAND_REG(reg_encoding * 8, op_size_to_pis_operand_size(size));
@@ -3252,192 +3258,196 @@ static err_t lift_op(
 ) {
     err_t err = SUCCESS;
     switch (op_info->kind) {
-    case OP_KIND_IMM: {
-        op_size_t encoded_size = calc_size(ctx, op_info->imm.encoded_size_info_index);
-        op_size_t extended_size = calc_size(ctx, op_info->imm.extended_size_info_index);
+        case OP_KIND_IMM: {
+            op_size_t encoded_size = calc_size(ctx, op_info->imm.encoded_size_info_index);
+            op_size_t extended_size = calc_size(ctx, op_info->imm.extended_size_info_index);
 
-        u64 imm = 0;
-        switch (op_info->imm.extend_kind) {
-        case IMM_EXT_SIGN_EXTEND:
-            CHECK_RETHROW(fetch_imm_of_op_size_sext(ctx, encoded_size, &imm));
-            break;
-        case IMM_EXT_ZERO_EXTEND:
-            CHECK_RETHROW(fetch_imm_of_op_size_zext(ctx, encoded_size, &imm));
-            break;
-        }
+            u64 imm = 0;
+            switch (op_info->imm.extend_kind) {
+                case IMM_EXT_SIGN_EXTEND:
+                    CHECK_RETHROW(fetch_imm_of_op_size_sext(ctx, encoded_size, &imm));
+                    break;
+                case IMM_EXT_ZERO_EXTEND:
+                    CHECK_RETHROW(fetch_imm_of_op_size_zext(ctx, encoded_size, &imm));
+                    break;
+            }
 
-        CHECK(extended_size >= encoded_size);
+            CHECK(extended_size >= encoded_size);
 
-        imm &= op_size_max_unsigned_value(extended_size);
+            imm &= op_size_max_unsigned_value(extended_size);
 
-        *lifted_operand = (lifted_op_t) {
-            .kind = LIFTED_OP_KIND_VALUE,
-            .value = PIS_OPERAND_CONST(imm, op_size_to_pis_operand_size(extended_size)),
-        };
-
-        break;
-    }
-    case OP_KIND_SPECIFIC_IMM: {
-        u64 imm;
-
-        switch (op_info->specific_imm.value) {
-        case SPECIFIC_IMM_ZERO:
-            imm = 0;
-            break;
-        case SPECIFIC_IMM_ONE:
-            imm = 1;
-            break;
-        }
-
-        op_size_t size = calc_size(ctx, op_info->specific_imm.operand_size_info_index);
-        *lifted_operand = (lifted_op_t) {
-            .kind = LIFTED_OP_KIND_VALUE,
-            .value = PIS_OPERAND_CONST(imm, op_size_to_pis_operand_size(size)),
-        };
-
-        break;
-    }
-    case OP_KIND_REG: {
-        u8 reg_encoding;
-        switch (op_info->reg.encoding) {
-        case REG_ENC_MODRM: {
-            modrm_t modrm = {};
-            CHECK_RETHROW(get_or_fetch_modrm(ctx, &modrm));
-            reg_encoding = apply_rex_bit_to_reg_encoding(modrm.reg, ctx->prefixes->rex.r);
-            break;
-        }
-        case REG_ENC_OPCODE:
-            reg_encoding = opcode_reg_extract(ctx, opcode_byte);
-            break;
-        }
-
-        op_size_t size = calc_size(ctx, op_info->reg.size_info_index);
-
-        *lifted_operand = (lifted_op_t) {
-            .kind = LIFTED_OP_KIND_WRITABLE_VALUE,
-            .value =
-                reg_get_operand(reg_encoding, op_size_to_pis_operand_size(size), ctx->prefixes),
-        };
-
-        break;
-    }
-    case OP_KIND_RM: {
-        modrm_t modrm = {};
-        CHECK_RETHROW(get_or_fetch_modrm(ctx, &modrm));
-
-        op_size_t size = calc_size(ctx, op_info->rm.size_info_index);
-        pis_operand_size_t pis_operand_size = op_size_to_pis_operand_size(size);
-
-        modrm_rm_operand_t rm_operand = {};
-        CHECK_RETHROW(modrm_decode_rm_operand(ctx, &modrm, pis_operand_size, &rm_operand));
-
-        if (rm_operand.is_memory) {
             *lifted_operand = (lifted_op_t) {
-                .kind = LIFTED_OP_KIND_MEM,
-                .mem =
-                    (lifted_op_mem_t) {
-                        .addr = rm_operand.addr_or_reg,
-                        .size = pis_operand_size,
-                    },
+                .kind = LIFTED_OP_KIND_VALUE,
+                .value = PIS_OPERAND_CONST(imm, op_size_to_pis_operand_size(extended_size)),
             };
-        } else {
+
+            break;
+        }
+        case OP_KIND_SPECIFIC_IMM: {
+            u64 imm;
+
+            switch (op_info->specific_imm.value) {
+                case SPECIFIC_IMM_ZERO:
+                    imm = 0;
+                    break;
+                case SPECIFIC_IMM_ONE:
+                    imm = 1;
+                    break;
+            }
+
+            op_size_t size = calc_size(ctx, op_info->specific_imm.operand_size_info_index);
+            *lifted_operand = (lifted_op_t) {
+                .kind = LIFTED_OP_KIND_VALUE,
+                .value = PIS_OPERAND_CONST(imm, op_size_to_pis_operand_size(size)),
+            };
+
+            break;
+        }
+        case OP_KIND_REG: {
+            u8 reg_encoding;
+            switch (op_info->reg.encoding) {
+                case REG_ENC_MODRM: {
+                    modrm_t modrm = {};
+                    CHECK_RETHROW(get_or_fetch_modrm(ctx, &modrm));
+                    reg_encoding = apply_rex_bit_to_reg_encoding(modrm.reg, ctx->prefixes->rex.r);
+                    break;
+                }
+                case REG_ENC_OPCODE:
+                    reg_encoding = opcode_reg_extract(ctx, opcode_byte);
+                    break;
+            }
+
+            op_size_t size = calc_size(ctx, op_info->reg.size_info_index);
+
             *lifted_operand = (lifted_op_t) {
                 .kind = LIFTED_OP_KIND_WRITABLE_VALUE,
-                .value = rm_operand.addr_or_reg,
+                .value =
+                    reg_get_operand(reg_encoding, op_size_to_pis_operand_size(size), ctx->prefixes),
             };
+
+            break;
         }
-        break;
-    }
-    case OP_KIND_SPECIFIC_REG: {
-        op_size_t size = calc_size(ctx, op_info->specific_reg.size_info_index);
+        case OP_KIND_RM: {
+            modrm_t modrm = {};
+            CHECK_RETHROW(get_or_fetch_modrm(ctx, &modrm));
 
-        *lifted_operand = (lifted_op_t) {
-            .kind = LIFTED_OP_KIND_WRITABLE_VALUE,
-            .value = decode_specific_reg(op_info->specific_reg.reg, size),
-        };
-        break;
-    }
-    case OP_KIND_ZEXT_SPECIFIC_REG: {
-        op_size_t size = calc_size(ctx, op_info->zext_specific_reg.size_info_index);
-        op_size_t extended_size =
-            calc_size(ctx, op_info->zext_specific_reg.extended_size_info_index);
+            op_size_t size = calc_size(ctx, op_info->rm.size_info_index);
+            pis_operand_size_t pis_operand_size = op_size_to_pis_operand_size(size);
 
-        pis_operand_t reg_operand = decode_specific_reg(op_info->zext_specific_reg.reg, size);
+            modrm_rm_operand_t rm_operand = {};
+            CHECK_RETHROW(modrm_decode_rm_operand(ctx, &modrm, pis_operand_size, &rm_operand));
 
-        if (extended_size > size) {
-            pis_operand_t extended_reg =
-                LIFT_CTX_NEW_TMP(ctx->lift_ctx, op_size_to_pis_operand_size(extended_size));
-            LIFT_CTX_EMIT(
-                ctx->lift_ctx,
-                PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, extended_reg, reg_operand)
+            if (rm_operand.is_memory) {
+                *lifted_operand = (lifted_op_t) {
+                    .kind = LIFTED_OP_KIND_MEM,
+                    .mem =
+                        (lifted_op_mem_t) {
+                            .addr = rm_operand.addr_or_reg,
+                            .size = pis_operand_size,
+                        },
+                };
+            } else {
+                *lifted_operand = (lifted_op_t) {
+                    .kind = LIFTED_OP_KIND_WRITABLE_VALUE,
+                    .value = rm_operand.addr_or_reg,
+                };
+            }
+            break;
+        }
+        case OP_KIND_SPECIFIC_REG: {
+            op_size_t size = calc_size(ctx, op_info->specific_reg.size_info_index);
+
+            *lifted_operand = (lifted_op_t) {
+                .kind = LIFTED_OP_KIND_WRITABLE_VALUE,
+                .value = decode_specific_reg(op_info->specific_reg.reg, size),
+            };
+            break;
+        }
+        case OP_KIND_ZEXT_SPECIFIC_REG: {
+            op_size_t size = calc_size(ctx, op_info->zext_specific_reg.size_info_index);
+            op_size_t extended_size =
+                calc_size(ctx, op_info->zext_specific_reg.extended_size_info_index);
+
+            pis_operand_t reg_operand = decode_specific_reg(op_info->zext_specific_reg.reg, size);
+
+            if (extended_size > size) {
+                pis_operand_t extended_reg =
+                    LIFT_CTX_NEW_TMP(ctx->lift_ctx, op_size_to_pis_operand_size(extended_size));
+                LIFT_CTX_EMIT(
+                    ctx->lift_ctx,
+                    PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, extended_reg, reg_operand)
+                );
+                *lifted_operand = (lifted_op_t) {
+                    .kind = LIFTED_OP_KIND_VALUE,
+                    .value = extended_reg,
+                };
+            } else {
+                *lifted_operand = (lifted_op_t) {
+                    .kind = LIFTED_OP_KIND_VALUE,
+                    .value = reg_operand,
+                };
+            }
+
+            break;
+        }
+        case OP_KIND_REL: {
+            // the behvaiour of relative operands with address/operand size override is weird, so
+            // don't allow it.
+            CHECK(
+                !prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_OPERAND_SIZE_OVERRIDE)
             );
+            CHECK(
+                !prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_ADDRESS_SIZE_OVERRIDE)
+            );
+
+            op_size_t size = calc_size(ctx, op_info->rel.size_info_index);
+
+            u64 rel_offset = 0;
+            CHECK_RETHROW(fetch_imm_of_op_size_sext(ctx, size, &rel_offset));
+
+            u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
+            u64 target_addr = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr + rel_offset);
+
             *lifted_operand = (lifted_op_t) {
                 .kind = LIFTED_OP_KIND_VALUE,
-                .value = extended_reg,
+                .value = PIS_OPERAND_RAM(target_addr, PIS_OPERAND_SIZE_1),
             };
-        } else {
-            *lifted_operand = (lifted_op_t) {
-                .kind = LIFTED_OP_KIND_VALUE,
-                .value = reg_operand,
-            };
+
+            break;
         }
+        case OP_KIND_MEM_OFFSET: {
+            u64 addr = 0;
+            CHECK_RETHROW(fetch_imm_of_pis_size_zext(ctx, ctx->addr_size, &addr));
 
-        break;
-    }
-    case OP_KIND_REL: {
-        // the behvaiour of relative operands with address/operand size override is weird, so don't
-        // allow it.
-        CHECK(!prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_OPERAND_SIZE_OVERRIDE));
-        CHECK(!prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_ADDRESS_SIZE_OVERRIDE));
+            *lifted_operand = (lifted_op_t) {
+                .kind = LIFTED_OP_KIND_MEM,
+                .value = PIS_OPERAND_CONST(addr, ctx->addr_size),
+            };
 
-        op_size_t size = calc_size(ctx, op_info->rel.size_info_index);
+            break;
+        }
+        case OP_KIND_IMPLICIT: {
+            op_size_t size = calc_size(ctx, op_info->implicit.size_info_index);
 
-        u64 rel_offset = 0;
-        CHECK_RETHROW(fetch_imm_of_op_size_sext(ctx, size, &rel_offset));
+            // implicit operands are only used to determine the operand size. we pass a constant of
+            // zero with the correct size.
+            *lifted_operand = (lifted_op_t) {
+                .kind = LIFTED_OP_KIND_VALUE,
+                .value = PIS_OPERAND_CONST(0, op_size_to_pis_operand_size(size)),
+            };
+            break;
+        }
+        case OP_KIND_COND: {
+            pis_operand_t cond = {};
+            CHECK_RETHROW(cond_opcode_decode_and_calc(ctx, opcode_byte, &cond));
 
-        u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
-        u64 target_addr = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr + rel_offset);
+            *lifted_operand = (lifted_op_t) {
+                .kind = LIFTED_OP_KIND_VALUE,
+                .value = cond,
+            };
 
-        *lifted_operand = (lifted_op_t) {
-            .kind = LIFTED_OP_KIND_VALUE,
-            .value = PIS_OPERAND_RAM(target_addr, PIS_OPERAND_SIZE_1),
-        };
-
-        break;
-    }
-    case OP_KIND_MEM_OFFSET: {
-        u64 addr = 0;
-        CHECK_RETHROW(fetch_imm_of_pis_size_zext(ctx, ctx->addr_size, &addr));
-
-        *lifted_operand = (lifted_op_t) {
-            .kind = LIFTED_OP_KIND_MEM,
-            .value = PIS_OPERAND_CONST(addr, ctx->addr_size),
-        };
-
-        break;
-    }
-    case OP_KIND_IMPLICIT: {
-        op_size_t size = calc_size(ctx, op_info->implicit.size_info_index);
-
-        // implicit operands are only used to determine the operand size. we pass a constant of zero
-        // with the correct size.
-        *lifted_operand = (lifted_op_t) {
-            .kind = LIFTED_OP_KIND_VALUE,
-            .value = PIS_OPERAND_CONST(0, op_size_to_pis_operand_size(size)),
-        };
-        break;
-    }
-    case OP_KIND_COND: {
-        pis_operand_t cond = {};
-        CHECK_RETHROW(cond_opcode_decode_and_calc(ctx, opcode_byte, &cond));
-
-        *lifted_operand = (lifted_op_t) {
-            .kind = LIFTED_OP_KIND_VALUE,
-            .value = cond,
-        };
-
-        break;
-    }
+            break;
+        }
     }
 cleanup:
     return err;
@@ -3445,27 +3455,27 @@ cleanup:
 
 static pis_operand_size_t lifted_op_size(const lifted_op_t* op) {
     switch (op->kind) {
-    case LIFTED_OP_KIND_MEM:
-        return op->mem.size;
-    case LIFTED_OP_KIND_VALUE:
-    case LIFTED_OP_KIND_WRITABLE_VALUE:
-        return op->value.size;
+        case LIFTED_OP_KIND_MEM:
+            return op->mem.size;
+        case LIFTED_OP_KIND_VALUE:
+        case LIFTED_OP_KIND_WRITABLE_VALUE:
+            return op->value.size;
     }
 }
 
 static err_t lifted_op_read(const insn_ctx_t* ctx, const lifted_op_t* op, pis_operand_t* value) {
     err_t err = SUCCESS;
     switch (op->kind) {
-    case LIFTED_OP_KIND_MEM: {
-        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, op->mem.size);
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_LOAD, tmp, op->mem.addr));
-        *value = tmp;
-        break;
-    }
-    case LIFTED_OP_KIND_VALUE:
-    case LIFTED_OP_KIND_WRITABLE_VALUE:
-        *value = op->value;
-        break;
+        case LIFTED_OP_KIND_MEM: {
+            pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, op->mem.size);
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_LOAD, tmp, op->mem.addr));
+            *value = tmp;
+            break;
+        }
+        case LIFTED_OP_KIND_VALUE:
+        case LIFTED_OP_KIND_WRITABLE_VALUE:
+            *value = op->value;
+            break;
     }
 cleanup:
     return err;
@@ -3475,14 +3485,14 @@ static err_t
     lifted_op_write(const insn_ctx_t* ctx, const lifted_op_t* op, const pis_operand_t* value) {
     err_t err = SUCCESS;
     switch (op->kind) {
-    case LIFTED_OP_KIND_MEM: {
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_STORE, op->mem.addr, *value));
-        break;
-    case LIFTED_OP_KIND_VALUE:
-    case LIFTED_OP_KIND_WRITABLE_VALUE:
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, op->value, *value));
-        break;
-    }
+        case LIFTED_OP_KIND_MEM: {
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_STORE, op->mem.addr, *value));
+            break;
+            case LIFTED_OP_KIND_VALUE:
+            case LIFTED_OP_KIND_WRITABLE_VALUE:
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, op->value, *value));
+                break;
+        }
     }
 cleanup:
     return err;

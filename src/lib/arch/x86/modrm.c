@@ -84,63 +84,68 @@ static err_t build_modrm_rm_addr_16_into(
     } else {
         // handle the base regs
         switch (modrm->rm) {
-        case 0b000:
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, BX));
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, SI));
-            break;
-        case 0b001:
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, BX));
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, DI));
-            break;
-        case 0b010:
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, BP));
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, SI));
-            break;
-        case 0b011:
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, BP));
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, DI));
-            break;
-        case 0b100:
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, SI));
-            break;
-        case 0b101:
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, DI));
-            break;
-        case 0b110:
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, BP));
-            break;
-        case 0b111:
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, BX));
-            break;
+            case 0b000:
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, BX));
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, SI));
+                break;
+            case 0b001:
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, BX));
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, DI));
+                break;
+            case 0b010:
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, BP));
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, SI));
+                break;
+            case 0b011:
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, BP));
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, DI));
+                break;
+            case 0b100:
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, SI));
+                break;
+            case 0b101:
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, DI));
+                break;
+            case 0b110:
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, BP));
+                break;
+            case 0b111:
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *into, BX));
+                break;
         }
 
         // now handle displacement
         switch (modrm->mod) {
-        case 0b00:
-            // no displacement
-            break;
-        case 0b01: {
-            // 8 bit displacement
-            i8 disp8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-            // sign extend it to 16 bits
-            u16 disp16 = (i16) disp8;
-            LIFT_CTX_EMIT(
-                ctx->lift_ctx,
-                PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp16, ctx->addr_size))
-            );
-            break;
-        }
-        case 0b10: {
-            // 16 bit displacement
-            u16 disp = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
-            LIFT_CTX_EMIT(
-                ctx->lift_ctx,
-                PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
-            );
-            break;
-        }
-        case 0b11:
-            UNREACHABLE();
+            case 0b00:
+                // no displacement
+                break;
+            case 0b01: {
+                // 8 bit displacement
+                i8 disp8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+                // sign extend it to 16 bits
+                u16 disp16 = (i16) disp8;
+                LIFT_CTX_EMIT(
+                    ctx->lift_ctx,
+                    PIS_INSN3(
+                        PIS_OPCODE_ADD,
+                        *into,
+                        *into,
+                        PIS_OPERAND_CONST(disp16, ctx->addr_size)
+                    )
+                );
+                break;
+            }
+            case 0b10: {
+                // 16 bit displacement
+                u16 disp = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
+                LIFT_CTX_EMIT(
+                    ctx->lift_ctx,
+                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
+                );
+                break;
+            }
+            case 0b11:
+                UNREACHABLE();
         }
     }
 cleanup:
@@ -171,31 +176,36 @@ static err_t build_modrm_rm_addr_32_into(
 
         // handle displacement
         switch (modrm->mod) {
-        case 0b00:
-            // no displacement
-            break;
-        case 0b01: {
-            // 8 bit displacement
-            i8 disp8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-            // sign extend it to 32 bits
-            u32 disp32 = (i32) disp8;
-            LIFT_CTX_EMIT(
-                ctx->lift_ctx,
-                PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp32, ctx->addr_size))
-            );
-            break;
-        }
-        case 0b10: {
-            // 32 bit displacement
-            u32 disp = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
-            LIFT_CTX_EMIT(
-                ctx->lift_ctx,
-                PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
-            );
-            break;
-        }
-        case 0b11:
-            UNREACHABLE();
+            case 0b00:
+                // no displacement
+                break;
+            case 0b01: {
+                // 8 bit displacement
+                i8 disp8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+                // sign extend it to 32 bits
+                u32 disp32 = (i32) disp8;
+                LIFT_CTX_EMIT(
+                    ctx->lift_ctx,
+                    PIS_INSN3(
+                        PIS_OPCODE_ADD,
+                        *into,
+                        *into,
+                        PIS_OPERAND_CONST(disp32, ctx->addr_size)
+                    )
+                );
+                break;
+            }
+            case 0b10: {
+                // 32 bit displacement
+                u32 disp = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+                LIFT_CTX_EMIT(
+                    ctx->lift_ctx,
+                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
+                );
+                break;
+            }
+            case 0b11:
+                UNREACHABLE();
         }
     }
 
@@ -236,33 +246,43 @@ static err_t build_modrm_rm_addr_64_into(
 
         // handle displacement
         switch (modrm->mod) {
-        case 0b00:
-            // no displacement
-            break;
-        case 0b01: {
-            // 8 bit displacement
-            i8 disp8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-            // sign extend it to 64 bits
-            u64 disp64 = (i64) disp8;
-            LIFT_CTX_EMIT(
-                ctx->lift_ctx,
-                PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp64, ctx->addr_size))
-            );
-            break;
-        }
-        case 0b10: {
-            // 32 bit displacement
-            i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
-            // sign extend it to 64 bits
-            u64 disp64 = (i64) disp32;
-            LIFT_CTX_EMIT(
-                ctx->lift_ctx,
-                PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp64, ctx->addr_size))
-            );
-            break;
-        }
-        case 0b11:
-            UNREACHABLE();
+            case 0b00:
+                // no displacement
+                break;
+            case 0b01: {
+                // 8 bit displacement
+                i8 disp8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+                // sign extend it to 64 bits
+                u64 disp64 = (i64) disp8;
+                LIFT_CTX_EMIT(
+                    ctx->lift_ctx,
+                    PIS_INSN3(
+                        PIS_OPCODE_ADD,
+                        *into,
+                        *into,
+                        PIS_OPERAND_CONST(disp64, ctx->addr_size)
+                    )
+                );
+                break;
+            }
+            case 0b10: {
+                // 32 bit displacement
+                i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+                // sign extend it to 64 bits
+                u64 disp64 = (i64) disp32;
+                LIFT_CTX_EMIT(
+                    ctx->lift_ctx,
+                    PIS_INSN3(
+                        PIS_OPCODE_ADD,
+                        *into,
+                        *into,
+                        PIS_OPERAND_CONST(disp64, ctx->addr_size)
+                    )
+                );
+                break;
+            }
+            case 0b11:
+                UNREACHABLE();
         }
     }
 
@@ -279,17 +299,17 @@ static err_t build_modrm_rm_addr_into(
     CHECK(modrm->mod != 0b11);
 
     switch (ctx->addr_size) {
-    case PIS_OPERAND_SIZE_8:
-        CHECK_RETHROW(build_modrm_rm_addr_64_into(ctx, modrm, into));
-        break;
-    case PIS_OPERAND_SIZE_4:
-        CHECK_RETHROW(build_modrm_rm_addr_32_into(ctx, modrm, into));
-        break;
-    case PIS_OPERAND_SIZE_2:
-        CHECK_RETHROW(build_modrm_rm_addr_16_into(ctx, modrm, into));
-        break;
-    case PIS_OPERAND_SIZE_1:
-        UNREACHABLE();
+        case PIS_OPERAND_SIZE_8:
+            CHECK_RETHROW(build_modrm_rm_addr_64_into(ctx, modrm, into));
+            break;
+        case PIS_OPERAND_SIZE_4:
+            CHECK_RETHROW(build_modrm_rm_addr_32_into(ctx, modrm, into));
+            break;
+        case PIS_OPERAND_SIZE_2:
+            CHECK_RETHROW(build_modrm_rm_addr_16_into(ctx, modrm, into));
+            break;
+        case PIS_OPERAND_SIZE_1:
+            UNREACHABLE();
     }
 cleanup:
     return err;
@@ -418,14 +438,14 @@ err_t modrm_operand_read(
     err_t err = SUCCESS;
 
     switch (operand->type) {
-    case MODRM_OPERAND_TYPE_REG:
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *read_into, operand->reg));
-        break;
-    case MODRM_OPERAND_TYPE_RM:
-        CHECK_RETHROW(modrm_rm_read(ctx, read_into, &operand->rm));
-        break;
-    default:
-        UNREACHABLE();
+        case MODRM_OPERAND_TYPE_REG:
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *read_into, operand->reg));
+            break;
+        case MODRM_OPERAND_TYPE_RM:
+            CHECK_RETHROW(modrm_rm_read(ctx, read_into, &operand->rm));
+            break;
+        default:
+            UNREACHABLE();
     }
 
 cleanup:
@@ -438,14 +458,14 @@ err_t modrm_operand_write(
     err_t err = SUCCESS;
 
     switch (operand->type) {
-    case MODRM_OPERAND_TYPE_REG:
-        CHECK_RETHROW(write_gpr(ctx, &operand->reg, to_write));
-        break;
-    case MODRM_OPERAND_TYPE_RM:
-        CHECK_RETHROW(modrm_rm_write(ctx, &operand->rm, to_write));
-        break;
-    default:
-        UNREACHABLE();
+        case MODRM_OPERAND_TYPE_REG:
+            CHECK_RETHROW(write_gpr(ctx, &operand->reg, to_write));
+            break;
+        case MODRM_OPERAND_TYPE_RM:
+            CHECK_RETHROW(modrm_rm_write(ctx, &operand->rm, to_write));
+            break;
+        default:
+            UNREACHABLE();
     }
 
 cleanup:
