@@ -3621,6 +3621,30 @@ cleanup:
     return err;
 }
 
+static err_t handle_mnemonic_bt(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 2);
+
+    pis_operand_t bit_offset = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &bit_offset));
+
+    switch (ops[0].kind) {
+        case LIFTED_OP_KIND_MEM:
+            CHECK_RETHROW(do_bt_memory(ctx, &ops[0].mem.addr, &bit_offset));
+            break;
+        case LIFTED_OP_KIND_VALUE:
+        case LIFTED_OP_KIND_WRITABLE_VALUE:
+            CHECK(ops[0].value.addr.space == PIS_SPACE_REG);
+            CHECK_RETHROW(do_bt_reg(ctx, &ops[0].value, &bit_offset));
+            break;
+        default:
+            UNREACHABLE();
+    }
+
+cleanup:
+    return err;
+}
+
 static err_t
     handle_mnemonic_movzx(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
@@ -3803,6 +3827,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_CALL] = handle_mnemonic_call,     [MNEMONIC_JMP] = handle_mnemonic_jmp,
     [MNEMONIC_TEST] = handle_mnemonic_test,     [MNEMONIC_DEC] = handle_mnemonic_dec,
     [MNEMONIC_CMOVCC] = handle_mnemonic_cmovcc, [MNEMONIC_MOVZX] = handle_mnemonic_movzx,
+    [MNEMONIC_BT] = handle_mnemonic_bt,
 };
 
 static err_t lift_regular_insn_info(
