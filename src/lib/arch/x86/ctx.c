@@ -3676,8 +3676,11 @@ cleanup:
     return err;
 }
 
-static err_t
-    handle_mnemonic_movzx(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+/// handles a mnemonic which extends the size of the first operand and stores the result in the
+/// second operand.
+static err_t handle_mnemonic_extend(
+    const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount, pis_opcode_t extend_opcode
+) {
     err_t err = SUCCESS;
     CHECK(ops_amount == 2);
 
@@ -3685,9 +3688,32 @@ static err_t
     CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &rhs));
 
     pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, lifted_op_size(&ops[0]));
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, tmp, rhs));
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(extend_opcode, tmp, rhs));
 
     CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &tmp));
+cleanup:
+    return err;
+}
+
+static err_t
+    handle_mnemonic_movzx(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW(handle_mnemonic_extend(ctx, ops, ops_amount, PIS_OPCODE_ZERO_EXTEND));
+cleanup:
+    return err;
+}
+
+static err_t
+    handle_mnemonic_movsxd(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+
+    // on 32-bit mode, the same byte is used to encode a different instruction, `ARPL`. this
+    // behaviour of having a single byte decode to different instructions based on cpumode is
+    // currently not supported, so make sure that we are in 64-bit mode here to avoid mis-decoding
+    // the instruction.
+    CHECK(ctx->lift_ctx->pis_x86_ctx->cpumode == PIS_X86_CPUMODE_64_BIT);
+
+    CHECK_RETHROW(handle_mnemonic_extend(ctx, ops, ops_amount, PIS_OPCODE_SIGN_EXTEND));
 cleanup:
     return err;
 }
@@ -3859,7 +3885,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_TEST] = handle_mnemonic_test,     [MNEMONIC_DEC] = handle_mnemonic_dec,
     [MNEMONIC_CMOVCC] = handle_mnemonic_cmovcc, [MNEMONIC_MOVZX] = handle_mnemonic_movzx,
     [MNEMONIC_BT] = handle_mnemonic_bt,         [MNEMONIC_SBB] = handle_mnemonic_sbb,
-    [MNEMONIC_INC] = handle_mnemonic_inc,
+    [MNEMONIC_INC] = handle_mnemonic_inc,       [MNEMONIC_MOVSXD] = handle_mnemonic_movsxd,
 };
 
 static err_t lift_regular_insn_info(
