@@ -34,6 +34,7 @@ typedef enum {
     LIFTED_OP_KIND_VALUE,
     LIFTED_OP_KIND_WRITABLE_VALUE,
     LIFTED_OP_KIND_MEM,
+    LIFTED_OP_KIND_IMPLICIT,
 } lifted_op_kind_t;
 
 typedef struct {
@@ -46,6 +47,9 @@ typedef struct {
     union {
         pis_operand_t value;
         lifted_op_mem_t mem;
+        struct {
+            pis_operand_size_t size;
+        } implicit;
     };
 } lifted_op_t;
 
@@ -3433,11 +3437,13 @@ static err_t lift_op(
         case OP_KIND_IMPLICIT: {
             op_size_t size = calc_size(ctx, op_info->implicit.size_info_index);
 
-            // implicit operands are only used to determine the operand size. we pass a constant of
-            // zero with the correct size.
+            // implicit operands are only used to determine the operand size.
             *lifted_operand = (lifted_op_t) {
-                .kind = LIFTED_OP_KIND_VALUE,
-                .value = PIS_OPERAND_CONST(0, op_size_to_pis_operand_size(size)),
+                .kind = LIFTED_OP_KIND_IMPLICIT,
+                .implicit =
+                    {
+                        .size = op_size_to_pis_operand_size(size),
+                    },
             };
             break;
         }
@@ -3483,6 +3489,9 @@ static err_t lifted_op_read(const insn_ctx_t* ctx, const lifted_op_t* op, pis_op
         case LIFTED_OP_KIND_WRITABLE_VALUE:
             *value = op->value;
             break;
+        case LIFTED_OP_KIND_IMPLICIT:
+            // can't read implicit operands
+            UNREACHABLE();
     }
 cleanup:
     return err;
@@ -3495,11 +3504,14 @@ static err_t
         case LIFTED_OP_KIND_MEM: {
             LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_STORE, op->mem.addr, *value));
             break;
-            case LIFTED_OP_KIND_VALUE:
-            case LIFTED_OP_KIND_WRITABLE_VALUE:
-                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, op->value, *value));
-                break;
         }
+        case LIFTED_OP_KIND_VALUE:
+        case LIFTED_OP_KIND_WRITABLE_VALUE:
+            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, op->value, *value));
+            break;
+        case LIFTED_OP_KIND_IMPLICIT:
+            // can't write to implicit operands
+            UNREACHABLE();
     }
 cleanup:
     return err;
@@ -3610,6 +3622,38 @@ cleanup:
     return err;
 }
 
+static err_t
+    handle_mnemonic_stos(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+
+    // we expect 1 implicit operand
+    CHECK(ops_amount == 1);
+    CHECK(ops[0].kind == LIFTED_OP_KIND_IMPLICIT);
+
+    // `stos` must be used with a `rep` prefix
+    CHECK(group1_prefix(ctx) == LEGACY_PREFIX_REPZ_OR_REP);
+
+    rep_ctx_t rep_ctx = {};
+    CHECK_RETHROW(rep_begin(ctx, &rep_ctx));
+
+    pis_operand_size_t operand_size = ops[0].implicit.size;
+
+    pis_operand_t ax = operand_resize(&RAX, operand_size);
+    pis_operand_t di = operand_resize(&RDI, ctx->addr_size);
+
+    // copy one chunk from ax to [di].
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_STORE, di, ax));
+
+    // increment di
+    pis_operand_t increment =
+        PIS_OPERAND_CONST(pis_operand_size_to_bytes(operand_size), ctx->addr_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, di, di, increment));
+
+    CHECK_RETHROW(rep_end(ctx, &rep_ctx));
+cleanup:
+    return err;
+}
+
 static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_SHR] = handle_mnemonic_shr,
     [MNEMONIC_XOR] = handle_mnemonic_xor,
@@ -3622,6 +3666,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_POP] = handle_mnemonic_pop,
     [MNEMONIC_PUSH] = handle_mnemonic_push,
     [MNEMONIC_LEA] = handle_mnemonic_lea,
+    [MNEMONIC_STOS] = handle_mnemonic_stos,
 };
 
 static err_t lift_regular_insn_info(
