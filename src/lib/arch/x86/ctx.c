@@ -3718,6 +3718,13 @@ cleanup:
     return err;
 }
 
+static err_t handle_mnemonic_nop(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    UNUSED(ctx);
+    UNUSED(ops);
+    UNUSED(ops_amount);
+    return SUCCESS;
+}
+
 static err_t
     handle_mnemonic_cmovcc(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
@@ -3925,7 +3932,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_CMOVCC] = handle_mnemonic_cmovcc, [MNEMONIC_MOVZX] = handle_mnemonic_movzx,
     [MNEMONIC_BT] = handle_mnemonic_bt,         [MNEMONIC_SBB] = handle_mnemonic_sbb,
     [MNEMONIC_INC] = handle_mnemonic_inc,       [MNEMONIC_MOVSXD] = handle_mnemonic_movsxd,
-    [MNEMONIC_RET] = handle_mnemonic_ret,
+    [MNEMONIC_RET] = handle_mnemonic_ret,       [MNEMONIC_NOP] = handle_mnemonic_nop,
 };
 
 static err_t lift_regular_insn_info(
