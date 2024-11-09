@@ -3518,7 +3518,7 @@ cleanup:
 }
 
 static err_t handle_mnemonic_binop(
-    const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount, binop_fn_t binop
+    const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount, binop_fn_t binop, bool store
 ) {
     err_t err = SUCCESS;
     CHECK(ops_amount == 2);
@@ -3532,7 +3532,9 @@ static err_t handle_mnemonic_binop(
     pis_operand_t res = {};
     CHECK_RETHROW(binop(ctx, &lhs, &rhs, &res));
 
-    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &res));
+    if (store) {
+        CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &res));
+    }
 cleanup:
     return err;
 }
@@ -3544,10 +3546,23 @@ cleanup:
         size_t ops_amount                                                                          \
     ) {                                                                                            \
         err_t err = SUCCESS;                                                                       \
-        CHECK_RETHROW(handle_mnemonic_binop(ctx, ops, ops_amount, binop_##NAME));                  \
+        CHECK_RETHROW(handle_mnemonic_binop(ctx, ops, ops_amount, binop_##NAME, true));            \
     cleanup:                                                                                       \
         return err;                                                                                \
     }
+
+#define DEFINE_COMPARISON_BINOP_MNEMONIC_HANDLER(NAME, BINOP_NAME)                                 \
+    static err_t handle_mnemonic_##NAME(                                                           \
+        const insn_ctx_t* ctx,                                                                     \
+        const lifted_op_t* ops,                                                                    \
+        size_t ops_amount                                                                          \
+    ) {                                                                                            \
+        err_t err = SUCCESS;                                                                       \
+        CHECK_RETHROW(handle_mnemonic_binop(ctx, ops, ops_amount, binop_##BINOP_NAME, false));     \
+    cleanup:                                                                                       \
+        return err;                                                                                \
+    }
+
 
 DEFINE_BINOP_MNEMONIC_HANDLER(add);
 DEFINE_BINOP_MNEMONIC_HANDLER(and);
@@ -3555,6 +3570,8 @@ DEFINE_BINOP_MNEMONIC_HANDLER(sub);
 DEFINE_BINOP_MNEMONIC_HANDLER(shr);
 DEFINE_BINOP_MNEMONIC_HANDLER(xor);
 DEFINE_BINOP_MNEMONIC_HANDLER(or);
+
+DEFINE_COMPARISON_BINOP_MNEMONIC_HANDLER(cmp, sub);
 
 static err_t handle_mnemonic_mov(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
@@ -3667,6 +3684,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_PUSH] = handle_mnemonic_push,
     [MNEMONIC_LEA] = handle_mnemonic_lea,
     [MNEMONIC_STOS] = handle_mnemonic_stos,
+    [MNEMONIC_CMP] = handle_mnemonic_cmp,
 };
 
 static err_t lift_regular_insn_info(
