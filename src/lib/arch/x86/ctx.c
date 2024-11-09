@@ -3544,6 +3544,36 @@ cleanup:
     return err;
 }
 
+static err_t handle_mnemonic_sbb(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 2);
+
+    pis_operand_t lhs = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &lhs));
+
+    pis_operand_t rhs = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &rhs));
+
+    // first, zero extend CF
+    pis_operand_t rhs_plus_cf;
+    if (rhs.size == PIS_OPERAND_SIZE_1) {
+        rhs_plus_cf = FLAGS_CF;
+    } else {
+        rhs_plus_cf = LIFT_CTX_NEW_TMP(ctx->lift_ctx, rhs.size);
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, rhs_plus_cf, FLAGS_CF));
+    }
+
+    // add rhs to CF
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, rhs_plus_cf, rhs_plus_cf, rhs));
+
+    pis_operand_t res = {};
+    CHECK_RETHROW(binop_sub(ctx, &lhs, &rhs_plus_cf, &res));
+
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &res));
+
+cleanup:
+    return err;
+}
 static err_t handle_mnemonic_unary_op(
     const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount, unary_op_fn_t unary_op
 ) {
@@ -3827,7 +3857,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_CALL] = handle_mnemonic_call,     [MNEMONIC_JMP] = handle_mnemonic_jmp,
     [MNEMONIC_TEST] = handle_mnemonic_test,     [MNEMONIC_DEC] = handle_mnemonic_dec,
     [MNEMONIC_CMOVCC] = handle_mnemonic_cmovcc, [MNEMONIC_MOVZX] = handle_mnemonic_movzx,
-    [MNEMONIC_BT] = handle_mnemonic_bt,
+    [MNEMONIC_BT] = handle_mnemonic_bt,         [MNEMONIC_SBB] = handle_mnemonic_sbb,
 };
 
 static err_t lift_regular_insn_info(
