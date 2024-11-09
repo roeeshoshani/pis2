@@ -691,6 +691,11 @@ cleanup:
 typedef err_t (*binop_fn_t
 )(const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result);
 
+/// the prototype for a unary operation function - that is an operation which takes 1 operand and
+/// applies some operation to it, for example a `NOT` operation.
+typedef err_t (*unary_op_fn_t
+)(const insn_ctx_t* ctx, const pis_operand_t* operand, pis_operand_t* result);
+
 /// calculates a binary operation with modrm operands as inputs using the given operand size.
 /// returns an operand containing the result of the operation in `result`.
 static err_t calc_binop_modrm_with_size(
@@ -3539,6 +3544,23 @@ cleanup:
     return err;
 }
 
+static err_t handle_mnemonic_unary_op(
+    const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount, unary_op_fn_t unary_op
+) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 1);
+
+    pis_operand_t op = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &op));
+
+    pis_operand_t res = {};
+    CHECK_RETHROW(unary_op(ctx, &op, &res));
+
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &res));
+cleanup:
+    return err;
+}
+
 #define DEFINE_BINOP_MNEMONIC_HANDLER(NAME)                                                        \
     static err_t handle_mnemonic_##NAME(                                                           \
         const insn_ctx_t* ctx,                                                                     \
@@ -3563,6 +3585,17 @@ cleanup:
         return err;                                                                                \
     }
 
+#define DEFINE_UNARY_OP_MNEMONIC_HANDLER(NAME)                                                     \
+    static err_t handle_mnemonic_##NAME(                                                           \
+        const insn_ctx_t* ctx,                                                                     \
+        const lifted_op_t* ops,                                                                    \
+        size_t ops_amount                                                                          \
+    ) {                                                                                            \
+        err_t err = SUCCESS;                                                                       \
+        CHECK_RETHROW(handle_mnemonic_unary_op(ctx, ops, ops_amount, unary_op_##NAME));            \
+    cleanup:                                                                                       \
+        return err;                                                                                \
+    }
 
 DEFINE_BINOP_MNEMONIC_HANDLER(add);
 DEFINE_BINOP_MNEMONIC_HANDLER(and);
@@ -3573,6 +3606,8 @@ DEFINE_BINOP_MNEMONIC_HANDLER(or);
 
 DEFINE_COMPARISON_BINOP_MNEMONIC_HANDLER(cmp, sub);
 DEFINE_COMPARISON_BINOP_MNEMONIC_HANDLER(test, and);
+
+DEFINE_UNARY_OP_MNEMONIC_HANDLER(dec);
 
 static err_t handle_mnemonic_mov(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
@@ -3735,6 +3770,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_CALL] = handle_mnemonic_call,
     [MNEMONIC_JMP] = handle_mnemonic_jmp,
     [MNEMONIC_TEST] = handle_mnemonic_test,
+    [MNEMONIC_DEC] = handle_mnemonic_dec,
 };
 
 static err_t lift_regular_insn_info(
