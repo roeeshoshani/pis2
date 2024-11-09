@@ -322,7 +322,7 @@ const modrm_reg_opcode_ext_table_t modrm_reg_opcode_ext_tables[] = {
                     .ops_amount = 2,
                 },
                 {
-                    .mnemonic = MNEMONIC_CMD,
+                    .mnemonic = MNEMONIC_CMP,
                     .first_op_index = 24,
                     .ops_amount = 2,
                 },
@@ -367,7 +367,7 @@ const modrm_reg_opcode_ext_table_t modrm_reg_opcode_ext_tables[] = {
                     .ops_amount = 2,
                 },
                 {
-                    .mnemonic = MNEMONIC_CMD,
+                    .mnemonic = MNEMONIC_CMP,
                     .first_op_index = 20,
                     .ops_amount = 2,
                 },
@@ -412,7 +412,7 @@ const modrm_reg_opcode_ext_table_t modrm_reg_opcode_ext_tables[] = {
                     .ops_amount = 2,
                 },
                 {
-                    .mnemonic = MNEMONIC_CMD,
+                    .mnemonic = MNEMONIC_CMP,
                     .first_op_index = 43,
                     .ops_amount = 2,
                 },
