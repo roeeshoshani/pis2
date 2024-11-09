@@ -14,6 +14,12 @@ const op_size_info_t op_size_infos_table[] = {
     {
         .with_operand_size_override = OP_SIZE_16,
         .mode_32 = OP_SIZE_32,
+        .mode_64 = OP_SIZE_32,
+        .mode_64_with_rex_w = OP_SIZE_32,
+    },
+    {
+        .with_operand_size_override = OP_SIZE_16,
+        .mode_32 = OP_SIZE_32,
         .mode_64 = OP_SIZE_64,
         .mode_64_with_rex_w = OP_SIZE_64,
     },
@@ -21,12 +27,6 @@ const op_size_info_t op_size_infos_table[] = {
         .with_operand_size_override = OP_SIZE_8,
         .mode_32 = OP_SIZE_16,
         .mode_64 = OP_SIZE_16,
-        .mode_64_with_rex_w = OP_SIZE_32,
-    },
-    {
-        .with_operand_size_override = OP_SIZE_16,
-        .mode_32 = OP_SIZE_32,
-        .mode_64 = OP_SIZE_32,
         .mode_64_with_rex_w = OP_SIZE_32,
     },
 };
@@ -65,8 +65,8 @@ const op_info_t op_infos_table[] = {
         .imm =
             {
                 .kind = OP_KIND_IMM,
-                .encoded_size_info_index = 4,
-                .extended_size_info_index = 2,
+                .encoded_size_info_index = 2,
+                .extended_size_info_index = 3,
                 .extend_kind = IMM_EXT_SIGN_EXTEND,
             },
     },
@@ -74,7 +74,7 @@ const op_info_t op_infos_table[] = {
         .rm =
             {
                 .kind = OP_KIND_RM,
-                .size_info_index = 4,
+                .size_info_index = 2,
             },
     },
     {
@@ -88,7 +88,7 @@ const op_info_t op_infos_table[] = {
         .imm =
             {
                 .kind = OP_KIND_IMM,
-                .encoded_size_info_index = 4,
+                .encoded_size_info_index = 2,
                 .extended_size_info_index = 1,
                 .extend_kind = IMM_EXT_SIGN_EXTEND,
             },
@@ -154,7 +154,7 @@ const op_info_t op_infos_table[] = {
             {
                 .kind = OP_KIND_IMM,
                 .encoded_size_info_index = 0,
-                .extended_size_info_index = 2,
+                .extended_size_info_index = 3,
                 .extend_kind = IMM_EXT_SIGN_EXTEND,
             },
     },
@@ -210,7 +210,7 @@ const op_info_t op_infos_table[] = {
         .rm =
             {
                 .kind = OP_KIND_RM,
-                .size_info_index = 2,
+                .size_info_index = 3,
             },
     },
     {
@@ -232,7 +232,7 @@ const op_info_t op_infos_table[] = {
         .reg =
             {
                 .kind = OP_KIND_REG,
-                .size_info_index = 2,
+                .size_info_index = 3,
                 .encoding = REG_ENC_OPCODE,
             },
     },
@@ -240,7 +240,7 @@ const op_info_t op_infos_table[] = {
         .specific_reg =
             {
                 .kind = OP_KIND_SPECIFIC_REG,
-                .size_info_index = 3,
+                .size_info_index = 4,
                 .reg = SPECIFIC_REG_RAX,
             },
     },
