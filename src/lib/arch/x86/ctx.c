@@ -3803,6 +3803,19 @@ cleanup:
     return err;
 }
 
+static err_t
+    handle_mnemonic_setcc(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 2);
+
+    pis_operand_t cond = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &cond));
+
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[1], &cond));
+cleanup:
+    return err;
+}
+
 static err_t handle_mnemonic_jcc(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
     CHECK(ops_amount == 2);
@@ -4026,6 +4039,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_SHL] = handle_mnemonic_shl,       [MNEMONIC_IMUL] = handle_mnemonic_imul,
     [MNEMONIC_MOVS] = handle_mnemonic_movs,     [MNEMONIC_NOT] = handle_mnemonic_not,
     [MNEMONIC_NEG] = handle_mnemonic_neg,       [MNEMONIC_MOVSX] = handle_mnemonic_movsx,
+    [MNEMONIC_SETCC] = handle_mnemonic_setcc,
 };
 
 static err_t lift_regular_insn_info(
