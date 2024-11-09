@@ -3963,6 +3963,41 @@ cleanup:
     return err;
 }
 
+static err_t
+    handle_mnemonic_movs(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+
+    // we expect 1 implicit operand
+    CHECK(ops_amount == 1);
+    CHECK(ops[0].kind == LIFTED_OP_KIND_IMPLICIT);
+
+    // `stos` must be used with a `rep` prefix
+    CHECK(group1_prefix(ctx) == LEGACY_PREFIX_REPZ_OR_REP);
+
+    rep_ctx_t rep_ctx = {};
+    CHECK_RETHROW(rep_begin(ctx, &rep_ctx));
+
+    pis_operand_size_t operand_size = ops[0].implicit.size;
+
+    pis_operand_t si = operand_resize(&RSI, ctx->addr_size);
+    pis_operand_t di = operand_resize(&RDI, ctx->addr_size);
+
+    // copy one chunk from [si] to [di].
+    pis_operand_t byte_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_LOAD, byte_tmp, si));
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_STORE, di, byte_tmp));
+
+    // increment si and di
+    pis_operand_t increment =
+        PIS_OPERAND_CONST(pis_operand_size_to_bytes(operand_size), ctx->addr_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, si, si, increment));
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, di, di, increment));
+
+    CHECK_RETHROW(rep_end(ctx, &rep_ctx));
+cleanup:
+    return err;
+}
+
 static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_SHR] = handle_mnemonic_shr,       [MNEMONIC_XOR] = handle_mnemonic_xor,
     [MNEMONIC_ADD] = handle_mnemonic_add,       [MNEMONIC_AND] = handle_mnemonic_and,
@@ -3979,6 +4014,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_RET] = handle_mnemonic_ret,       [MNEMONIC_NOP] = handle_mnemonic_nop,
     [MNEMONIC_HLT] = handle_mnemonic_hlt,       [MNEMONIC_SAR] = handle_mnemonic_sar,
     [MNEMONIC_SHL] = handle_mnemonic_shl,       [MNEMONIC_IMUL] = handle_mnemonic_imul,
+    [MNEMONIC_MOVS] = handle_mnemonic_movs,
 };
 
 static err_t lift_regular_insn_info(
