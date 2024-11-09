@@ -3727,6 +3727,37 @@ static err_t handle_mnemonic_nop(const insn_ctx_t* ctx, const lifted_op_t* ops, 
     return SUCCESS;
 }
 
+static err_t
+    handle_mnemonic_imul(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+
+    switch (ops_amount) {
+        case 1:
+            TODO();
+            break;
+        case 2:
+            CHECK_RETHROW(handle_mnemonic_binop(ctx, ops, ops_amount, binop_imul, true));
+            break;
+        case 3: {
+            pis_operand_t lhs = {};
+            CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &lhs));
+
+            pis_operand_t rhs = {};
+            CHECK_RETHROW(lifted_op_read(ctx, &ops[2], &rhs));
+
+            pis_operand_t res = {};
+            CHECK_RETHROW(binop_imul(ctx, &lhs, &rhs, &res));
+
+            CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &res));
+            break;
+        }
+        default:
+            UNREACHABLE();
+    }
+cleanup:
+    return err;
+}
+
 static err_t handle_mnemonic_hlt(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
 
@@ -3947,7 +3978,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_INC] = handle_mnemonic_inc,       [MNEMONIC_MOVSXD] = handle_mnemonic_movsxd,
     [MNEMONIC_RET] = handle_mnemonic_ret,       [MNEMONIC_NOP] = handle_mnemonic_nop,
     [MNEMONIC_HLT] = handle_mnemonic_hlt,       [MNEMONIC_SAR] = handle_mnemonic_sar,
-    [MNEMONIC_SHL] = handle_mnemonic_shl,
+    [MNEMONIC_SHL] = handle_mnemonic_shl,       [MNEMONIC_IMUL] = handle_mnemonic_imul,
 };
 
 static err_t lift_regular_insn_info(
