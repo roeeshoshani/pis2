@@ -3617,6 +3617,19 @@ cleanup:
     return err;
 }
 
+static err_t handle_mnemonic_jmp(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 1);
+
+    pis_operand_t target = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &target));
+
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN1(PIS_OPCODE_JMP, target));
+
+cleanup:
+    return err;
+}
+
 static err_t handle_mnemonic_lea(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
     CHECK(ops_amount == 2);
@@ -3719,6 +3732,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_CMP] = handle_mnemonic_cmp,
     [MNEMONIC_JCC] = handle_mnemonic_jcc,
     [MNEMONIC_CALL] = handle_mnemonic_call,
+    [MNEMONIC_JMP] = handle_mnemonic_jmp,
 };
 
 static err_t lift_regular_insn_info(
