@@ -3622,6 +3622,22 @@ cleanup:
 }
 
 static err_t
+    handle_mnemonic_movzx(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 2);
+
+    pis_operand_t rhs = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &rhs));
+
+    pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, lifted_op_size(&ops[0]));
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, tmp, rhs));
+
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &tmp));
+cleanup:
+    return err;
+}
+
+static err_t
     handle_mnemonic_cmovcc(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
     CHECK(ops_amount == 3);
@@ -3786,7 +3802,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_CMP] = handle_mnemonic_cmp,       [MNEMONIC_JCC] = handle_mnemonic_jcc,
     [MNEMONIC_CALL] = handle_mnemonic_call,     [MNEMONIC_JMP] = handle_mnemonic_jmp,
     [MNEMONIC_TEST] = handle_mnemonic_test,     [MNEMONIC_DEC] = handle_mnemonic_dec,
-    [MNEMONIC_CMOVCC] = handle_mnemonic_cmovcc,
+    [MNEMONIC_CMOVCC] = handle_mnemonic_cmovcc, [MNEMONIC_MOVZX] = handle_mnemonic_movzx,
 };
 
 static err_t lift_regular_insn_info(
