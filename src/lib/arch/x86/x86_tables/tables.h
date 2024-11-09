@@ -2280,7 +2280,7 @@ const insn_info_t
             {
                 .regular =
                     {
-                        .mnemonic = MNEMONIC_MOVSZ,
+                        .mnemonic = MNEMONIC_MOVSX,
                         .first_op_index = 35,
                         .ops_amount = 2,
                     },
