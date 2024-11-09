@@ -3631,6 +3631,7 @@ DEFINE_BINOP_MNEMONIC_HANDLER(add);
 DEFINE_BINOP_MNEMONIC_HANDLER(and);
 DEFINE_BINOP_MNEMONIC_HANDLER(sub);
 DEFINE_BINOP_MNEMONIC_HANDLER(shr);
+DEFINE_BINOP_MNEMONIC_HANDLER(sar);
 DEFINE_BINOP_MNEMONIC_HANDLER(xor);
 DEFINE_BINOP_MNEMONIC_HANDLER(or);
 
@@ -3944,7 +3945,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_BT] = handle_mnemonic_bt,         [MNEMONIC_SBB] = handle_mnemonic_sbb,
     [MNEMONIC_INC] = handle_mnemonic_inc,       [MNEMONIC_MOVSXD] = handle_mnemonic_movsxd,
     [MNEMONIC_RET] = handle_mnemonic_ret,       [MNEMONIC_NOP] = handle_mnemonic_nop,
-    [MNEMONIC_HLT] = handle_mnemonic_hlt,
+    [MNEMONIC_HLT] = handle_mnemonic_hlt,       [MNEMONIC_SAR] = handle_mnemonic_sar,
 };
 
 static err_t lift_regular_insn_info(
