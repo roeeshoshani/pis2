@@ -3641,6 +3641,7 @@ DEFINE_COMPARISON_BINOP_MNEMONIC_HANDLER(test, and);
 
 DEFINE_UNARY_OP_MNEMONIC_HANDLER(dec);
 DEFINE_UNARY_OP_MNEMONIC_HANDLER(inc);
+DEFINE_UNARY_OP_MNEMONIC_HANDLER(not );
 
 static err_t handle_mnemonic_mov(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
@@ -4014,7 +4015,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_RET] = handle_mnemonic_ret,       [MNEMONIC_NOP] = handle_mnemonic_nop,
     [MNEMONIC_HLT] = handle_mnemonic_hlt,       [MNEMONIC_SAR] = handle_mnemonic_sar,
     [MNEMONIC_SHL] = handle_mnemonic_shl,       [MNEMONIC_IMUL] = handle_mnemonic_imul,
-    [MNEMONIC_MOVS] = handle_mnemonic_movs,
+    [MNEMONIC_MOVS] = handle_mnemonic_movs,     [MNEMONIC_NOT] = handle_mnemonic_not,
 };
 
 static err_t lift_regular_insn_info(
