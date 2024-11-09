@@ -3708,6 +3708,14 @@ cleanup:
 }
 
 static err_t
+    handle_mnemonic_movsx(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW(handle_mnemonic_extend(ctx, ops, ops_amount, PIS_OPCODE_SIGN_EXTEND));
+cleanup:
+    return err;
+}
+
+static err_t
     handle_mnemonic_movsxd(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
 
@@ -4017,7 +4025,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_HLT] = handle_mnemonic_hlt,       [MNEMONIC_SAR] = handle_mnemonic_sar,
     [MNEMONIC_SHL] = handle_mnemonic_shl,       [MNEMONIC_IMUL] = handle_mnemonic_imul,
     [MNEMONIC_MOVS] = handle_mnemonic_movs,     [MNEMONIC_NOT] = handle_mnemonic_not,
-    [MNEMONIC_NEG] = handle_mnemonic_neg,
+    [MNEMONIC_NEG] = handle_mnemonic_neg,       [MNEMONIC_MOVSX] = handle_mnemonic_movsx,
 };
 
 static err_t lift_regular_insn_info(
