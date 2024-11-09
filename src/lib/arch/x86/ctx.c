@@ -3266,6 +3266,15 @@ static pis_operand_t decode_specific_reg(specific_reg_t reg, op_size_t size) {
     return PIS_OPERAND_REG(reg_encoding * 8, op_size_to_pis_operand_size(size));
 }
 
+// make sure that the instruction doesn't have any size override prefixes
+static err_t verify_no_size_override_prefixes(const insn_ctx_t* ctx) {
+    err_t err = SUCCESS;
+    CHECK(!prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_OPERAND_SIZE_OVERRIDE));
+    CHECK(!prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_ADDRESS_SIZE_OVERRIDE));
+cleanup:
+    return err;
+}
+
 static err_t lift_op(
     insn_ctx_t* ctx, u8 opcode_byte, const op_info_t* op_info, lifted_op_t* lifted_operand
 ) {
@@ -3404,15 +3413,6 @@ static err_t lift_op(
             break;
         }
         case OP_KIND_REL: {
-            // the behvaiour of relative operands with address/operand size override is weird
-            // (masking of the ip value), so don't allow it.
-            CHECK(
-                !prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_OPERAND_SIZE_OVERRIDE)
-            );
-            CHECK(
-                !prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_ADDRESS_SIZE_OVERRIDE)
-            );
-
             op_size_t size = calc_size(ctx, op_info->rel.size_info_index);
 
             u64 rel_offset = 0;
@@ -3746,6 +3746,10 @@ static err_t handle_mnemonic_jcc(const insn_ctx_t* ctx, const lifted_op_t* ops, 
     err_t err = SUCCESS;
     CHECK(ops_amount == 2);
 
+    // branch instructions behave weirdly when using size override prefixes, so make sure that
+    // we don't have any.
+    CHECK_RETHROW(verify_no_size_override_prefixes(ctx));
+
     pis_operand_t cond = {};
     CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &cond));
 
@@ -3763,6 +3767,10 @@ static err_t
     err_t err = SUCCESS;
     CHECK(ops_amount == 1);
 
+    // branch instructions behave weirdly when using size override prefixes, so make sure that
+    // we don't have any.
+    CHECK_RETHROW(verify_no_size_override_prefixes(ctx));
+
     pis_operand_t target = {};
     CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &target));
 
@@ -3777,6 +3785,10 @@ cleanup:
 static err_t handle_mnemonic_jmp(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
     CHECK(ops_amount == 1);
+
+    // branch instructions behave weirdly when using size override prefixes, so make sure that
+    // we don't have any.
+    CHECK_RETHROW(verify_no_size_override_prefixes(ctx));
 
     pis_operand_t target = {};
     CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &target));
