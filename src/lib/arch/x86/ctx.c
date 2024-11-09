@@ -3399,8 +3399,8 @@ static err_t lift_op(
             break;
         }
         case OP_KIND_REL: {
-            // the behvaiour of relative operands with address/operand size override is weird, so
-            // don't allow it.
+            // the behvaiour of relative operands with address/operand size override is weird
+            // (masking of the ip value), so don't allow it.
             CHECK(
                 !prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_OPERAND_SIZE_OVERRIDE)
             );
@@ -3585,6 +3585,22 @@ cleanup:
     return err;
 }
 
+static err_t handle_mnemonic_jcc(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 2);
+
+    pis_operand_t cond = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &cond));
+
+    pis_operand_t target = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &target));
+
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_JMP_COND, cond, target));
+
+cleanup:
+    return err;
+}
+
 static err_t handle_mnemonic_lea(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
     CHECK(ops_amount == 2);
@@ -3685,6 +3701,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_LEA] = handle_mnemonic_lea,
     [MNEMONIC_STOS] = handle_mnemonic_stos,
     [MNEMONIC_CMP] = handle_mnemonic_cmp,
+    [MNEMONIC_JCC] = handle_mnemonic_jcc,
 };
 
 static err_t lift_regular_insn_info(
