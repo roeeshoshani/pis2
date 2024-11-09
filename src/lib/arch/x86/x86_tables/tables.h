@@ -66,7 +66,7 @@ const op_info_t op_infos_table[] = {
             {
                 .kind = OP_KIND_IMM,
                 .encoded_size_info_index = 4,
-                .extended_size_info_index = 4,
+                .extended_size_info_index = 2,
                 .extend_kind = IMM_EXT_SIGN_EXTEND,
             },
     },
@@ -89,7 +89,7 @@ const op_info_t op_infos_table[] = {
             {
                 .kind = OP_KIND_IMM,
                 .encoded_size_info_index = 4,
-                .extended_size_info_index = 4,
+                .extended_size_info_index = 1,
                 .extend_kind = IMM_EXT_SIGN_EXTEND,
             },
     },
@@ -154,7 +154,7 @@ const op_info_t op_infos_table[] = {
             {
                 .kind = OP_KIND_IMM,
                 .encoded_size_info_index = 0,
-                .extended_size_info_index = 0,
+                .extended_size_info_index = 2,
                 .extend_kind = IMM_EXT_SIGN_EXTEND,
             },
     },
@@ -171,7 +171,7 @@ const op_info_t op_infos_table[] = {
             {
                 .kind = OP_KIND_IMM,
                 .encoded_size_info_index = 0,
-                .extended_size_info_index = 0,
+                .extended_size_info_index = 1,
                 .extend_kind = IMM_EXT_ZERO_EXTEND,
             },
     },
@@ -195,7 +195,7 @@ const op_info_t op_infos_table[] = {
             {
                 .kind = OP_KIND_IMM,
                 .encoded_size_info_index = 0,
-                .extended_size_info_index = 0,
+                .extended_size_info_index = 1,
                 .extend_kind = IMM_EXT_SIGN_EXTEND,
             },
     },
