@@ -3621,6 +3621,30 @@ cleanup:
     return err;
 }
 
+static err_t
+    handle_mnemonic_cmovcc(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 3);
+
+    pis_operand_size_t operand_size = lifted_op_size(&ops[1]);
+
+    pis_operand_t cond = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &cond));
+
+    pis_operand_t orig_value = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &cond));
+
+    pis_operand_t new_value = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[2], &cond));
+
+    pis_operand_t final_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    CHECK_RETHROW(ternary(ctx, &cond, &new_value, &orig_value, &final_value));
+
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[1], &final_value));
+cleanup:
+    return err;
+}
+
 static err_t handle_mnemonic_jcc(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
     CHECK(ops_amount == 2);
@@ -3753,24 +3777,16 @@ cleanup:
 }
 
 static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
-    [MNEMONIC_SHR] = handle_mnemonic_shr,
-    [MNEMONIC_XOR] = handle_mnemonic_xor,
-    [MNEMONIC_ADD] = handle_mnemonic_add,
-    [MNEMONIC_AND] = handle_mnemonic_and,
-    [MNEMONIC_SUB] = handle_mnemonic_sub,
-    [MNEMONIC_OR] = handle_mnemonic_or,
-    [MNEMONIC_MOV] = handle_mnemonic_mov,
-    [MNEMONIC_ENDBR] = handle_mnemonic_endbr,
-    [MNEMONIC_POP] = handle_mnemonic_pop,
-    [MNEMONIC_PUSH] = handle_mnemonic_push,
-    [MNEMONIC_LEA] = handle_mnemonic_lea,
-    [MNEMONIC_STOS] = handle_mnemonic_stos,
-    [MNEMONIC_CMP] = handle_mnemonic_cmp,
-    [MNEMONIC_JCC] = handle_mnemonic_jcc,
-    [MNEMONIC_CALL] = handle_mnemonic_call,
-    [MNEMONIC_JMP] = handle_mnemonic_jmp,
-    [MNEMONIC_TEST] = handle_mnemonic_test,
-    [MNEMONIC_DEC] = handle_mnemonic_dec,
+    [MNEMONIC_SHR] = handle_mnemonic_shr,       [MNEMONIC_XOR] = handle_mnemonic_xor,
+    [MNEMONIC_ADD] = handle_mnemonic_add,       [MNEMONIC_AND] = handle_mnemonic_and,
+    [MNEMONIC_SUB] = handle_mnemonic_sub,       [MNEMONIC_OR] = handle_mnemonic_or,
+    [MNEMONIC_MOV] = handle_mnemonic_mov,       [MNEMONIC_ENDBR] = handle_mnemonic_endbr,
+    [MNEMONIC_POP] = handle_mnemonic_pop,       [MNEMONIC_PUSH] = handle_mnemonic_push,
+    [MNEMONIC_LEA] = handle_mnemonic_lea,       [MNEMONIC_STOS] = handle_mnemonic_stos,
+    [MNEMONIC_CMP] = handle_mnemonic_cmp,       [MNEMONIC_JCC] = handle_mnemonic_jcc,
+    [MNEMONIC_CALL] = handle_mnemonic_call,     [MNEMONIC_JMP] = handle_mnemonic_jmp,
+    [MNEMONIC_TEST] = handle_mnemonic_test,     [MNEMONIC_DEC] = handle_mnemonic_dec,
+    [MNEMONIC_CMOVCC] = handle_mnemonic_cmovcc,
 };
 
 static err_t lift_regular_insn_info(
