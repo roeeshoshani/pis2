@@ -3632,10 +3632,10 @@ static err_t
     CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &cond));
 
     pis_operand_t orig_value = {};
-    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &cond));
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &orig_value));
 
     pis_operand_t new_value = {};
-    CHECK_RETHROW(lifted_op_read(ctx, &ops[2], &cond));
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[2], &new_value));
 
     pis_operand_t final_value = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
     CHECK_RETHROW(ternary(ctx, &cond, &new_value, &orig_value, &final_value));
