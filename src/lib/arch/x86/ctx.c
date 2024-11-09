@@ -3892,6 +3892,14 @@ static err_t lift_regular_insn_info(
     insn_ctx_t* ctx, uint8_t opcode_byte, const regular_insn_info_t* insn_info
 ) {
     err_t err = SUCCESS;
+
+    CHECK_TRACE_CODE(
+        insn_info->mnemonic != MNEMONIC_UNSUPPORTED,
+        PIS_ERR_UNSUPPORTED_INSN,
+        "unsupported opcode byte 0x%x",
+        opcode_byte
+    );
+
     lifted_op_t lifted_ops[X86_TABLES_INSN_MAX_OPS] = {};
     const uint8_t* op_info_indexes = &laid_out_ops_infos_table[insn_info->first_op_index];
     u8 ops_amount = insn_info->ops_amount;
@@ -3931,13 +3939,7 @@ static err_t
     lift_opcode_byte(insn_ctx_t* ctx, u8 opcode_byte, const insn_info_t* opcode_byte_table) {
     err_t err = SUCCESS;
     const insn_info_t* insn_info = &opcode_byte_table[opcode_byte];
-    if (insn_info->mnemonic == MNEMONIC_UNSUPPORTED) {
-        CHECK_FAIL_TRACE_CODE(
-            PIS_ERR_UNSUPPORTED_INSN,
-            "unsupported opcode byte 0x%x",
-            opcode_byte
-        );
-    } else if (insn_info->mnemonic == MNEMONIC_MODRM_REG_OPCODE_EXT) {
+    if (insn_info->mnemonic == MNEMONIC_MODRM_REG_OPCODE_EXT) {
         // modrm reg opcode ext
         CHECK_RETHROW(lift_modrm_reg_opcode_ext_insn_info(
             ctx,
