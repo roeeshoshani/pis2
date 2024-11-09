@@ -3803,6 +3803,7 @@ static err_t post_prefixes_lift(insn_ctx_t* ctx) {
             CHECK_RETHROW(lift_opcode_byte(ctx, second_opcode_byte, second_opcode_byte_table));
         }
     } else {
+        // 1 byte opcode
         CHECK_RETHROW(lift_opcode_byte(ctx, first_opcode_byte, first_opcode_byte_table));
     }
 
