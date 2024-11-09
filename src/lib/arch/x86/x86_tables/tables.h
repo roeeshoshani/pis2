@@ -4623,17 +4623,17 @@ const insn_info_t
             {
                 .regular =
                     {
-                        .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 12,
-                        .ops_amount = 0,
+                        .mnemonic = MNEMONIC_MOVSX,
+                        .first_op_index = 81,
+                        .ops_amount = 2,
                     },
             },
             {
                 .regular =
                     {
-                        .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 12,
-                        .ops_amount = 0,
+                        .mnemonic = MNEMONIC_MOVSX,
+                        .first_op_index = 83,
+                        .ops_amount = 2,
                     },
             },
             {
