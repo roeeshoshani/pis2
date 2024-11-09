@@ -3556,6 +3556,17 @@ cleanup:
     return err;
 }
 
+static err_t handle_mnemonic_lea(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 2);
+
+    CHECK(ops[1].kind == LIFTED_OP_KIND_MEM);
+
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &ops[1].mem.addr));
+cleanup:
+    return err;
+}
+
 static err_t
     handle_mnemonic_endbr(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     // endbr is a nop
@@ -3610,6 +3621,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_ENDBR] = handle_mnemonic_endbr,
     [MNEMONIC_POP] = handle_mnemonic_pop,
     [MNEMONIC_PUSH] = handle_mnemonic_push,
+    [MNEMONIC_LEA] = handle_mnemonic_lea,
 };
 
 static err_t lift_regular_insn_info(
