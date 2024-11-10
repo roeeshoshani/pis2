@@ -2,8 +2,8 @@
 
 #include "../../pis.h"
 #include "../../types.h"
-#include "prefixes.h"
 #include "ctx.h"
+#include "prefixes.h"
 
 typedef struct {
     u8 mod;
@@ -58,10 +58,7 @@ err_t modrm_decode_rm_operand(
 );
 
 err_t modrm_fetch_and_process_with_operand_sizes(
-    ctx_t* ctx,
-    modrm_operands_t* operands,
-    pis_operand_size_t rm_size,
-    pis_operand_size_t reg_size
+    ctx_t* ctx, modrm_operands_t* operands, pis_operand_size_t rm_size, pis_operand_size_t reg_size
 );
 
 err_t modrm_rm_write(

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "prefixes.h"
-#include "cpumode.h"
 #include "../../tmp.h"
+#include "cpumode.h"
+#include "prefixes.h"
 
 typedef struct {
     pis_lift_args_t* args;
@@ -15,4 +15,3 @@ typedef struct {
     bool has_modrm;
     uint8_t modrm_byte;
 } ctx_t;
-

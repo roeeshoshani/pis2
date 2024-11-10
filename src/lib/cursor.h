@@ -1,11 +1,12 @@
 #pragma once
 
-#include "types.h"
-#include "except.h"
 #include "endianness.h"
+#include "except.h"
 #include "operand_size.h"
+#include "types.h"
 
-#define CURSOR_INIT(PTR, LEN) { .start = (PTR), .cur = (PTR), .end = ((PTR) + (LEN)) }
+#define CURSOR_INIT(PTR, LEN)                                                                      \
+    { .start = (PTR), .cur = (PTR), .end = ((PTR) + (LEN)) }
 
 typedef struct {
     const u8* start;

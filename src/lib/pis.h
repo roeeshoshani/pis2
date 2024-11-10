@@ -1,11 +1,11 @@
 #pragma once
 
+#include "endianness.h"
 #include "except.h"
+#include "operand_size.h"
 #include "recursive_macros.h"
 #include "str_enum.h"
 #include "types.h"
-#include "endianness.h"
-#include "operand_size.h"
 
 #define PIS_INSN_MAX_OPERANDS_AMOUNT (4)
 
@@ -67,8 +67,7 @@
 #define PIS_OPERAND_CONST_NEG(ABS_VALUE, SIZE)                                                     \
     (PIS_OPERAND(PIS_ADDR(PIS_SPACE_CONST, pis_const_negate(ABS_VALUE, SIZE)), SIZE))
 
-#define PIS_EMIT(LIFT_RESULT, INSN)                                                    \
-    CHECK_RETHROW(pis_lift_result_emit((LIFT_RESULT), &(INSN)))
+#define PIS_EMIT(LIFT_RESULT, INSN) CHECK_RETHROW(pis_lift_result_emit((LIFT_RESULT), &(INSN)))
 
 #define DECLARE_REG_OPERAND(NAME) extern const pis_operand_t NAME;
 
