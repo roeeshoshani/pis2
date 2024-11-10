@@ -2222,7 +2222,11 @@ static err_t
         }
         case LIFTED_OP_KIND_VALUE:
         case LIFTED_OP_KIND_WRITABLE_VALUE:
-            LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, op->value, *value));
+            if (op->value.addr.space == PIS_SPACE_REG) {
+                CHECK_RETHROW(write_gpr(ctx, &op->value, value));
+            } else {
+                LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, op->value, *value));
+            }
             break;
         case LIFTED_OP_KIND_IMPLICIT:
             // can't write to implicit operands
