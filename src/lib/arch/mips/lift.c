@@ -1,17 +1,10 @@
 #include "lift.h"
 
-err_t pis_mips_lift(
-    const pis_mips_ctx_t* ctx,
-    cursor_t* machine_code,
-    u64 machine_code_addr,
-    pis_lift_result_t* result
-) {
+err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
     err_t err = SUCCESS;
 
-    UNUSED(ctx);
-    UNUSED(machine_code);
-    UNUSED(machine_code_addr);
-    UNUSED(result);
+    UNUSED(args);
+    UNUSED(cpuinfo);
 
     goto cleanup;
 
