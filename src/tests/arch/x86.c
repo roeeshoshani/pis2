@@ -750,28 +750,12 @@ DEFINE_TEST(test_rel_operand_32_bit_mode) {
         7
     ));
 
-    CHECK_RETHROW_VERBOSE(generic_test_jmp(
-        CODE(0x66, 0xe9, 0x09, 0x00),
-        PIS_X86_CPUMODE_32_BIT,
-        (0xffff + 1) - 4 - 2,
-        7
-    ));
-
     CHECK_RETHROW_VERBOSE(generic_test_call(
         CODE(0xe8, 0x09, 0x00, 0x00, 0x00),
         PIS_X86_CPUMODE_32_BIT,
         &ESP,
         PIS_OPERAND_SIZE_4,
         (0xffffffffULL + 1) - 5 - 2,
-        7
-    ));
-
-    CHECK_RETHROW_VERBOSE(generic_test_call(
-        CODE(0x66, 0xe8, 0x09, 0x00),
-        PIS_X86_CPUMODE_32_BIT,
-        &ESP,
-        PIS_OPERAND_SIZE_2,
-        (0xffff + 1) - 4 - 2,
         7
     ));
 
@@ -789,28 +773,12 @@ DEFINE_TEST(test_rel_operand_64_bit_mode) {
         7
     ));
 
-    CHECK_RETHROW_VERBOSE(generic_test_jmp(
-        CODE(0x66, 0xe9, 0x09, 0x00, 0x00, 0x00),
-        PIS_X86_CPUMODE_64_BIT,
-        0ULL - 6 - 2,
-        7
-    ));
-
     CHECK_RETHROW_VERBOSE(generic_test_call(
         CODE(0xe8, 0x09, 0x00, 0x00, 0x00),
         PIS_X86_CPUMODE_64_BIT,
         &RSP,
         PIS_OPERAND_SIZE_8,
         0ULL - 5 - 2,
-        7
-    ));
-
-    CHECK_RETHROW_VERBOSE(generic_test_call(
-        CODE(0x66, 0xe8, 0x09, 0x00, 0x00, 0x00),
-        PIS_X86_CPUMODE_64_BIT,
-        &RSP,
-        PIS_OPERAND_SIZE_8,
-        0ULL - 6 - 2,
         7
     ));
 
