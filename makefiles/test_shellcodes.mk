@@ -5,6 +5,7 @@ SHELLCODE_CFLAGS += -static
 SHELLCODE_CFLAGS += -ffreestanding -nostdlib
 SHELLCODE_CFLAGS += -Wall -Wextra
 SHELLCODE_CFLAGS += -Werror
+SHELLCODE_CFLAGS += -Wno-unused-function
 SHELLCODE_CFLAGS += -mno-sse -mno-avx
 SHELLCODE_CFLAGS += -O3
 

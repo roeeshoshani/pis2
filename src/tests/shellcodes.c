@@ -340,6 +340,15 @@ cleanup:
     return err;
 }
 
+DEFINE_TEST(test_shellcode_json) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(test_shellcode_result(&shellcode_json, &(shellcode_args_t) {}, 40));
+
+cleanup:
+    return err;
+}
+
 static err_t test_chacha20(
     u32 key_seed, u32 nonce_seed, u32 counter, u32 plaintext_seed, u32 expected_output
 ) {

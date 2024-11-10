@@ -41,6 +41,7 @@ typedef struct {
     _(factorial)                                                                                   \
     _(gcd)                                                                                         \
     _(ackermann)                                                                                   \
+    _(json)                                                                                        \
     _(chacha20)
 
 EACH_SHELLCODE(DECLARE_SHELLCODE);
