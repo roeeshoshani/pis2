@@ -1560,11 +1560,10 @@ cleanup:
 
 /// peforms a multiplication operation that operates on the `ax` operand and stores its
 /// result in the `ax` and `dx` operands.
-static err_t UNUSED_ATTR
-    do_mul_ax(const insn_ctx_t* ctx, pis_operand_size_t operand_size, const pis_operand_t* factor) {
+static err_t do_mul_ax(const insn_ctx_t* ctx, const pis_operand_t* factor) {
     err_t err = SUCCESS;
 
-    CHECK(factor->size == operand_size);
+    pis_operand_size_t operand_size = factor->size;
 
     pis_operand_t result_high = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
     pis_operand_t result_low = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
@@ -2310,6 +2309,19 @@ cleanup:
     return err;
 }
 
+static err_t handle_mnemonic_mul(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 1);
+
+    pis_operand_t mul_by = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &mul_by));
+
+    CHECK_RETHROW(do_mul_ax(ctx, &mul_by));
+
+cleanup:
+    return err;
+}
+
 static err_t handle_mnemonic_bt(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
     CHECK(ops_amount == 2);
@@ -2723,7 +2735,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_MOVS] = handle_mnemonic_movs,     [MNEMONIC_NOT] = handle_mnemonic_not,
     [MNEMONIC_NEG] = handle_mnemonic_neg,       [MNEMONIC_MOVSX] = handle_mnemonic_movsx,
     [MNEMONIC_SETCC] = handle_mnemonic_setcc,   [MNEMONIC_ROL] = handle_mnemonic_rol,
-    [MNEMONIC_DIV] = handle_mnemonic_div,
+    [MNEMONIC_DIV] = handle_mnemonic_div,       [MNEMONIC_MUL] = handle_mnemonic_mul,
 };
 
 static err_t lift_regular_insn_info(
