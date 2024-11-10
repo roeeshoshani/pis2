@@ -42,7 +42,6 @@ typedef struct {
     _(gcd)                                                                                         \
     _(ackermann)                                                                                   \
     _(json)                                                                                        \
-    _(tinyscript)                                                                                  \
     _(regex)                                                                                       \
     _(chacha20)
 
