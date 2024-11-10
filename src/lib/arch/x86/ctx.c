@@ -2428,6 +2428,7 @@ cleanup:
 static err_t
     handle_mnemonic_movsxd(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
+    CHECK(ops_amount == 2);
 
     // on 32-bit mode, the same byte is used to encode a different instruction, `ARPL`. this
     // behaviour of having a single byte decode to different instructions based on cpumode is
@@ -2435,7 +2436,13 @@ static err_t
     // the instruction.
     CHECK(ctx->lift_ctx->pis_x86_ctx->cpumode == PIS_X86_CPUMODE_64_BIT);
 
-    CHECK_RETHROW(handle_mnemonic_extend(ctx, ops, ops_amount, PIS_OPCODE_SIGN_EXTEND));
+    if (lifted_op_size(&ops[0]) > lifted_op_size(&ops[1])) {
+        CHECK_RETHROW(handle_mnemonic_extend(ctx, ops, ops_amount, PIS_OPCODE_SIGN_EXTEND));
+    } else {
+        // movsxd may act as a move if its operands are of the same size
+        CHECK_RETHROW(handle_mnemonic_mov(ctx, ops, ops_amount));
+    }
+
 cleanup:
     return err;
 }
