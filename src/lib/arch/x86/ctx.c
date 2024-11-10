@@ -794,31 +794,25 @@ static err_t ternary(
     pis_operand_size_t operand_size = then_value->size;
     CHECK(operand_size > PIS_OPERAND_SIZE_1);
 
-    // calculate the negative condition
-    pis_operand_t not_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_COND_NEGATE, not_cond, *cond));
-
-    // zero extend the condition and its negative
+    // zero extend the condition
     pis_operand_t cond_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, cond_zero_extended, *cond));
 
-    pis_operand_t not_cond_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, not_cond_zero_extended, not_cond)
-    );
+    // arithmetically negate the condition to convert it to a bit mask.
+    // if the condition is 1, negating it will produce an all 1s mask, and if it is zero, it will
+    // produce an all 0s mask.
+    pis_operand_t cond_mask = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_NEG, cond_mask, cond_zero_extended));
+
+    // calculate the negative condition mask
+    pis_operand_t not_cond_mask = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_NOT, not_cond_mask, cond_mask));
 
     pis_operand_t true_case = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_AND, true_case, cond_zero_extended, *then_value)
-    );
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, true_case, cond_mask, *then_value));
 
     pis_operand_t false_case = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_AND, false_case, not_cond_zero_extended, *else_value)
-    );
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_AND, false_case, not_cond_mask, *else_value));
 
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, *result, true_case, false_case));
 
