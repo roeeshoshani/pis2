@@ -1,4 +1,4 @@
-SHELLCODE_SRCS := $(wildcard find src/test_shellcodes/*.c)
+SHELLCODE_SRCS := $(wildcard src/test_shellcodes/*.c)
 
 SHELLCODE_CFLAGS ?=
 SHELLCODE_CFLAGS += -static
