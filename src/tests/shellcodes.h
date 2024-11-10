@@ -42,7 +42,7 @@ typedef struct {
     _(gcd)                                                                                         \
     _(ackermann)                                                                                   \
     _(json)                                                                                        \
-    _(regex)                                                                                        \
+    _(regex)                                                                                       \
     _(chacha20)
 
 EACH_SHELLCODE(DECLARE_SHELLCODE);

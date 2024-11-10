@@ -1005,7 +1005,7 @@ const modrm_reg_opcode_ext_table_t modrm_reg_opcode_ext_tables[] = {
                     .ops_amount = 0,
                 },
                 {
-                    .mnemonic = MNEMONIC_JMP,
+                    .mnemonic = MNEMONIC_PUSH,
                     .first_op_index = 32,
                     .ops_amount = 1,
                 },
