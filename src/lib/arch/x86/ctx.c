@@ -61,6 +61,61 @@ static u8 opcode_cond_extract(u8 opcode_byte) {
     return opcode_byte & 0b1111;
 }
 
+/// reads and resizes an operand to the desired size. if the new size is larger than the original,
+/// zero extension is used.
+static err_t read_resize_zext(
+    const insn_ctx_t* ctx,
+    const pis_operand_t* value,
+    pis_operand_size_t new_size,
+    pis_operand_t* resized
+) {
+    err_t err = SUCCESS;
+
+    pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, new_size);
+
+    pis_opcode_t opcode;
+    if (new_size == value->size) {
+        // same size
+        opcode = PIS_OPCODE_MOVE;
+    } else if (new_size > value->size) {
+        // increase size
+        opcode = PIS_OPCODE_ZERO_EXTEND;
+    } else {
+        // truncate
+        opcode = PIS_OPCODE_GET_LOW_BITS;
+    }
+
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(opcode, tmp, *value));
+
+    *resized = tmp;
+cleanup:
+    return err;
+}
+
+/// resizes the input operand to the desired size and writes it to the target operand. if the new
+/// size is larger than the original, zero extension is used.
+static err_t write_resize_zext(
+    const insn_ctx_t* ctx, const pis_operand_t* write_to, const pis_operand_t* input
+) {
+    err_t err = SUCCESS;
+
+    pis_opcode_t opcode;
+    if (write_to->size == input->size) {
+        // same size
+        opcode = PIS_OPCODE_MOVE;
+    } else if (write_to->size > input->size) {
+        // increase size
+        opcode = PIS_OPCODE_ZERO_EXTEND;
+    } else {
+        // truncate
+        opcode = PIS_OPCODE_GET_LOW_BITS;
+    }
+
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(opcode, *write_to, *input));
+cleanup:
+    return err;
+}
+
 /// decodes an x86 condition encoding. the encoding can usually be achieved by subtrating the opcode
 /// with some base opcode value.
 static err_t cond_decode(u8 cond_encoding, x86_cond_t* cond) {
@@ -213,13 +268,9 @@ static err_t calc_parity_flag_into(
 ) {
     err_t err = SUCCESS;
 
-    pis_operand_t low_byte;
-    if (value->size != PIS_OPERAND_SIZE_1) {
-        low_byte = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, low_byte, *value));
-    } else {
-        low_byte = *value;
-    }
+    pis_operand_t low_byte = {};
+    CHECK_RETHROW(read_resize_zext(ctx, value, PIS_OPERAND_SIZE_1, &low_byte));
+
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_PARITY, *result, low_byte));
 
 cleanup:
@@ -280,15 +331,8 @@ static err_t extract_most_significant_bit(
         PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, tmp, *value, PIS_OPERAND_CONST(shift_amount, value->size))
     );
 
-    // write the result into the result operand, while optionally truncating its size
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN2(
-            value->size == PIS_OPERAND_SIZE_1 ? PIS_OPCODE_MOVE : PIS_OPCODE_GET_LOW_BITS,
-            *result,
-            tmp
-        )
-    );
+    // resize and write the result into the result operand
+    CHECK_RETHROW(write_resize_zext(ctx, result, &tmp));
 
 cleanup:
     return err;
@@ -305,20 +349,18 @@ static err_t extract_least_significant_bit(
     // make sure that the output operand is a 1 byte conditional expression
     CHECK(result->size == PIS_OPERAND_SIZE_1);
 
-    if (value->size == PIS_OPERAND_SIZE_1) {
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN3(PIS_OPCODE_AND, *result, *value, PIS_OPERAND_CONST(1, value->size))
-        );
-    } else {
-        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, value->size);
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN3(PIS_OPCODE_AND, tmp, *value, PIS_OPERAND_CONST(1, value->size))
-        );
+    pis_operand_t least_significant_byte = {};
+    CHECK_RETHROW(read_resize_zext(ctx, value, PIS_OPERAND_SIZE_1, &least_significant_byte));
 
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, *result, tmp));
-    }
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(
+            PIS_OPCODE_AND,
+            *result,
+            least_significant_byte,
+            PIS_OPERAND_CONST(1, PIS_OPERAND_SIZE_1)
+        )
+    );
 
 cleanup:
     return err;
@@ -393,15 +435,8 @@ static err_t impl_binop_with_carry(
     CHECK(a->size == b->size);
     pis_operand_size_t operand_size = a->size;
 
-    pis_operand_t orig_cf_zext = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN2(
-            operand_size == PIS_OPERAND_SIZE_1 ? PIS_OPCODE_MOVE : PIS_OPCODE_ZERO_EXTEND,
-            orig_cf_zext,
-            FLAGS_CF
-        )
-    );
+    pis_operand_t orig_cf_zext = {};
+    CHECK_RETHROW(read_resize_zext(ctx, &FLAGS_CF, operand_size, &orig_cf_zext));
 
     pis_operand_t a_and_b = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(binop_opcode, a_and_b, *a, *b));
@@ -854,8 +889,8 @@ static err_t ternary(
     CHECK(operand_size > PIS_OPERAND_SIZE_1);
 
     // zero extend the condition
-    pis_operand_t cond_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, cond_zero_extended, *cond));
+    pis_operand_t cond_zero_extended = {};
+    CHECK_RETHROW(read_resize_zext(ctx, cond, operand_size, &cond_zero_extended));
 
     // arithmetically negate the condition to convert it to a bit mask.
     // if the condition is 1, negating it will produce an all 1s mask, and if it is zero, it will
@@ -1036,11 +1071,8 @@ static err_t shl_calc_carry_flag(
         ctx->lift_ctx,
         PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, right_shifted, *to_shift, right_shift_count)
     );
-    pis_operand_t last_extracted_bit = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, last_extracted_bit, right_shifted)
-    );
+    pis_operand_t last_extracted_bit = {};
+    CHECK_RETHROW(read_resize_zext(ctx, &right_shifted, PIS_OPERAND_SIZE_1, &last_extracted_bit));
 
     // now, we only want to set the carry flag if the count is non-zero, otherwise we want to use
     // the original CF value.
@@ -1493,7 +1525,7 @@ static err_t binop_rol(
         ctx->lift_ctx,
         PIS_INSN3(PIS_OPCODE_AND, last_extracted_bit, res_tmp, PIS_OPERAND_CONST(1, operand_size))
     );
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, FLAGS_CF, last_extracted_bit));
+    CHECK_RETHROW(write_resize_zext(ctx, &FLAGS_CF, &last_extracted_bit));
 
     // overflow flag is the same as `shl`
     CHECK_RETHROW(shl_calc_overflow_flag(ctx, a, &count, &res_tmp));
@@ -1550,42 +1582,34 @@ static err_t do_div_ax_dx(const insn_ctx_t* ctx, const pis_operand_t* divisor) {
     } else {
         // divide `dx:ax` or `edx:eax`.
 
-        // first, combine the 2 registers into a single operand.
+        pis_operand_t ax = operand_resize(&RAX, operand_size);
+        pis_operand_t dx = operand_resize(&RDX, operand_size);
+
         pis_operand_size_t double_operand_size = operand_size * 2;
-        pis_operand_t divide_lhs = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, divide_lhs, operand_resize(&RAX, operand_size))
-        );
+
+        // first, combine the 2 registers into a single operand.
+        pis_operand_t divide_lhs = {};
+        CHECK_RETHROW(read_resize_zext(ctx, &ax, double_operand_size, &divide_lhs));
 
         // zero extend the dx part and shift it left
-        pis_operand_t zero_extended_dx = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, zero_extended_dx, operand_resize(&RDX, operand_size))
-        );
+        pis_operand_t zext_dx = {};
+        CHECK_RETHROW(read_resize_zext(ctx, &dx, double_operand_size, &zext_dx));
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
             PIS_INSN3(
                 PIS_OPCODE_SHIFT_LEFT,
-                zero_extended_dx,
-                zero_extended_dx,
+                zext_dx,
+                zext_dx,
                 PIS_OPERAND_CONST(pis_operand_size_to_bits(operand_size), double_operand_size)
             )
         );
 
         // or the shifted dx value into the result operand
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN3(PIS_OPCODE_OR, divide_lhs, divide_lhs, zero_extended_dx)
-        );
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_OR, divide_lhs, divide_lhs, zext_dx));
 
         // zero extend the divisor
-        pis_operand_t zero_extended_divisor = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, zero_extended_divisor, *divisor)
-        );
+        pis_operand_t zero_extended_divisor = {};
+        CHECK_RETHROW(read_resize_zext(ctx, divisor, double_operand_size, &zero_extended_divisor));
 
         // perform the division
         pis_operand_t div_result = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
@@ -1595,10 +1619,7 @@ static err_t do_div_ax_dx(const insn_ctx_t* ctx, const pis_operand_t* divisor) {
         );
 
         // store the division result in ax
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, operand_resize(&RAX, operand_size), div_result)
-        );
+        CHECK_RETHROW(write_resize_zext(ctx, &ax, &div_result));
 
         // perform the remainder calculation
         pis_operand_t rem_result = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
@@ -1608,10 +1629,7 @@ static err_t do_div_ax_dx(const insn_ctx_t* ctx, const pis_operand_t* divisor) {
         );
 
         // store the division result in dx
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, operand_resize(&RDX, operand_size), rem_result)
-        );
+        CHECK_RETHROW(write_resize_zext(ctx, &dx, &rem_result));
     }
 cleanup:
     return err;
@@ -1643,37 +1661,26 @@ static err_t do_mul_ax(const insn_ctx_t* ctx, const pis_operand_t* factor) {
         // operand size is less than 8, so we can use the regular multiplication opcode.
         pis_operand_size_t double_operand_size = operand_size * 2;
 
-        pis_operand_t factor_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, factor_zero_extended, *factor)
-        );
+        pis_operand_t factor_zext = {};
+        CHECK_RETHROW(read_resize_zext(ctx, factor, double_operand_size, &factor_zext));
 
         pis_operand_t ax = operand_resize(&RAX, operand_size);
-        pis_operand_t ax_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, ax_zero_extended, ax));
+
+        pis_operand_t ax_zext = {};
+        CHECK_RETHROW(read_resize_zext(ctx, &ax, double_operand_size, &ax_zext));
 
         pis_operand_t multiplication_result = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN3(
-                PIS_OPCODE_UNSIGNED_MUL,
-                multiplication_result,
-                ax_zero_extended,
-                factor_zero_extended
-            )
+            PIS_INSN3(PIS_OPCODE_UNSIGNED_MUL, multiplication_result, ax_zext, factor_zext)
         );
         // store the result of the multiplication
         if (operand_size == PIS_OPERAND_SIZE_1) {
             LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, AX, multiplication_result));
         } else {
             // split the result into the low and high parts
-            pis_operand_t result_high = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-            pis_operand_t result_low = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-            LIFT_CTX_EMIT(
-                ctx->lift_ctx,
-                PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, result_low, multiplication_result)
-            );
+            pis_operand_t result_low = {};
+            CHECK_RETHROW(read_resize_zext(ctx, &multiplication_result, operand_size, &result_low));
 
             pis_operand_t shifted_multiplication_result =
                 LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
@@ -1686,11 +1693,11 @@ static err_t do_mul_ax(const insn_ctx_t* ctx, const pis_operand_t* factor) {
                     PIS_OPERAND_CONST(pis_operand_size_to_bits(operand_size), double_operand_size)
                 )
             );
-            LIFT_CTX_EMIT(
-                ctx->lift_ctx,
-                PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, result_high, shifted_multiplication_result)
-            );
 
+            pis_operand_t result_high = {};
+            CHECK_RETHROW(
+                read_resize_zext(ctx, &shifted_multiplication_result, operand_size, &result_high)
+            );
 
             pis_operand_t dx = operand_resize(&RDX, operand_size);
             LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, dx, result_high));
@@ -1718,25 +1725,8 @@ static err_t do_bt_memory(
     err_t err = SUCCESS;
 
     // resize the bit offset operand to the address size, since we need to add it to the address
-    pis_operand_t resized_bit_offset;
-    if (ctx->addr_size > bit_offset->size) {
-        // sign extend it
-        resized_bit_offset = LIFT_CTX_NEW_TMP(ctx->lift_ctx, ctx->addr_size);
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, resized_bit_offset, *bit_offset)
-        );
-    } else if (ctx->addr_size < bit_offset->size) {
-        // truncate it
-        resized_bit_offset = LIFT_CTX_NEW_TMP(ctx->lift_ctx, ctx->addr_size);
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, resized_bit_offset, *bit_offset)
-        );
-    } else {
-        // same size
-        resized_bit_offset = *bit_offset;
-    }
+    pis_operand_t resized_bit_offset = {};
+    CHECK_RETHROW(read_resize_zext(ctx, bit_offset, ctx->addr_size, &resized_bit_offset));
 
     // divide the bit offset by 8 to get the byte offset. this can be done by shifting it right 3
     // times.
@@ -1760,16 +1750,8 @@ static err_t do_bt_memory(
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_LOAD, byte, byte_addr));
 
     // calculate the in-byte bit offset
-    pis_operand_t in_byte_bit_offset;
-    if (bit_offset->size == PIS_OPERAND_SIZE_1) {
-        in_byte_bit_offset = *bit_offset;
-    } else {
-        in_byte_bit_offset = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, in_byte_bit_offset, *bit_offset)
-        );
-    }
+    pis_operand_t in_byte_bit_offset = {};
+    CHECK_RETHROW(read_resize_zext(ctx, bit_offset, PIS_OPERAND_SIZE_1, &in_byte_bit_offset));
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
         PIS_INSN3(
@@ -2080,23 +2062,17 @@ static err_t lift_op(
 
             pis_operand_t reg_operand = decode_specific_reg(op_info->zext_specific_reg.reg, size);
 
-            if (extended_size > size) {
-                pis_operand_t extended_reg =
-                    LIFT_CTX_NEW_TMP(ctx->lift_ctx, op_size_to_pis_operand_size(extended_size));
-                LIFT_CTX_EMIT(
-                    ctx->lift_ctx,
-                    PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, extended_reg, reg_operand)
-                );
-                *lifted_operand = (lifted_op_t) {
-                    .kind = LIFTED_OP_KIND_VALUE,
-                    .value = extended_reg,
-                };
-            } else {
-                *lifted_operand = (lifted_op_t) {
-                    .kind = LIFTED_OP_KIND_VALUE,
-                    .value = reg_operand,
-                };
-            }
+            pis_operand_t extended_reg = {};
+            CHECK_RETHROW(read_resize_zext(
+                ctx,
+                &reg_operand,
+                op_size_to_pis_operand_size(extended_size),
+                &extended_reg
+            ));
+            *lifted_operand = (lifted_op_t) {
+                .kind = LIFTED_OP_KIND_VALUE,
+                .value = extended_reg,
+            };
 
             break;
         }
@@ -2584,25 +2560,11 @@ static err_t handle_mnemonic_lea(const insn_ctx_t* ctx, const lifted_op_t* ops, 
 
     const pis_operand_t* mem_addr = &ops[1].mem.addr;
 
-    pis_operand_size_t addr_size = mem_addr->size;
     pis_operand_size_t dst_size = lifted_op_size(&ops[0]);
 
     // resize the memory address to the desired size
-    pis_operand_t resized_addr;
-    if (dst_size == addr_size) {
-        resized_addr = *mem_addr;
-    } else {
-        resized_addr = LIFT_CTX_NEW_TMP(ctx->lift_ctx, dst_size);
-        pis_opcode_t opcode;
-        if (dst_size > addr_size) {
-            // we want to zero extend the address
-            opcode = PIS_OPCODE_ZERO_EXTEND;
-        } else {
-            // we want to shrink the address
-            opcode = PIS_OPCODE_GET_LOW_BITS;
-        }
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(opcode, resized_addr, *mem_addr));
-    }
+    pis_operand_t resized_addr = {};
+    CHECK_RETHROW(read_resize_zext(ctx, mem_addr, dst_size, &resized_addr));
 
     CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &resized_addr));
 cleanup:
