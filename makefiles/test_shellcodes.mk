@@ -13,6 +13,8 @@ SHELLCODE_LDFLAGS ?=
 SHELLCODE_LDFLAGS += -Tsrc/test_shellcodes/shellcode.lds
 SHELLCODE_LDFLAGS += -Wl,--build-id=none
 
+SHELLCODE_CC ?= clang-18
+
 .PRECIOUS: build/test_shellcodes/%.shellcode.bin
 build/test_shellcodes/%.shellcode.bin: build/test_shellcodes/%.shellcode.elf
 	$(OBJCOPY) -j .all -O binary $< $@
@@ -28,7 +30,7 @@ SHELLCODE_ELFS += $$(SHELLCODE_SRCS:src/%.c=build/%_$(ARCH).shellcode.elf)
 .PRECIOUS: build/test_shellcodes/%_$(ARCH).shellcode.elf
 build/test_shellcodes/%_$(ARCH).shellcode.elf: src/test_shellcodes/%.c
 	@mkdir -p $$(@D)
-	clang-18 -MMD -target $(ARCH) $(SHELLCODE_LDFLAGS) $(SHELLCODE_CFLAGS) $$< -o $$@
+	$(SHELLCODE_CC) -MMD -target $(ARCH) $(SHELLCODE_LDFLAGS) $(SHELLCODE_CFLAGS) $$< -o $$@
 endef
 
 $(foreach ARCH,$(ARCHS),$(eval $(SHELLCODE_IMPL_ARCH)))
