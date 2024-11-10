@@ -75,6 +75,88 @@ typedef struct json_s {
     jsonType_t type;
 } json_t;
 
+#include <limits.h>
+
+static long long my_strtoll(const char* str, char** endptr, int base) {
+    const char* p = str;
+    long long result = 0;
+    int sign = 1;
+
+    // Skip leading whitespace
+    while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\v' || *p == '\f' || *p == '\r') {
+        p++;
+    }
+
+    // Handle optional sign
+    if (*p == '-') {
+        sign = -1;
+        p++;
+    } else if (*p == '+') {
+        p++;
+    }
+
+    // Detect base if not specified
+    if (base == 0) {
+        if (*p == '0') {
+            if (p[1] == 'x' || p[1] == 'X') {
+                base = 16;
+                p += 2;
+            } else {
+                base = 8;
+                p++;
+            }
+        } else {
+            base = 10;
+        }
+    } else if (base == 16 && *p == '0' && (p[1] == 'x' || p[1] == 'X')) {
+        p += 2;
+    }
+
+    // Convert characters to integer
+    while (*p) {
+        int digit;
+        if (*p >= '0' && *p <= '9') {
+            digit = *p - '0';
+        } else if (*p >= 'a' && *p <= 'z') {
+            digit = *p - 'a' + 10;
+        } else if (*p >= 'A' && *p <= 'Z') {
+            digit = *p - 'A' + 10;
+        } else {
+            break;
+        }
+
+        if (digit >= base)
+            break;
+
+        // Check for overflow
+        if (result > (LLONG_MAX - digit) / base) {
+            result = (sign == 1) ? LLONG_MAX : LLONG_MIN;
+            if (endptr)
+                *endptr = (char*) p;
+            return result;
+        }
+
+        result = result * base + digit;
+        p++;
+    }
+
+    if (endptr) {
+        *endptr = (char*) p;
+    }
+
+    return result * sign;
+}
+
+void* memcpy(void* dest, const void* src, size_t n) {
+    unsigned char* d = (unsigned char*) dest;
+    const unsigned char* s = (const unsigned char*) src;
+
+    for (size_t i = 0; i < n; i++) {
+        d[i] = s[i];
+    }
+
+    return dest;
+}
 /** Parse a string to get a json.
  * @param str String pointer with a JSON object. It will be modified.
  * @param mem Array of json properties to allocate.
@@ -150,7 +232,7 @@ static inline bool json_getBoolean(json_t const* property) {
  * @param property A valid handler of a json object. Its type must be JSON_INTEGER.
  * @return The value stdint. */
 static inline int64_t json_getInteger(json_t const* property) {
-    return strtoll(property->u.value, (char**) NULL, 10);
+    return my_strtoll(property->u.value, (char**) NULL, 10);
 }
 
 /** Get the value of a json real property.
@@ -177,7 +259,6 @@ struct jsonPool_s {
 json_t const* json_createWithPool(char* str, jsonPool_t* pool);
 
 /** @ } */
-#include <ctype.h>
 #include <string.h>
 
 /** Structure to handle a heap of JSON properties. */
@@ -267,6 +348,13 @@ static char getEscape(char ch) {
     return '\0';
 }
 
+static int isdigit(int c) {
+    return (c >= '0' && c <= '9');
+}
+
+static int isxdigit(int c) {
+    return ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'));
+}
 /** Parse 4 characters.
  * @param str Pointer to  first digit.
  * @retval '?' If the four characters are hexadecimal digits.

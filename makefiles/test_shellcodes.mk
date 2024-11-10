@@ -28,7 +28,7 @@ SHELLCODE_ELFS += $$(SHELLCODE_SRCS:src/%.c=build/%_$(ARCH).shellcode.elf)
 .PRECIOUS: build/test_shellcodes/%_$(ARCH).shellcode.elf
 build/test_shellcodes/%_$(ARCH).shellcode.elf: src/test_shellcodes/%.c
 	@mkdir -p $$(@D)
-	clang -MMD -target $(ARCH) $(SHELLCODE_LDFLAGS) $(SHELLCODE_CFLAGS) $$< -o $$@
+	clang-18 -MMD -target $(ARCH) $(SHELLCODE_LDFLAGS) $(SHELLCODE_CFLAGS) $$< -o $$@
 endef
 
 $(foreach ARCH,$(ARCHS),$(eval $(SHELLCODE_IMPL_ARCH)))
