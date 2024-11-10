@@ -1737,10 +1737,20 @@ static err_t do_bt_reg(
     pis_operand_t masked_bit_offset = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
     CHECK_RETHROW(mask_shift_count(ctx, bit_offset, &masked_bit_offset, operand_size));
 
-    // extract the bit into the carry flag.
+    // extract the bit
+    pis_operand_t resulting_bit_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, FLAGS_CF, *bit_base_reg, masked_bit_offset)
+        PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, resulting_bit_tmp, *bit_base_reg, masked_bit_offset)
+    );
+
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN2(
+            operand_size == PIS_OPERAND_SIZE_1 ? PIS_OPCODE_MOVE : PIS_OPCODE_GET_LOW_BITS,
+            FLAGS_CF,
+            resulting_bit_tmp
+        )
     );
 
 cleanup:
