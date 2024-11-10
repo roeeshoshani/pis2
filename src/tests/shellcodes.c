@@ -349,6 +349,15 @@ cleanup:
     return err;
 }
 
+DEFINE_TEST(test_shellcode_tinyscript) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(test_shellcode_result(&shellcode_tinyscript, &(shellcode_args_t) {}, 0));
+
+cleanup:
+    return err;
+}
+
 DEFINE_TEST(test_shellcode_regex) {
     err_t err = SUCCESS;
 
