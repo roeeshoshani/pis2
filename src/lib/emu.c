@@ -387,6 +387,20 @@ cleanup:
     return err;
 }
 
+static err_t check_cond_expr_value(u64 value) {
+    err_t err = SUCCESS;
+
+    CHECK_TRACE_CODE(
+        value == 0 || value == 1,
+        PIS_ERR_EMU_COND_EXPR_WRONG_VALUE,
+        "wrong value %lu for conditional expression",
+        value
+    );
+
+cleanup:
+    return err;
+}
+
 err_t pis_emu_run_one(pis_emu_t* emu, exec_ctx_t* exec_ctx, const pis_insn_t* insn) {
     err_t err = SUCCESS;
     switch (insn->opcode) {
@@ -662,6 +676,9 @@ err_t pis_emu_run_one(pis_emu_t* emu, exec_ctx_t* exec_ctx, const pis_insn_t* in
             u64 cond = 0;
             CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[0], &cond));
 
+            // the input should be a conditional expression, verify its value
+            CHECK_RETHROW(check_cond_expr_value(cond));
+
             if (cond) {
                 CHECK_RETHROW(do_jmp(emu, exec_ctx, &insn->operands[1]));
             }
@@ -823,13 +840,8 @@ err_t pis_emu_run_one(pis_emu_t* emu, exec_ctx_t* exec_ctx, const pis_insn_t* in
             u64 input = 0;
             CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &input));
 
-            // the input should be a conditional expression and should have a value of 0 or 1.
-            CHECK_TRACE_CODE(
-                input == 0 || input == 1,
-                PIS_ERR_EMU_COND_EXPR_WRONG_VALUE,
-                "wrong value %lu for conditional expression",
-                input
-            );
+            // the input should be a conditional expression, verify its value
+            CHECK_RETHROW(check_cond_expr_value(input));
 
             CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], !input));
 
