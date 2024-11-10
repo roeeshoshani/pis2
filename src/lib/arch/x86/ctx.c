@@ -1399,7 +1399,7 @@ cleanup:
 
 /// performs a `ROL` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
-static err_t UNUSED_ATTR binop_rol(
+static err_t binop_rol(
     const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
 ) {
     err_t err = SUCCESS;
@@ -2343,6 +2343,7 @@ DEFINE_BINOP_MNEMONIC_HANDLER(sub);
 DEFINE_BINOP_MNEMONIC_HANDLER(shr);
 DEFINE_BINOP_MNEMONIC_HANDLER(sar);
 DEFINE_BINOP_MNEMONIC_HANDLER(shl);
+DEFINE_BINOP_MNEMONIC_HANDLER(rol);
 DEFINE_BINOP_MNEMONIC_HANDLER(xor);
 DEFINE_BINOP_MNEMONIC_HANDLER(or);
 
@@ -2756,7 +2757,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_SHL] = handle_mnemonic_shl,       [MNEMONIC_IMUL] = handle_mnemonic_imul,
     [MNEMONIC_MOVS] = handle_mnemonic_movs,     [MNEMONIC_NOT] = handle_mnemonic_not,
     [MNEMONIC_NEG] = handle_mnemonic_neg,       [MNEMONIC_MOVSX] = handle_mnemonic_movsx,
-    [MNEMONIC_SETCC] = handle_mnemonic_setcc,
+    [MNEMONIC_SETCC] = handle_mnemonic_setcc,   [MNEMONIC_ROL] = handle_mnemonic_rol,
 };
 
 static err_t lift_regular_insn_info(
