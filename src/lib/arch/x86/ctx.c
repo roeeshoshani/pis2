@@ -295,8 +295,8 @@ cleanup:
 }
 
 /// extracts the least significant bit of the given value into the given result operand.
-/// the output is a 1 byte conditional expression which indicates whether the sign bit of the given
-/// value is enabled.
+/// the output is a 1 byte conditional expression which indicates whether the least significant bit
+/// of the given value is enabled.
 static err_t extract_least_significant_bit(
     const insn_ctx_t* ctx, const pis_operand_t* value, const pis_operand_t* result
 ) {
@@ -305,13 +305,20 @@ static err_t extract_least_significant_bit(
     // make sure that the output operand is a 1 byte conditional expression
     CHECK(result->size == PIS_OPERAND_SIZE_1);
 
-    pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, value->size);
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_AND, tmp, *value, PIS_OPERAND_CONST(1, value->size))
-    );
+    if (value->size == PIS_OPERAND_SIZE_1) {
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(PIS_OPCODE_AND, *result, *value, PIS_OPERAND_CONST(1, value->size))
+        );
+    } else {
+        pis_operand_t tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, value->size);
+        LIFT_CTX_EMIT(
+            ctx->lift_ctx,
+            PIS_INSN3(PIS_OPCODE_AND, tmp, *value, PIS_OPERAND_CONST(1, value->size))
+        );
 
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, *result, tmp));
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, *result, tmp));
+    }
 
 cleanup:
     return err;
@@ -1824,15 +1831,7 @@ static err_t do_bt_reg(
         ctx->lift_ctx,
         PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, resulting_bit_tmp, *bit_base_reg, masked_bit_offset)
     );
-
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN2(
-            operand_size == PIS_OPERAND_SIZE_1 ? PIS_OPCODE_MOVE : PIS_OPCODE_GET_LOW_BITS,
-            FLAGS_CF,
-            resulting_bit_tmp
-        )
-    );
+    CHECK_RETHROW(extract_least_significant_bit(ctx, &resulting_bit_tmp, &FLAGS_CF));
 
 cleanup:
     return err;
