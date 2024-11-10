@@ -1468,12 +1468,10 @@ cleanup:
 
 /// peforms a division operation that operates on the `ax` and `dx` operands and stores its
 /// results in the `ax` and `dx` operands.
-static err_t UNUSED_ATTR do_div_ax_dx(
-    const insn_ctx_t* ctx, pis_operand_size_t operand_size, const pis_operand_t* divisor
-) {
+static err_t do_div_ax_dx(const insn_ctx_t* ctx, const pis_operand_t* divisor) {
     err_t err = SUCCESS;
 
-    CHECK(divisor->size == operand_size);
+    pis_operand_size_t operand_size = divisor->size;
 
     if (operand_size == PIS_OPERAND_SIZE_8) {
         // divide `rdx:rax`.
@@ -2376,6 +2374,19 @@ cleanup:
     return err;
 }
 
+static err_t handle_mnemonic_div(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 1);
+
+    pis_operand_t divide_by = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &divide_by));
+
+    CHECK_RETHROW(do_div_ax_dx(ctx, &divide_by));
+
+cleanup:
+    return err;
+}
+
 static err_t handle_mnemonic_bt(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
     CHECK(ops_amount == 2);
@@ -2767,6 +2778,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_MOVS] = handle_mnemonic_movs,     [MNEMONIC_NOT] = handle_mnemonic_not,
     [MNEMONIC_NEG] = handle_mnemonic_neg,       [MNEMONIC_MOVSX] = handle_mnemonic_movsx,
     [MNEMONIC_SETCC] = handle_mnemonic_setcc,   [MNEMONIC_ROL] = handle_mnemonic_rol,
+    [MNEMONIC_DIV] = handle_mnemonic_div,
 };
 
 static err_t lift_regular_insn_info(
