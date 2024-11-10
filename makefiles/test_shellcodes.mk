@@ -9,6 +9,7 @@ SHELLCODE_CFLAGS += -Werror
 SHELLCODE_CFLAGS += -Wno-unused-function
 SHELLCODE_CFLAGS += -mno-sse -mno-avx
 SHELLCODE_CFLAGS += -O3
+SHELLCODE_CFLAGS += -flto
 
 SHELLCODE_LDFLAGS ?=
 SHELLCODE_LDFLAGS += -Tsrc/test_shellcodes/shellcode.lds
