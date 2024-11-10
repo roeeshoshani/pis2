@@ -8,17 +8,17 @@
 
 modrm_t modrm_decode_byte(u8 modrm_byte) {
     return (modrm_t) {
-        .mod = modrm_byte >> 6,
-        .reg = (modrm_byte >> 3) & 0b111,
-        .rm = modrm_byte & 0b111,
+        .mod = GET_BITS(modrm_byte, 6, 2),
+        .reg = GET_BITS(modrm_byte, 3, 3),
+        .rm = GET_BITS(modrm_byte, 0, 3),
     };
 }
 
 sib_t sib_decode_byte(u8 sib_byte) {
     return (sib_t) {
-        .scale = sib_byte >> 6,
-        .index = (sib_byte >> 3) & 0b111,
-        .base = sib_byte & 0b111,
+        .scale = GET_BITS(sib_byte, 6, 2),
+        .index = GET_BITS(sib_byte, 3, 3),
+        .base = GET_BITS(sib_byte, 0, 3),
     };
 }
 

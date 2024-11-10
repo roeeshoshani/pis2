@@ -6,6 +6,8 @@
 #define UNUSED(X) (void) X
 
 #define GET_BIT_VALUE(VALUE, BIT_INDEX) (((VALUE) >> (BIT_INDEX)) & 1)
+#define GET_BITS(VALUE, START_BIT_INDEX, BITS_AMOUNT)                                              \
+    (((VALUE) >> (START_BIT_INDEX)) & ((1 << BITS_AMOUNT) - 1))
 
 #define ARRAY_SIZE(ARRAY) ((sizeof(ARRAY)) / (sizeof(*(ARRAY))))
 
