@@ -1,4 +1,5 @@
 SHELLCODE_SRCS := $(wildcard src/test_shellcodes/*.c)
+SHELLCODE_UTIL_SRCS := $(shell find src/test_shellcodes/utils/ -type f -name "*.c")
 
 SHELLCODE_CFLAGS ?=
 SHELLCODE_CFLAGS += -static
@@ -28,9 +29,9 @@ define SHELLCODE_IMPL_ARCH
 SHELLCODE_ELFS += $$(SHELLCODE_SRCS:src/%.c=build/%_$(ARCH).elf.shellcode)
 
 .PRECIOUS: build/test_shellcodes/%_$(ARCH).elf.shellcode
-build/test_shellcodes/%_$(ARCH).elf.shellcode: src/test_shellcodes/%.c
+build/test_shellcodes/%_$(ARCH).elf.shellcode: src/test_shellcodes/%.c $(SHELLCODE_UTIL_SRCS)
 	@mkdir -p $$(@D)
-	$(SHELLCODE_CC) -MMD -target $(ARCH) $(SHELLCODE_LDFLAGS) $(SHELLCODE_CFLAGS) $$< -o $$@
+	$(SHELLCODE_CC) -MMD -target $(ARCH) $(SHELLCODE_LDFLAGS) $(SHELLCODE_CFLAGS) $$^ -o $$@
 endef
 
 $(foreach ARCH,$(ARCHS),$(eval $(SHELLCODE_IMPL_ARCH)))
