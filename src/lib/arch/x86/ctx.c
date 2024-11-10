@@ -2212,6 +2212,11 @@ cleanup:
     return err;
 }
 
+static bool is_gpr(const pis_operand_t* operand) {
+    return operand->addr.space == PIS_SPACE_REG &&
+           operand->addr.offset < R15.addr.offset + pis_operand_size_to_bytes(R15.size);
+}
+
 static err_t
     lifted_op_write(const insn_ctx_t* ctx, const lifted_op_t* op, const pis_operand_t* value) {
     err_t err = SUCCESS;
@@ -2222,7 +2227,7 @@ static err_t
         }
         case LIFTED_OP_KIND_VALUE:
         case LIFTED_OP_KIND_WRITABLE_VALUE:
-            if (op->value.addr.space == PIS_SPACE_REG) {
+            if (is_gpr(&op->value)) {
                 CHECK_RETHROW(write_gpr(ctx, &op->value, value));
             } else {
                 LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, op->value, *value));
