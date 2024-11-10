@@ -3,7 +3,8 @@
 #include "../../except.h"
 #include "../../pis.h"
 #include "../../types.h"
-#include "lift_ctx.h"
+#include "../../lift_args.h"
+#include "cpumode.h"
 
 typedef enum {
     // group 1
@@ -55,23 +56,7 @@ typedef struct {
     rex_prefix_t rex;
 } prefixes_t;
 
-typedef struct {
-    /// the operand size for instructions that default to using 64 bit operands
-    pis_operand_size_t insn_default_64_bit;
-    /// the operand size for instructions that don't default to using 64 bit operands
-    pis_operand_size_t insn_default_not_64_bit;
-} effective_operand_sizes_t;
-
-typedef struct {
-    lift_ctx_t* lift_ctx;
-    const prefixes_t* prefixes;
-    pis_operand_size_t addr_size;
-    effective_operand_sizes_t operand_sizes;
-    bool has_modrm;
-    uint8_t modrm_byte;
-} insn_ctx_t;
-
-err_t parse_prefixes(lift_ctx_t* ctx, prefixes_t* prefixes);
+err_t parse_prefixes(pis_lift_args_t* args, pis_x86_cpumode_t cpumode, prefixes_t* prefixes);
 
 bool prefixes_contain_legacy_prefix(const prefixes_t* prefixes, legacy_prefix_t contains);
 

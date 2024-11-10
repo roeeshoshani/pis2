@@ -3,6 +3,7 @@
 #include "../../pis.h"
 #include "../../types.h"
 #include "prefixes.h"
+#include "ctx.h"
 
 typedef struct {
     u8 mod;
@@ -50,33 +51,31 @@ modrm_t modrm_decode_byte(u8 modrm_byte);
 sib_t sib_decode_byte(u8 sib_byte);
 
 err_t modrm_decode_rm_operand(
-    const insn_ctx_t* ctx,
+    ctx_t* ctx,
     const modrm_t* modrm,
     pis_operand_size_t operand_size,
     modrm_rm_operand_t* rm_operand
 );
 
 err_t modrm_fetch_and_process_with_operand_sizes(
-    const insn_ctx_t* ctx,
+    ctx_t* ctx,
     modrm_operands_t* operands,
     pis_operand_size_t rm_size,
     pis_operand_size_t reg_size
 );
 
-err_t modrm_fetch_and_process(const insn_ctx_t* ctx, modrm_operands_t* operands);
-
 err_t modrm_rm_write(
-    const insn_ctx_t* ctx, const modrm_rm_operand_t* rm_operand, const pis_operand_t* to_write
+    ctx_t* ctx, const modrm_rm_operand_t* rm_operand, const pis_operand_t* to_write
 );
 
 err_t modrm_rm_read(
-    const insn_ctx_t* ctx, const pis_operand_t* read_into, const modrm_rm_operand_t* rm_operand
+    ctx_t* ctx, const pis_operand_t* read_into, const modrm_rm_operand_t* rm_operand
 );
 
 err_t modrm_operand_read(
-    const insn_ctx_t* ctx, const pis_operand_t* read_into, const modrm_operand_t* operand
+    ctx_t* ctx, const pis_operand_t* read_into, const modrm_operand_t* operand
 );
 
 err_t modrm_operand_write(
-    const insn_ctx_t* ctx, const modrm_operand_t* operand, const pis_operand_t* to_write
+    ctx_t* ctx, const modrm_operand_t* operand, const pis_operand_t* to_write
 );

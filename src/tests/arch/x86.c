@@ -1,4 +1,4 @@
-#include "../../lib/arch/x86/ctx.h"
+#include "../../lib/arch/x86/lift.h"
 #include "../../lib/arch/x86/regs.h"
 #include "../../lib/emu.h"
 #include "../../lib/errors.h"
@@ -13,23 +13,20 @@
 static err_t emulate_insn(pis_emu_t* emu, code_t code, pis_x86_cpumode_t cpumode, u64 addr) {
     err_t err = SUCCESS;
 
-    pis_lift_result_t result = {};
-
-    pis_x86_ctx_t ctx = {
-        .cpumode = cpumode,
+    pis_lift_args_t args = {
+        .machine_code = CURSOR_INIT(code.code, code.len),
+        .machine_code_addr = addr,
     };
-
-    cursor_t cursor = CURSOR_INIT(code.code, code.len);
-    CHECK_RETHROW_VERBOSE(pis_x86_lift(&ctx, &cursor, addr, &result));
+    CHECK_RETHROW_VERBOSE(pis_x86_lift(&args, cpumode));
 
     CHECK_TRACE(
-        result.machine_insn_len == code.len,
+        args.result.machine_insn_len == code.len,
         "expected the instruction to be %lu bytes, instead it was %lu bytes",
         code.len,
-        result.machine_insn_len
+        args.result.machine_insn_len
     );
 
-    CHECK_RETHROW_VERBOSE(pis_emu_run(emu, &result));
+    CHECK_RETHROW_VERBOSE(pis_emu_run(emu, &args.result));
 
 cleanup:
     return err;

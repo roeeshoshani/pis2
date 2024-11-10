@@ -1,22 +1,18 @@
 #pragma once
 
-#include "../../except.h"
-#include "../../pis.h"
-#include "../../types.h"
-#include "../../cursor.h"
-
-typedef enum {
-    PIS_X86_CPUMODE_32_BIT,
-    PIS_X86_CPUMODE_64_BIT,
-} pis_x86_cpumode_t;
+#include "prefixes.h"
+#include "cpumode.h"
+#include "../../tmp.h"
 
 typedef struct {
+    pis_lift_args_t* args;
+    prefixes_t prefixes;
     pis_x86_cpumode_t cpumode;
-} pis_x86_ctx_t;
+    tmp_allocator_t tmp_allocator;
+    pis_operand_size_t addr_size;
+    pis_operand_size_t stack_addr_size;
+    pis_operand_t sp;
+    bool has_modrm;
+    uint8_t modrm_byte;
+} ctx_t;
 
-err_t pis_x86_lift(
-    const pis_x86_ctx_t* ctx,
-    cursor_t* machine_code,
-    u64 machine_code_addr,
-    pis_lift_result_t* result
-);

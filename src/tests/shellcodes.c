@@ -1,5 +1,5 @@
 #include "shellcodes.h"
-#include "../lib/arch/x86/ctx.h"
+#include "../lib/arch/x86/lift.h"
 #include "../lib/arch/x86/regs.h"
 #include "../lib/emu.h"
 #include "../lib/except.h"
@@ -20,7 +20,7 @@ typedef struct {
     u64 arg4;
 } shellcode_args_t;
 
-typedef err_t (*lift_fn_t)(cursor_t* cursor, u64 addr, pis_lift_result_t* result);
+typedef err_t (*lift_fn_t)(pis_lift_args_t* args);
 typedef err_t (*prepare_fn_t)(pis_emu_t* emu, const shellcode_args_t* args);
 
 typedef struct {
@@ -30,22 +30,16 @@ typedef struct {
     const pis_operand_t* result_operand;
 } arch_def_t;
 
-static err_t lift_x86_64(cursor_t* cursor, u64 addr, pis_lift_result_t* result) {
+static err_t lift_x86_64(pis_lift_args_t* args) {
     err_t err = SUCCESS;
-    pis_x86_ctx_t ctx = {
-        .cpumode = PIS_X86_CPUMODE_64_BIT,
-    };
-    CHECK_RETHROW_VERBOSE(pis_x86_lift(&ctx, cursor, addr, result));
+    CHECK_RETHROW_VERBOSE(pis_x86_lift(args, PIS_X86_CPUMODE_64_BIT));
 cleanup:
     return err;
 }
 
-static err_t lift_i386(cursor_t* cursor, u64 addr, pis_lift_result_t* result) {
+static err_t lift_i386(pis_lift_args_t* args) {
     err_t err = SUCCESS;
-    pis_x86_ctx_t ctx = {
-        .cpumode = PIS_X86_CPUMODE_32_BIT,
-    };
-    CHECK_RETHROW_VERBOSE(pis_x86_lift(&ctx, cursor, addr, result));
+    CHECK_RETHROW_VERBOSE(pis_x86_lift(args, PIS_X86_CPUMODE_32_BIT));
 cleanup:
     return err;
 }
@@ -157,24 +151,24 @@ const arch_def_t arch_def_i386 = {
 static err_t
     run_arch_specific_shellcode(pis_emu_t* emu, const shellcode_t* shellcode, lift_fn_t lift_fn) {
     err_t err = SUCCESS;
-    pis_lift_result_t result = {};
 
     size_t code_len = shellcode->code_end - shellcode->code;
 
     u64 cur_offset = 0;
     while (cur_offset < code_len) {
-        pis_lift_result_reset(&result);
-
-        cursor_t cursor = CURSOR_INIT(shellcode->code + cur_offset, code_len - cur_offset);
+        pis_lift_args_t args = {
+            .machine_code = CURSOR_INIT(shellcode->code + cur_offset, code_len - cur_offset),
+            .machine_code_addr = SHELLCODE_BASE_ADDR + cur_offset,
+        };
         CHECK_RETHROW_TRACE(
-            lift_fn(&cursor, SHELLCODE_BASE_ADDR + cur_offset, &result),
+            lift_fn(&args),
             "failed to lift insn at offset 0x%lx in shellcode %s",
             cur_offset,
             shellcode->name
         );
 
         CHECK_RETHROW_TRACE(
-            pis_emu_run(emu, &result),
+            pis_emu_run(emu, &args.result),
             "failed to emulate insn at offset 0x%lx in shellcode %s",
             cur_offset,
             shellcode->name
@@ -191,7 +185,7 @@ static err_t
             }
         } else {
             // advance to the next instruction
-            cur_offset += result.machine_insn_len;
+            cur_offset += args.result.machine_insn_len;
         }
     }
 cleanup:

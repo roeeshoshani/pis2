@@ -3,7 +3,6 @@
 #include "../../except.h"
 #include "../../utils.h"
 #include "ctx.h"
-#include "lift_ctx.h"
 
 /// returns the group of the given legacy prefix.
 /// if the provided value is not a valid legacy prefix, returns `LEGACY_PREFIX_GROUP_INVALID`.
@@ -30,13 +29,13 @@ static legacy_prefix_group_t legacy_prefix_get_group(legacy_prefix_t prefix) {
     }
 }
 
-static err_t parse_legacy_prefixes(lift_ctx_t* ctx, legacy_prefixes_t* parsed_prefixes) {
+static err_t parse_legacy_prefixes(pis_lift_args_t* args, legacy_prefixes_t* parsed_prefixes) {
     err_t err = SUCCESS;
     legacy_prefixes_t prefixes = {};
 
-    while (!cursor_eof(ctx->machine_code)) {
+    while (!cursor_eof(&args->machine_code)) {
         u8 cur_byte = 0;
-        CHECK_RETHROW(cursor_peek_1(ctx->machine_code, &cur_byte));
+        CHECK_RETHROW(cursor_peek_1(&args->machine_code, &cur_byte));
 
         legacy_prefix_t cur_prefix = (legacy_prefix_t) cur_byte;
 
@@ -60,7 +59,7 @@ static err_t parse_legacy_prefixes(lift_ctx_t* ctx, legacy_prefixes_t* parsed_pr
         );
 
         prefixes.by_group[group] = cur_prefix;
-        cursor_advance(ctx->machine_code, 1);
+        cursor_advance(&args->machine_code, 1);
     }
 
     *parsed_prefixes = prefixes;
@@ -69,16 +68,17 @@ cleanup:
     return err;
 }
 
-static err_t parse_rex_prefix(lift_ctx_t* ctx, rex_prefix_t* rex_prefix) {
+static err_t
+    parse_rex_prefix(pis_lift_args_t* args, pis_x86_cpumode_t cpumode, rex_prefix_t* rex_prefix) {
     err_t err = SUCCESS;
 
     // REX prefix is only relevant for 64-bit mode
-    if (ctx->pis_x86_ctx->cpumode != PIS_X86_CPUMODE_64_BIT) {
+    if (cpumode != PIS_X86_CPUMODE_64_BIT) {
         SUCCESS_CLEANUP();
     }
 
     u8 cur_byte = 0;
-    CHECK_RETHROW(cursor_peek_1(ctx->machine_code, &cur_byte));
+    CHECK_RETHROW(cursor_peek_1(&args->machine_code, &cur_byte));
 
     if ((cur_byte & 0xf0) == 0x40) {
         // the byte is a REX prefix
@@ -89,7 +89,7 @@ static err_t parse_rex_prefix(lift_ctx_t* ctx, rex_prefix_t* rex_prefix) {
             .x = GET_BIT_VALUE(cur_byte, 1),
             .b = GET_BIT_VALUE(cur_byte, 0),
         };
-        cursor_advance(ctx->machine_code, 1);
+        cursor_advance(&args->machine_code, 1);
     } else {
         *rex_prefix = (rex_prefix_t) {};
     }
@@ -98,12 +98,12 @@ cleanup:
     return err;
 }
 
-err_t parse_prefixes(lift_ctx_t* ctx, prefixes_t* prefixes) {
+err_t parse_prefixes(pis_lift_args_t* args, pis_x86_cpumode_t cpumode, prefixes_t* prefixes) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(parse_legacy_prefixes(ctx, &prefixes->legacy));
+    CHECK_RETHROW(parse_legacy_prefixes(args, &prefixes->legacy));
 
-    CHECK_RETHROW(parse_rex_prefix(ctx, &prefixes->rex));
+    CHECK_RETHROW(parse_rex_prefix(args, cpumode, &prefixes->rex));
 
 cleanup:
     return err;
