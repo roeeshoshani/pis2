@@ -3,8 +3,7 @@ LIB_OBJS := $(LIB_SRCS:src/%.c=build/%.o)
 
 SRCS := $(shell find src -type f -name "*.c")
 HDRS := $(shell find src -type f -name "*.h")
-OBJS := $(SRCS:src/%.c=build/%.o)
-DEPS := $(OBJS:%.o=%.d)
+DEPS := $(shell find build -type f -name "*.d")
 
 ARCHS := x86_64 i386
 
