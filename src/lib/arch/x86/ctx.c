@@ -428,6 +428,67 @@ cleanup:
     return err;
 }
 
+/// performs an `SBB` operation on the 2 input operands `a` and `b` and returns an operand
+/// containing the result of the operation in `result`.
+static err_t UNUSED_ATTR binop_sbb(
+    const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    CHECK(a->size == b->size);
+    pis_operand_size_t operand_size = a->size;
+
+    pis_operand_t orig_cf = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, orig_cf, FLAGS_CF));
+
+    pis_operand_t a_minus_b = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SUB, a_minus_b, *a, *b));
+
+    // carry flag
+    pis_operand_t carry_first_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_UNSIGNED_LESS_THAN, carry_first_cond, *a, *b)
+    );
+
+    pis_operand_t carry_second_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_UNSIGNED_LESS_THAN, carry_second_cond, a_minus_b, orig_cf)
+    );
+
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_OR, FLAGS_CF, carry_first_cond, carry_second_cond)
+    );
+
+    // overflow flag
+    pis_operand_t overflow_first_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SIGNED_BORROW, overflow_first_cond, *a, *b));
+
+    pis_operand_t overflow_second_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_SIGNED_BORROW, overflow_second_cond, a_minus_b, orig_cf)
+    );
+
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN3(PIS_OPCODE_OR, FLAGS_OF, overflow_first_cond, overflow_second_cond)
+    );
+
+    // perform the actual subtraction
+    pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SUB, res_tmp, a_minus_b, orig_cf));
+
+    CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &res_tmp));
+
+    *result = res_tmp;
+
+cleanup:
+    return err;
+}
+
 /// performs an `SUB` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
 static err_t binop_sub(
@@ -2183,36 +2244,6 @@ cleanup:
     return err;
 }
 
-static err_t handle_mnemonic_sbb(const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
-    err_t err = SUCCESS;
-    CHECK(ops_amount == 2);
-
-    pis_operand_t lhs = {};
-    CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &lhs));
-
-    pis_operand_t rhs = {};
-    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &rhs));
-
-    // first, zero extend CF
-    pis_operand_t rhs_plus_cf;
-    if (rhs.size == PIS_OPERAND_SIZE_1) {
-        rhs_plus_cf = FLAGS_CF;
-    } else {
-        rhs_plus_cf = LIFT_CTX_NEW_TMP(ctx->lift_ctx, rhs.size);
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, rhs_plus_cf, FLAGS_CF));
-    }
-
-    // add rhs to CF
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, rhs_plus_cf, rhs_plus_cf, rhs));
-
-    pis_operand_t res = {};
-    CHECK_RETHROW(binop_sub(ctx, &lhs, &rhs_plus_cf, &res));
-
-    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &res));
-
-cleanup:
-    return err;
-}
 static err_t handle_mnemonic_unary_op(
     const insn_ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount, unary_op_fn_t unary_op
 ) {
@@ -2268,6 +2299,7 @@ cleanup:
 
 DEFINE_BINOP_MNEMONIC_HANDLER(add);
 DEFINE_BINOP_MNEMONIC_HANDLER(adc);
+DEFINE_BINOP_MNEMONIC_HANDLER(sbb);
 DEFINE_BINOP_MNEMONIC_HANDLER(and);
 DEFINE_BINOP_MNEMONIC_HANDLER(sub);
 DEFINE_BINOP_MNEMONIC_HANDLER(shr);
