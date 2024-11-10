@@ -377,10 +377,16 @@ cleanup:
     return err;
 }
 
-/// performs an `ADC` operation on the 2 input operands `a` and `b` and returns an operand
-/// containing the result of the operation in `result`.
-static err_t UNUSED_ATTR binop_adc(
-    const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
+/// a generic implementation of a binary operator which also uses the carry flag. can be used to
+/// implement both `ADC` and `SBB`
+static err_t impl_binop_with_carry(
+    const insn_ctx_t* ctx,
+    const pis_operand_t* a,
+    const pis_operand_t* b,
+    pis_operand_t* result,
+    pis_opcode_t binop_opcode,
+    pis_opcode_t carry_opcode,
+    pis_opcode_t overflow_opcode
 ) {
     err_t err = SUCCESS;
 
@@ -397,18 +403,15 @@ static err_t UNUSED_ATTR binop_adc(
         )
     );
 
-    pis_operand_t a_plus_b = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, a_plus_b, *a, *b));
+    pis_operand_t a_and_b = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(binop_opcode, a_and_b, *a, *b));
 
     // carry flag
     pis_operand_t carry_first_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_UNSIGNED_CARRY, carry_first_cond, *a, *b));
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(carry_opcode, carry_first_cond, *a, *b));
 
     pis_operand_t carry_second_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_UNSIGNED_CARRY, carry_second_cond, a_plus_b, orig_cf_zext)
-    );
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(carry_opcode, carry_second_cond, a_and_b, orig_cf_zext));
 
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
@@ -417,12 +420,12 @@ static err_t UNUSED_ATTR binop_adc(
 
     // overflow flag
     pis_operand_t overflow_first_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SIGNED_CARRY, overflow_first_cond, *a, *b));
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(overflow_opcode, overflow_first_cond, *a, *b));
 
     pis_operand_t overflow_second_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_SIGNED_CARRY, overflow_second_cond, a_plus_b, orig_cf_zext)
+        PIS_INSN3(overflow_opcode, overflow_second_cond, a_and_b, orig_cf_zext)
     );
 
     LIFT_CTX_EMIT(
@@ -430,13 +433,34 @@ static err_t UNUSED_ATTR binop_adc(
         PIS_INSN3(PIS_OPCODE_OR, FLAGS_OF, overflow_first_cond, overflow_second_cond)
     );
 
-    // perform the actual addition
+    // perform the actual binop
     pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, res_tmp, a_plus_b, orig_cf_zext));
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(binop_opcode, res_tmp, a_and_b, orig_cf_zext));
 
     CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &res_tmp));
 
     *result = res_tmp;
+
+cleanup:
+    return err;
+}
+
+/// performs an `ADC` operation on the 2 input operands `a` and `b` and returns an operand
+/// containing the result of the operation in `result`.
+static err_t binop_adc(
+    const insn_ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW(impl_binop_with_carry(
+        ctx,
+        a,
+        b,
+        result,
+        PIS_OPCODE_ADD,
+        PIS_OPCODE_UNSIGNED_CARRY,
+        PIS_OPCODE_SIGNED_CARRY
+    ));
 
 cleanup:
     return err;
@@ -449,62 +473,15 @@ static err_t UNUSED_ATTR binop_sbb(
 ) {
     err_t err = SUCCESS;
 
-    CHECK(a->size == b->size);
-    pis_operand_size_t operand_size = a->size;
-
-    pis_operand_t orig_cf_zext = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN2(
-            operand_size == PIS_OPERAND_SIZE_1 ? PIS_OPCODE_MOVE : PIS_OPCODE_ZERO_EXTEND,
-            orig_cf_zext,
-            FLAGS_CF
-        )
-    );
-
-    pis_operand_t a_minus_b = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SUB, a_minus_b, *a, *b));
-
-    // carry flag
-    pis_operand_t carry_first_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_UNSIGNED_LESS_THAN, carry_first_cond, *a, *b)
-    );
-
-    pis_operand_t carry_second_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_UNSIGNED_LESS_THAN, carry_second_cond, a_minus_b, orig_cf_zext)
-    );
-
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_OR, FLAGS_CF, carry_first_cond, carry_second_cond)
-    );
-
-    // overflow flag
-    pis_operand_t overflow_first_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SIGNED_BORROW, overflow_first_cond, *a, *b));
-
-    pis_operand_t overflow_second_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_SIGNED_BORROW, overflow_second_cond, a_minus_b, orig_cf_zext)
-    );
-
-    LIFT_CTX_EMIT(
-        ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_OR, FLAGS_OF, overflow_first_cond, overflow_second_cond)
-    );
-
-    // perform the actual subtraction
-    pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SUB, res_tmp, a_minus_b, orig_cf_zext));
-
-    CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &res_tmp));
-
-    *result = res_tmp;
+    CHECK_RETHROW(impl_binop_with_carry(
+        ctx,
+        a,
+        b,
+        result,
+        PIS_OPCODE_SUB,
+        PIS_OPCODE_UNSIGNED_LESS_THAN,
+        PIS_OPCODE_SIGNED_BORROW
+    ));
 
 cleanup:
     return err;
