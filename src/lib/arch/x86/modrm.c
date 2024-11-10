@@ -126,19 +126,19 @@ static err_t build_modrm_rm_addr_16_into(
                 // no displacement
                 break;
             case 0b01: {
-                // 8 bit displacement
-                u8 disp8 = 0;
-                CHECK_RETHROW(cursor_next_1(ctx->lift_ctx->machine_code, &disp8));
-                // sign extend it to 16 bits
-                u16 disp16 = (i16) (i8) disp8;
+                // 8 bit displacement, sign extended to 16-bits
+                u64 disp = 0;
+                CHECK_RETHROW(cursor_next_imm_ext(
+                    ctx->lift_ctx->machine_code,
+                    PIS_OPERAND_SIZE_1,
+                    PIS_OPERAND_SIZE_2,
+                    CURSOR_IMM_EXT_KIND_SIGN,
+                    PIS_ENDIANNESS_LITTLE,
+                    &disp
+                ));
                 LIFT_CTX_EMIT(
                     ctx->lift_ctx,
-                    PIS_INSN3(
-                        PIS_OPCODE_ADD,
-                        *into,
-                        *into,
-                        PIS_OPERAND_CONST(disp16, ctx->addr_size)
-                    )
+                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
                 );
                 break;
             }
@@ -192,17 +192,22 @@ static err_t build_modrm_rm_addr_32_into(
                 break;
             case 0b01: {
                 // 8 bit displacement
-                u8 disp8 = 0;
-                CHECK_RETHROW(cursor_next_1(ctx->lift_ctx->machine_code, &disp8));
-                // sign extend it to 32 bits
-                u32 disp32 = (i32) (i8) disp8;
+                u64 disp = 0;
+                CHECK_RETHROW(cursor_next_imm_ext(
+                    ctx->lift_ctx->machine_code,
+                    PIS_OPERAND_SIZE_1,
+                    PIS_OPERAND_SIZE_4,
+                    CURSOR_IMM_EXT_KIND_SIGN,
+                    PIS_ENDIANNESS_LITTLE,
+                    &disp
+                ));
                 LIFT_CTX_EMIT(
                     ctx->lift_ctx,
                     PIS_INSN3(
                         PIS_OPCODE_ADD,
                         *into,
                         *into,
-                        PIS_OPERAND_CONST(disp32, ctx->addr_size)
+                        PIS_OPERAND_CONST(disp, PIS_OPERAND_SIZE_4)
                     )
                 );
                 break;
@@ -235,14 +240,19 @@ static err_t build_modrm_rm_addr_64_into(
 
     if (modrm->rm == 0b101 && modrm->mod == 0b00) {
         // rip relative with 32-bit displacement
-        u32 disp32 = 0;
-        CHECK_RETHROW(cursor_next_4(ctx->lift_ctx->machine_code, &disp32, PIS_ENDIANNESS_LITTLE));
-        // sign extend it to 64 bits
-        u64 disp64 = (i64) (i32) disp32;
+        u64 disp = 0;
+        CHECK_RETHROW(cursor_next_imm_ext(
+            ctx->lift_ctx->machine_code,
+            PIS_OPERAND_SIZE_4,
+            PIS_OPERAND_SIZE_8,
+            CURSOR_IMM_EXT_KIND_SIGN,
+            PIS_ENDIANNESS_LITTLE,
+            &disp
+        ));
 
         u64 cur_insn_end_addr =
             ctx->lift_ctx->machine_code_addr + cursor_index(ctx->lift_ctx->machine_code);
-        u64 mem_addr = cur_insn_end_addr + disp64;
+        u64 mem_addr = cur_insn_end_addr + disp;
 
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
@@ -268,37 +278,35 @@ static err_t build_modrm_rm_addr_64_into(
                 break;
             case 0b01: {
                 // 8 bit displacement
-                u8 disp8 = 0;
-                CHECK_RETHROW(cursor_next_1(ctx->lift_ctx->machine_code, &disp8));
-                // sign extend it to 64 bits
-                u64 disp64 = (i64) (i8) disp8;
+                u64 disp = 0;
+                CHECK_RETHROW(cursor_next_imm_ext(
+                    ctx->lift_ctx->machine_code,
+                    PIS_OPERAND_SIZE_1,
+                    PIS_OPERAND_SIZE_8,
+                    CURSOR_IMM_EXT_KIND_SIGN,
+                    PIS_ENDIANNESS_LITTLE,
+                    &disp
+                ));
                 LIFT_CTX_EMIT(
                     ctx->lift_ctx,
-                    PIS_INSN3(
-                        PIS_OPCODE_ADD,
-                        *into,
-                        *into,
-                        PIS_OPERAND_CONST(disp64, ctx->addr_size)
-                    )
+                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
                 );
                 break;
             }
             case 0b10: {
                 // 32 bit displacement
-                u32 disp32 = 0;
-                CHECK_RETHROW(
-                    cursor_next_4(ctx->lift_ctx->machine_code, &disp32, PIS_ENDIANNESS_LITTLE)
-                );
-                // sign extend it to 64 bits
-                u64 disp64 = (i64) (i32) disp32;
+                u64 disp = 0;
+                CHECK_RETHROW(cursor_next_imm_ext(
+                    ctx->lift_ctx->machine_code,
+                    PIS_OPERAND_SIZE_4,
+                    PIS_OPERAND_SIZE_8,
+                    CURSOR_IMM_EXT_KIND_SIGN,
+                    PIS_ENDIANNESS_LITTLE,
+                    &disp
+                ));
                 LIFT_CTX_EMIT(
                     ctx->lift_ctx,
-                    PIS_INSN3(
-                        PIS_OPCODE_ADD,
-                        *into,
-                        *into,
-                        PIS_OPERAND_CONST(disp64, ctx->addr_size)
-                    )
+                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
                 );
                 break;
             }

@@ -1819,20 +1819,8 @@ op_size_t calc_size(const insn_ctx_t* ctx, size_t size_info_index) {
     }
 }
 
-static u32 op_size_to_bits(op_size_t op_size) {
-    return (u32) 1 << ((u32) op_size + 3);
-}
-
 static pis_operand_size_t op_size_to_pis_operand_size(op_size_t op_size) {
     return (u32) 1 << (u32) op_size;
-}
-
-static u64 op_size_max_unsigned_value(op_size_t op_size) {
-    if (op_size == OP_SIZE_64) {
-        return UINT64_MAX;
-    } else {
-        return ((u64) 1 << op_size_to_bits(op_size)) - 1;
-    }
 }
 
 static err_t get_or_fetch_modrm(insn_ctx_t* ctx, modrm_t* modrm) {
@@ -1889,17 +1877,14 @@ static err_t lift_op(
             cursor_imm_ext_kind_t extend_kind = op_info->imm.extend_kind == IMM_EXT_SIGN_EXTEND
                                                     ? CURSOR_IMM_EXT_KIND_SIGN
                                                     : CURSOR_IMM_EXT_KIND_ZERO;
-            CHECK_RETHROW(cursor_next_imm(
+            CHECK_RETHROW(cursor_next_imm_ext(
                 ctx->lift_ctx->machine_code,
                 op_size_to_pis_operand_size(encoded_size),
+                op_size_to_pis_operand_size(extended_size),
+                extend_kind,
                 PIS_ENDIANNESS_LITTLE,
-                &imm,
-                extend_kind
+                &imm
             ));
-
-            CHECK(extended_size >= encoded_size);
-
-            imm &= op_size_max_unsigned_value(extended_size);
 
             *lifted_operand = (lifted_op_t) {
                 .kind = LIFTED_OP_KIND_VALUE,
@@ -2013,12 +1998,13 @@ static err_t lift_op(
             op_size_t size = calc_size(ctx, op_info->rel.size_info_index);
 
             u64 rel_offset = 0;
-            CHECK_RETHROW(cursor_next_imm(
+            CHECK_RETHROW(cursor_next_imm_ext(
                 ctx->lift_ctx->machine_code,
                 op_size_to_pis_operand_size(size),
+                ctx->addr_size,
+                CURSOR_IMM_EXT_KIND_SIGN,
                 PIS_ENDIANNESS_LITTLE,
-                &rel_offset,
-                CURSOR_IMM_EXT_KIND_SIGN
+                &rel_offset
             ));
 
             u64 cur_insn_end_addr =
@@ -2034,12 +2020,13 @@ static err_t lift_op(
         }
         case OP_KIND_MEM_OFFSET: {
             u64 addr = 0;
-            CHECK_RETHROW(cursor_next_imm(
+            CHECK_RETHROW(cursor_next_imm_ext(
                 ctx->lift_ctx->machine_code,
                 ctx->addr_size,
+                ctx->addr_size,
+                CURSOR_IMM_EXT_KIND_ZERO,
                 PIS_ENDIANNESS_LITTLE,
-                &addr,
-                CURSOR_IMM_EXT_KIND_ZERO
+                &addr
             ));
 
             *lifted_operand = (lifted_op_t) {

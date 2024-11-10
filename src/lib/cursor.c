@@ -121,22 +121,27 @@ cleanup:
     return err;
 }
 
-err_t cursor_next_imm(
+err_t cursor_next_imm_ext(
     cursor_t* cursor,
-    pis_operand_size_t size,
+    pis_operand_size_t encoded_size,
+    pis_operand_size_t extended_size,
+    cursor_imm_ext_kind_t ext_kind,
     pis_endianness_t endianness,
-    u64* imm,
-    cursor_imm_ext_kind_t ext_kind
+    u64* imm
 ) {
     err_t err = SUCCESS;
-    switch (size) {
+
+    CHECK(extended_size >= encoded_size);
+
+    u64 extended_to_64_bits;
+    switch (encoded_size) {
         case PIS_OPERAND_SIZE_1: {
             u8 value = 0;
             CHECK_RETHROW(cursor_next_1(cursor, &value));
             if (ext_kind == CURSOR_IMM_EXT_KIND_SIGN) {
-                *imm = (i64) (i8) value;
+                extended_to_64_bits = (i64) (i8) value;
             } else {
-                *imm = value;
+                extended_to_64_bits = value;
             }
             break;
         }
@@ -144,9 +149,9 @@ err_t cursor_next_imm(
             u16 value = 0;
             CHECK_RETHROW(cursor_next_2(cursor, &value, endianness));
             if (ext_kind == CURSOR_IMM_EXT_KIND_SIGN) {
-                *imm = (i64) (i16) value;
+                extended_to_64_bits = (i64) (i16) value;
             } else {
-                *imm = value;
+                extended_to_64_bits = value;
             }
             break;
         }
@@ -154,9 +159,9 @@ err_t cursor_next_imm(
             u32 value = 0;
             CHECK_RETHROW(cursor_next_4(cursor, &value, endianness));
             if (ext_kind == CURSOR_IMM_EXT_KIND_SIGN) {
-                *imm = (i64) (i32) value;
+                extended_to_64_bits = (i64) (i32) value;
             } else {
-                *imm = value;
+                extended_to_64_bits = value;
             }
             break;
         }
@@ -164,15 +169,18 @@ err_t cursor_next_imm(
             u64 value = 0;
             CHECK_RETHROW(cursor_next_8(cursor, &value, endianness));
             if (ext_kind == CURSOR_IMM_EXT_KIND_SIGN) {
-                *imm = (i64) (i64) value;
+                extended_to_64_bits = (i64) (i64) value;
             } else {
-                *imm = value;
+                extended_to_64_bits = value;
             }
             break;
         }
         default:
             UNREACHABLE();
     }
+
+    *imm = extended_to_64_bits & pis_operand_size_max_unsigned_value(extended_size);
+
 cleanup:
     return err;
 }
