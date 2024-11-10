@@ -15,25 +15,25 @@ SHELLCODE_LDFLAGS += -Wl,--build-id=none
 
 SHELLCODE_CC ?= clang-18
 
-.PRECIOUS: build/test_shellcodes/%.shellcode.bin
-build/test_shellcodes/%.shellcode.bin: build/test_shellcodes/%.shellcode.elf
+.PRECIOUS: build/test_shellcodes/%.bin.shellcode
+build/test_shellcodes/%.bin.shellcode: build/test_shellcodes/%.elf.shellcode
 	$(OBJCOPY) -j .all -O binary $< $@
 
-build/test_shellcodes/%.shellcode.o: build/test_shellcodes/%.shellcode.bin
+build/test_shellcodes/%.bin.o.shellcode: build/test_shellcodes/%.bin.shellcode
 	$(CC) -c -DWRAP_FILENAME='"$<"' -DSHELLCODE_NAME=$* src/test_shellcodes/shellcode_wrapper.S -o $@
 
 SHELLCODE_ELFS :=
 
 define SHELLCODE_IMPL_ARCH
-SHELLCODE_ELFS += $$(SHELLCODE_SRCS:src/%.c=build/%_$(ARCH).shellcode.elf)
+SHELLCODE_ELFS += $$(SHELLCODE_SRCS:src/%.c=build/%_$(ARCH).elf.shellcode)
 
-.PRECIOUS: build/test_shellcodes/%_$(ARCH).shellcode.elf
-build/test_shellcodes/%_$(ARCH).shellcode.elf: src/test_shellcodes/%.c
+.PRECIOUS: build/test_shellcodes/%_$(ARCH).elf.shellcode
+build/test_shellcodes/%_$(ARCH).elf.shellcode: src/test_shellcodes/%.c
 	@mkdir -p $$(@D)
 	$(SHELLCODE_CC) -MMD -target $(ARCH) $(SHELLCODE_LDFLAGS) $(SHELLCODE_CFLAGS) $$< -o $$@
 endef
 
 $(foreach ARCH,$(ARCHS),$(eval $(SHELLCODE_IMPL_ARCH)))
 
-SHELLCODE_ELFS := $(SHELLCODE_ELFS:build/%.shellcode.elf=build/%.shellcode.o)
+SHELLCODE_BIN_OBJS := $(SHELLCODE_ELFS:build/%.elf.shellcode=build/%.bin.o.shellcode)
 
