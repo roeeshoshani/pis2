@@ -1665,43 +1665,50 @@ static err_t do_mul_ax(const insn_ctx_t* ctx, const pis_operand_t* factor) {
             PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, factor_zero_extended, *factor)
         );
 
-        pis_operand_t ax = operand_resize(&RAX, double_operand_size);
+        pis_operand_t ax = operand_resize(&RAX, operand_size);
+        pis_operand_t ax_zero_extended = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, ax_zero_extended, ax));
 
         pis_operand_t multiplication_result = LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
-            PIS_INSN3(PIS_OPCODE_UNSIGNED_MUL, multiplication_result, ax, factor_zero_extended)
-        );
-
-        // split the result into the low and high parts
-        pis_operand_t result_high = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-        pis_operand_t result_low = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, result_low, multiplication_result)
-        );
-
-        pis_operand_t shifted_multiplication_result =
-            LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
             PIS_INSN3(
-                PIS_OPCODE_SHIFT_RIGHT,
-                shifted_multiplication_result,
+                PIS_OPCODE_UNSIGNED_MUL,
                 multiplication_result,
-                PIS_OPERAND_CONST(pis_operand_size_to_bits(operand_size), double_operand_size)
+                ax_zero_extended,
+                factor_zero_extended
             )
         );
-        LIFT_CTX_EMIT(
-            ctx->lift_ctx,
-            PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, result_high, shifted_multiplication_result)
-        );
-
         // store the result of the multiplication
         if (operand_size == PIS_OPERAND_SIZE_1) {
             LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, AX, multiplication_result));
         } else {
-            pis_operand_t dx = operand_resize(&RDX, double_operand_size);
+            // split the result into the low and high parts
+            pis_operand_t result_high = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+            pis_operand_t result_low = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, result_low, multiplication_result)
+            );
+
+            pis_operand_t shifted_multiplication_result =
+                LIFT_CTX_NEW_TMP(ctx->lift_ctx, double_operand_size);
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN3(
+                    PIS_OPCODE_SHIFT_RIGHT,
+                    shifted_multiplication_result,
+                    multiplication_result,
+                    PIS_OPERAND_CONST(pis_operand_size_to_bits(operand_size), double_operand_size)
+                )
+            );
+            LIFT_CTX_EMIT(
+                ctx->lift_ctx,
+                PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, result_high, shifted_multiplication_result)
+            );
+
+
+            pis_operand_t dx = operand_resize(&RDX, operand_size);
             LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, dx, result_high));
             LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, ax, result_low));
         }
