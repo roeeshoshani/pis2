@@ -4503,9 +4503,9 @@ const insn_info_t
             {
                 .regular =
                     {
-                        .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 12,
-                        .ops_amount = 0,
+                        .mnemonic = MNEMONIC_IMUL,
+                        .first_op_index = 6,
+                        .ops_amount = 2,
                     },
             },
             {
