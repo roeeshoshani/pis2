@@ -2379,7 +2379,7 @@ static err_t handle_mnemonic_div(const insn_ctx_t* ctx, const lifted_op_t* ops, 
     CHECK(ops_amount == 1);
 
     pis_operand_t divide_by = {};
-    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &divide_by));
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &divide_by));
 
     CHECK_RETHROW(do_div_ax_dx(ctx, &divide_by));
 
