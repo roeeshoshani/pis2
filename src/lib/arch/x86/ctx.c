@@ -2540,7 +2540,29 @@ static err_t handle_mnemonic_lea(const insn_ctx_t* ctx, const lifted_op_t* ops, 
 
     CHECK(ops[1].kind == LIFTED_OP_KIND_MEM);
 
-    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &ops[1].mem.addr));
+    const pis_operand_t* mem_addr = &ops[1].mem.addr;
+
+    pis_operand_size_t addr_size = mem_addr->size;
+    pis_operand_size_t dst_size = lifted_op_size(&ops[0]);
+
+    // resize the memory address to the desired size
+    pis_operand_t resized_addr;
+    if (dst_size == addr_size) {
+        resized_addr = *mem_addr;
+    } else {
+        resized_addr = LIFT_CTX_NEW_TMP(ctx->lift_ctx, dst_size);
+        pis_opcode_t opcode;
+        if (dst_size > addr_size) {
+            // we want to zero extend the address
+            opcode = PIS_OPCODE_ZERO_EXTEND;
+        } else {
+            // we want to shrink the address
+            opcode = PIS_OPCODE_GET_LOW_BITS;
+        }
+        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(opcode, resized_addr, *mem_addr));
+    }
+
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &resized_addr));
 cleanup:
     return err;
 }
