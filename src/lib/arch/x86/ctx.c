@@ -1752,32 +1752,6 @@ static legacy_prefix_t group1_prefix(const insn_ctx_t* ctx) {
     return ctx->prefixes->legacy.by_group[LEGACY_PREFIX_GROUP_1];
 }
 
-/// lift an instruction with a REP or a BND prefix according to its second opcode byte
-static err_t rep_or_bnd_lift_second_opcode_byte(const insn_ctx_t* ctx, u8 second_opcode_byte) {
-    err_t err = SUCCESS;
-
-    if (second_opcode_byte == 0x1e) {
-        // endbr32/64
-
-        // endbr must use a REP prefix
-        CHECK(prefixes_contain_legacy_prefix(ctx->prefixes, LEGACY_PREFIX_REPZ_OR_REP));
-
-        // endbr must be followed by a 0xfa or 0xfb byte
-        u8 next_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-        CHECK(next_byte == 0xfa || next_byte == 0xfb);
-
-        // endbr is a nop, so emit nothing.
-    } else {
-        CHECK_FAIL_TRACE_CODE(
-            PIS_ERR_UNSUPPORTED_INSN,
-            "unsupported second opcode byte with rep or bnd prefix: 0x%x",
-            second_opcode_byte
-        );
-    }
-cleanup:
-    return err;
-}
-
 /// the context used to implement a REP prefix.
 typedef struct {
     size_t insn_index_at_loop_start;
@@ -1842,61 +1816,6 @@ static err_t rep_end(const insn_ctx_t* ctx, const rep_ctx_t* rep_ctx) {
     rep_ctx->jmp_end_insn->operands[1] =
         PIS_OPERAND_CONST(lift_ctx_index(ctx->lift_ctx), PIS_OPERAND_SIZE_1);
 
-cleanup:
-    return err;
-}
-
-static err_t do_movs(const insn_ctx_t* ctx, pis_operand_size_t operand_size) {
-    err_t err = SUCCESS;
-
-    // movs can only be used with a REP prefix, not a REPNE prefix.
-    CHECK(group1_prefix(ctx) == LEGACY_PREFIX_REPZ_OR_REP);
-
-    rep_ctx_t rep_ctx = {};
-    CHECK_RETHROW(rep_begin(ctx, &rep_ctx));
-
-    pis_operand_t si = operand_resize(&RSI, ctx->addr_size);
-    pis_operand_t di = operand_resize(&RDI, ctx->addr_size);
-
-    // copy one chunk from [si] to [di].
-    pis_operand_t byte_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_LOAD, byte_tmp, si));
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_STORE, di, byte_tmp));
-
-    // increment si and di
-    pis_operand_t increment =
-        PIS_OPERAND_CONST(pis_operand_size_to_bytes(operand_size), ctx->addr_size);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, si, si, increment));
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, di, di, increment));
-
-    CHECK_RETHROW(rep_end(ctx, &rep_ctx));
-cleanup:
-    return err;
-}
-
-/// lift an instruction with a REP or a BND prefix according to its first opcode byte
-static err_t __attribute__((unused))
-rep_or_bnd_lift_first_opcode_byte(const insn_ctx_t* ctx, u8 first_opcode_byte) {
-    err_t err = SUCCESS;
-
-    if (first_opcode_byte == 0x0f) {
-        // opcode is longer than 1 byte
-        u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-
-        CHECK_RETHROW(rep_or_bnd_lift_second_opcode_byte(ctx, second_opcode_byte));
-    } else if (first_opcode_byte == 0xa4) {
-        // movsb
-        CHECK_RETHROW(do_movs(ctx, PIS_OPERAND_SIZE_1));
-    } else if (first_opcode_byte == 0xa5) {
-        // movs[w/d/q]
-        CHECK_RETHROW(do_movs(ctx, ctx->operand_sizes.insn_default_not_64_bit));
-    } else {
-        CHECK_FAIL_TRACE_CODE(
-            PIS_ERR_UNSUPPORTED_INSN,
-            "unsupported first opcode byte with rep or bnd prefix: 0x%x",
-            first_opcode_byte
-        );
-    }
 cleanup:
     return err;
 }
