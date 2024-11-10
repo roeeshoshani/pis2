@@ -13,8 +13,6 @@
 static err_t emulate_insn(pis_emu_t* emu, code_t code, pis_x86_cpumode_t cpumode, u64 addr) {
     err_t err = SUCCESS;
 
-    pis_lift_result_t result = {};
-
     pis_lift_args_t args = {
         .machine_code = CURSOR_INIT(code.code, code.len),
         .machine_code_addr = addr,
@@ -22,13 +20,13 @@ static err_t emulate_insn(pis_emu_t* emu, code_t code, pis_x86_cpumode_t cpumode
     CHECK_RETHROW_VERBOSE(pis_x86_lift(&args, cpumode));
 
     CHECK_TRACE(
-        result.machine_insn_len == code.len,
+        args.result.machine_insn_len == code.len,
         "expected the instruction to be %lu bytes, instead it was %lu bytes",
         code.len,
-        result.machine_insn_len
+        args.result.machine_insn_len
     );
 
-    CHECK_RETHROW_VERBOSE(pis_emu_run(emu, &result));
+    CHECK_RETHROW_VERBOSE(pis_emu_run(emu, &args.result));
 
 cleanup:
     return err;
