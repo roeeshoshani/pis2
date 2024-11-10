@@ -380,8 +380,15 @@ static err_t UNUSED_ATTR binop_adc(
     CHECK(a->size == b->size);
     pis_operand_size_t operand_size = a->size;
 
-    pis_operand_t orig_cf = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, orig_cf, FLAGS_CF));
+    pis_operand_t orig_cf_zext = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN2(
+            operand_size == PIS_OPERAND_SIZE_1 ? PIS_OPCODE_MOVE : PIS_OPCODE_ZERO_EXTEND,
+            orig_cf_zext,
+            FLAGS_CF
+        )
+    );
 
     pis_operand_t a_plus_b = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, a_plus_b, *a, *b));
@@ -393,7 +400,7 @@ static err_t UNUSED_ATTR binop_adc(
     pis_operand_t carry_second_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_UNSIGNED_CARRY, carry_second_cond, a_plus_b, orig_cf)
+        PIS_INSN3(PIS_OPCODE_UNSIGNED_CARRY, carry_second_cond, a_plus_b, orig_cf_zext)
     );
 
     LIFT_CTX_EMIT(
@@ -408,7 +415,7 @@ static err_t UNUSED_ATTR binop_adc(
     pis_operand_t overflow_second_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_SIGNED_CARRY, overflow_second_cond, a_plus_b, orig_cf)
+        PIS_INSN3(PIS_OPCODE_SIGNED_CARRY, overflow_second_cond, a_plus_b, orig_cf_zext)
     );
 
     LIFT_CTX_EMIT(
@@ -418,7 +425,7 @@ static err_t UNUSED_ATTR binop_adc(
 
     // perform the actual addition
     pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, res_tmp, a_plus_b, orig_cf));
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_ADD, res_tmp, a_plus_b, orig_cf_zext));
 
     CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &res_tmp));
 
@@ -438,8 +445,15 @@ static err_t UNUSED_ATTR binop_sbb(
     CHECK(a->size == b->size);
     pis_operand_size_t operand_size = a->size;
 
-    pis_operand_t orig_cf = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, orig_cf, FLAGS_CF));
+    pis_operand_t orig_cf_zext = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
+    LIFT_CTX_EMIT(
+        ctx->lift_ctx,
+        PIS_INSN2(
+            operand_size == PIS_OPERAND_SIZE_1 ? PIS_OPCODE_MOVE : PIS_OPCODE_ZERO_EXTEND,
+            orig_cf_zext,
+            FLAGS_CF
+        )
+    );
 
     pis_operand_t a_minus_b = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
     LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SUB, a_minus_b, *a, *b));
@@ -454,7 +468,7 @@ static err_t UNUSED_ATTR binop_sbb(
     pis_operand_t carry_second_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_UNSIGNED_LESS_THAN, carry_second_cond, a_minus_b, orig_cf)
+        PIS_INSN3(PIS_OPCODE_UNSIGNED_LESS_THAN, carry_second_cond, a_minus_b, orig_cf_zext)
     );
 
     LIFT_CTX_EMIT(
@@ -469,7 +483,7 @@ static err_t UNUSED_ATTR binop_sbb(
     pis_operand_t overflow_second_cond = LIFT_CTX_NEW_TMP(ctx->lift_ctx, PIS_OPERAND_SIZE_1);
     LIFT_CTX_EMIT(
         ctx->lift_ctx,
-        PIS_INSN3(PIS_OPCODE_SIGNED_BORROW, overflow_second_cond, a_minus_b, orig_cf)
+        PIS_INSN3(PIS_OPCODE_SIGNED_BORROW, overflow_second_cond, a_minus_b, orig_cf_zext)
     );
 
     LIFT_CTX_EMIT(
@@ -479,7 +493,7 @@ static err_t UNUSED_ATTR binop_sbb(
 
     // perform the actual subtraction
     pis_operand_t res_tmp = LIFT_CTX_NEW_TMP(ctx->lift_ctx, operand_size);
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SUB, res_tmp, a_minus_b, orig_cf));
+    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN3(PIS_OPCODE_SUB, res_tmp, a_minus_b, orig_cf_zext));
 
     CHECK_RETHROW(calc_parity_zero_sign_flags(ctx, &res_tmp));
 
