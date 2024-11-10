@@ -3,7 +3,7 @@
 #include "../errors.h"
 #include "../types.h"
 
-#define EMU_MEM_STORAGE_SLOTS_AMOUNT (8192)
+#define EMU_MEM_STORAGE_SLOTS_AMOUNT (32 * 1024)
 
 typedef struct {
     u64 addr;

@@ -1,4 +1,5 @@
 #include "shellcode.h"
+#include "utils/my_std.h"
 
 /*
 
@@ -147,16 +148,6 @@ static long long my_strtoll(const char* str, char** endptr, int base) {
     return result * sign;
 }
 
-void* memcpy(void* dest, const void* src, size_t n) {
-    unsigned char* d = (unsigned char*) dest;
-    const unsigned char* s = (const unsigned char*) src;
-
-    for (size_t i = 0; i < n; i++) {
-        d[i] = s[i];
-    }
-
-    return dest;
-}
 /** Parse a string to get a json.
  * @param str String pointer with a JSON object. It will be modified.
  * @param mem Array of json properties to allocate.
@@ -348,13 +339,6 @@ static char getEscape(char ch) {
     return '\0';
 }
 
-static int isdigit(int c) {
-    return (c >= '0' && c <= '9');
-}
-
-static int isxdigit(int c) {
-    return ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'));
-}
 /** Parse 4 characters.
  * @param str Pointer to  first digit.
  * @retval '?' If the four characters are hexadecimal digits.

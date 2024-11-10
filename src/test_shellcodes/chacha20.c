@@ -1,42 +1,7 @@
 #include "shellcode.h"
-#include <assert.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
+#include "utils/my_std.h"
 
 // a shellcode which uses a chacha cipher. the implementation was copied from the internet.
-
-void* memcpy(void* dest, const void* src, size_t n) {
-    char* d = dest;
-    const char* s = src;
-    while (n--) {
-        *d++ = *s++;
-    }
-    return dest;
-}
-
-
-void* memset(void* s, int c, size_t n) {
-    unsigned char* p = s;
-    while (n--) {
-        *p++ = (unsigned char) c;
-    }
-    return s;
-}
-
-void __assert_fail(
-    const char* assertion, const char* file, unsigned int line, const char* function
-) {
-    (void) assertion;
-    (void) file;
-    (void) line;
-    (void) function;
-
-    // fail an assertion by jumping to address 0, which doesn't contain any code. this will fail the
-    // test if reached.
-    __attribute__((noreturn)) void (*x)() = NULL;
-    x();
-}
 
 struct chacha20_context {
     uint32_t keystream32[16];
