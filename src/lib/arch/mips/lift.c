@@ -1,4 +1,4 @@
-#include "ctx.h"
+#include "lift.h"
 
 err_t pis_mips_lift(
     const pis_mips_ctx_t* ctx,

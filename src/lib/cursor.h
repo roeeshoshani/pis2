@@ -2,7 +2,8 @@
 
 #include "types.h"
 #include "except.h"
-#include "pis.h"
+#include "endianness.h"
+#include "operand_size.h"
 
 #define CURSOR_INIT(PTR, LEN) { .start = (PTR), .cur = (PTR), .end = ((PTR) + (LEN)) }
 

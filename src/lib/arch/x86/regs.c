@@ -1,5 +1,6 @@
 #include "regs.h"
 #include "../../pis.h"
+#include "ctx.h"
 
 #define FLAGS_REG_OFFSET (0x1000)
 
@@ -131,14 +132,14 @@ pis_operand_t
 }
 
 
-err_t write_gpr(const insn_ctx_t* ctx, const pis_operand_t* gpr, const pis_operand_t* value) {
+err_t write_gpr(const ctx_t* ctx, const pis_operand_t* gpr, const pis_operand_t* value) {
     err_t err = SUCCESS;
-    LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_MOVE, *gpr, *value));
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *gpr, *value));
 
     // writes to 32 bit gprs zero out the upper half of the 64 bit gpr.
     if (gpr->size == PIS_OPERAND_SIZE_4) {
         pis_operand_t gpr64 = PIS_OPERAND(gpr->addr, PIS_OPERAND_SIZE_8);
-        LIFT_CTX_EMIT(ctx->lift_ctx, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, gpr64, *gpr));
+        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, gpr64, *gpr));
     }
 cleanup:
     return err;

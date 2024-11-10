@@ -23,7 +23,7 @@ err_t cursor_next_n(cursor_t* cursor, size_t n, u8* bytes) {
         bytes[i] = cursor->cur[i];
     }
 
-    cursor->cur += n;
+    cursor_advance(cursor, n);
 
 cleanup:
     return err;

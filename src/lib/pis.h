@@ -4,6 +4,8 @@
 #include "recursive_macros.h"
 #include "str_enum.h"
 #include "types.h"
+#include "endianness.h"
+#include "operand_size.h"
 
 #define PIS_INSN_MAX_OPERANDS_AMOUNT (4)
 
@@ -65,7 +67,7 @@
 #define PIS_OPERAND_CONST_NEG(ABS_VALUE, SIZE)                                                     \
     (PIS_OPERAND(PIS_ADDR(PIS_SPACE_CONST, pis_const_negate(ABS_VALUE, SIZE)), SIZE))
 
-#define PIS_LIFT_RESULT_EMIT(LIFT_RESULT, INSN)                                                    \
+#define PIS_EMIT(LIFT_RESULT, INSN)                                                    \
     CHECK_RETHROW(pis_lift_result_emit((LIFT_RESULT), &(INSN)))
 
 #define DECLARE_REG_OPERAND(NAME) extern const pis_operand_t NAME;
@@ -162,22 +164,6 @@ STR_ENUM(pis_opcode, PIS_OPCODE);
     _(PIS_SPACE_TMP, )
 STR_ENUM(pis_space, PIS_SPACE);
 
-typedef enum {
-    PIS_ENDIANNESS_LITTLE,
-    PIS_ENDIANNESS_BIG,
-} pis_endianness_t;
-
-typedef enum {
-    /// 1 byte
-    PIS_OPERAND_SIZE_1 = 1,
-    /// 2 bytes
-    PIS_OPERAND_SIZE_2 = 2,
-    /// 4 bytes
-    PIS_OPERAND_SIZE_4 = 4,
-    /// 8 bytes
-    PIS_OPERAND_SIZE_8 = 8,
-} pis_operand_size_t;
-
 typedef struct {
     pis_space_t space;
     u64 offset;
@@ -217,18 +203,8 @@ void pis_lift_result_reset(pis_lift_result_t* result);
 
 err_t pis_lift_result_get_last_emitted_insn(pis_lift_result_t* result, pis_insn_t** insn);
 
-u32 pis_operand_size_to_bytes(pis_operand_size_t operand_size);
-
-u32 pis_operand_size_to_bits(pis_operand_size_t operand_size);
-
-u64 pis_operand_size_max_unsigned_value(pis_operand_size_t operand_size);
-
 u64 pis_const_negate(u64 const_value, u32 operand_size);
 
 u64 pis_sign_extend_byte(i8 byte, pis_operand_size_t desired_size);
 
 err_t pis_addr_add(const pis_addr_t* addr, u64 amount, pis_addr_t* new_addr);
-
-pis_endianness_t pis_endianness_native();
-
-void pis_endianness_swap_bytes_if_needed(pis_endianness_t endianness, u8* bytes, size_t len);
