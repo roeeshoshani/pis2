@@ -1,5 +1,7 @@
 #pragma once
 
+#include "utils.h"
+
 extern __attribute__((format(printf, 1, 2))) void trace(const char* format, ...);
 
 #define TRACE_NO_NEWLINE(FMT, ...) trace(FMT, ##__VA_ARGS__)

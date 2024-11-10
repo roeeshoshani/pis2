@@ -3,6 +3,7 @@
 #include "../../except.h"
 #include "../../pis.h"
 #include "../../types.h"
+#include "../../cursor.h"
 
 typedef enum {
     PIS_X86_CPUMODE_32_BIT,
@@ -15,8 +16,7 @@ typedef struct {
 
 err_t pis_x86_lift(
     const pis_x86_ctx_t* ctx,
-    const u8* machine_code,
-    size_t machine_code_len,
+    cursor_t* machine_code,
     u64 machine_code_addr,
     pis_lift_result_t* result
 );

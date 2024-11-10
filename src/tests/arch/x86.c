@@ -19,7 +19,8 @@ static err_t emulate_insn(pis_emu_t* emu, code_t code, pis_x86_cpumode_t cpumode
         .cpumode = cpumode,
     };
 
-    CHECK_RETHROW_VERBOSE(pis_x86_lift(&ctx, code.code, code.len, addr, &result));
+    cursor_t cursor = CURSOR_INIT(code.code, code.len);
+    CHECK_RETHROW_VERBOSE(pis_x86_lift(&ctx, &cursor, addr, &result));
 
     CHECK_TRACE(
         result.machine_insn_len == code.len,

@@ -230,3 +230,5 @@ u64 pis_sign_extend_byte(i8 byte, pis_operand_size_t desired_size);
 err_t pis_addr_add(const pis_addr_t* addr, u64 amount, pis_addr_t* new_addr);
 
 pis_endianness_t pis_endianness_native();
+
+void pis_endianness_swap_bytes_if_needed(pis_endianness_t endianness, u8* bytes, size_t len);

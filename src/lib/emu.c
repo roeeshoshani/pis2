@@ -103,17 +103,6 @@ typedef union {
     u64 u64;
 } u64_bytes_t;
 
-static void endianness_swap_bytes_if_needed(const pis_emu_t* emu, u8* bytes, size_t len) {
-    if (emu->endianness != pis_endianness_native()) {
-        // endianness is not the same as native, reverse the bytes
-        for (size_t i = 0; i < len / 2; i++) {
-            u8 tmp = bytes[i];
-            bytes[i] = bytes[len - i - 1];
-            bytes[len - i - 1] = tmp;
-        }
-    }
-}
-
 err_t pis_emu_read_operand(const pis_emu_t* emu, const pis_operand_t* operand, u64* operand_value) {
     err_t err = SUCCESS;
 
@@ -134,7 +123,11 @@ err_t pis_emu_read_operand(const pis_emu_t* emu, const pis_operand_t* operand, u
         CHECK(operand_size_in_bytes <= ARRAY_SIZE(converter.bytes));
         CHECK_RETHROW(read_bytes(emu, &operand->addr, converter.bytes, operand_size_in_bytes));
 
-        endianness_swap_bytes_if_needed(emu, converter.bytes, operand_size_in_bytes);
+        pis_endianness_swap_bytes_if_needed(
+            emu->endianness,
+            converter.bytes,
+            operand_size_in_bytes
+        );
 
         *operand_value = converter.u64;
     }
@@ -150,7 +143,7 @@ err_t pis_emu_write_operand(pis_emu_t* emu, const pis_operand_t* operand, u64 va
 
     u64_bytes_t converter = {.u64 = value};
     CHECK(operand_size_in_bytes <= ARRAY_SIZE(converter.bytes));
-    endianness_swap_bytes_if_needed(emu, converter.bytes, operand_size_in_bytes);
+    pis_endianness_swap_bytes_if_needed(emu->endianness, converter.bytes, operand_size_in_bytes);
 
     CHECK_RETHROW(write_bytes(emu, &operand->addr, converter.bytes, operand_size_in_bytes));
 
@@ -169,7 +162,7 @@ err_t pis_emu_read_mem_value(
     CHECK(operand_size_in_bytes <= ARRAY_SIZE(converter.bytes));
     CHECK_RETHROW(read_mem_bytes(emu, addr, converter.bytes, operand_size_in_bytes));
 
-    endianness_swap_bytes_if_needed(emu, converter.bytes, operand_size_in_bytes);
+    pis_endianness_swap_bytes_if_needed(emu->endianness, converter.bytes, operand_size_in_bytes);
 
     *value = converter.u64;
 
@@ -184,7 +177,7 @@ err_t pis_emu_write_mem_value(pis_emu_t* emu, u64 addr, u64 value, pis_operand_s
 
     u64_bytes_t converter = {.u64 = value};
     CHECK(operand_size_in_bytes <= ARRAY_SIZE(converter.bytes));
-    endianness_swap_bytes_if_needed(emu, converter.bytes, operand_size_in_bytes);
+    pis_endianness_swap_bytes_if_needed(emu->endianness, converter.bytes, operand_size_in_bytes);
 
     CHECK_RETHROW(write_mem_bytes(emu, addr, converter.bytes, operand_size_in_bytes));
 

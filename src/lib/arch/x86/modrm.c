@@ -24,12 +24,17 @@ sib_t sib_decode_byte(u8 sib_byte) {
 static err_t
     build_sib_addr_into(const insn_ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into) {
     err_t err = SUCCESS;
-    sib_t sib = sib_decode_byte(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx));
+
+    u8 sib_byte = 0;
+    CHECK_RETHROW(cursor_next_1(ctx->lift_ctx->machine_code, &sib_byte));
+
+    sib_t sib = sib_decode_byte(sib_byte);
 
     // handle the sib base
     if (sib.base == 0b101 && modrm->mod == 0b00) {
         // the base is a disp32
-        u32 disp = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+        u32 disp = 0;
+        CHECK_RETHROW(cursor_next_4(ctx->lift_ctx->machine_code, &disp, PIS_ENDIANNESS_LITTLE));
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
             PIS_INSN2(PIS_OPCODE_MOVE, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
@@ -76,7 +81,8 @@ static err_t build_modrm_rm_addr_16_into(
 
     if (modrm->mod == 0b00 && modrm->rm == 0b110) {
         // 16 bit displacement only
-        u16 disp = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
+        u16 disp = 0;
+        CHECK_RETHROW(cursor_next_2(ctx->lift_ctx->machine_code, &disp, PIS_ENDIANNESS_LITTLE));
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
             PIS_INSN2(PIS_OPCODE_MOVE, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
@@ -121,9 +127,10 @@ static err_t build_modrm_rm_addr_16_into(
                 break;
             case 0b01: {
                 // 8 bit displacement
-                i8 disp8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+                u8 disp8 = 0;
+                CHECK_RETHROW(cursor_next_1(ctx->lift_ctx->machine_code, &disp8));
                 // sign extend it to 16 bits
-                u16 disp16 = (i16) disp8;
+                u16 disp16 = (i16) (i8) disp8;
                 LIFT_CTX_EMIT(
                     ctx->lift_ctx,
                     PIS_INSN3(
@@ -137,7 +144,10 @@ static err_t build_modrm_rm_addr_16_into(
             }
             case 0b10: {
                 // 16 bit displacement
-                u16 disp = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
+                u16 disp = 0;
+                CHECK_RETHROW(
+                    cursor_next_2(ctx->lift_ctx->machine_code, &disp, PIS_ENDIANNESS_LITTLE)
+                );
                 LIFT_CTX_EMIT(
                     ctx->lift_ctx,
                     PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
@@ -159,7 +169,8 @@ static err_t build_modrm_rm_addr_32_into(
 
     if (modrm->rm == 0b101 && modrm->mod == 0b00) {
         // 32-bit displacement only
-        u32 disp = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+        u32 disp = 0;
+        CHECK_RETHROW(cursor_next_4(ctx->lift_ctx->machine_code, &disp, PIS_ENDIANNESS_LITTLE));
         LIFT_CTX_EMIT(
             ctx->lift_ctx,
             PIS_INSN2(PIS_OPCODE_MOVE, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
@@ -181,9 +192,10 @@ static err_t build_modrm_rm_addr_32_into(
                 break;
             case 0b01: {
                 // 8 bit displacement
-                i8 disp8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+                u8 disp8 = 0;
+                CHECK_RETHROW(cursor_next_1(ctx->lift_ctx->machine_code, &disp8));
                 // sign extend it to 32 bits
-                u32 disp32 = (i32) disp8;
+                u32 disp32 = (i32) (i8) disp8;
                 LIFT_CTX_EMIT(
                     ctx->lift_ctx,
                     PIS_INSN3(
@@ -197,7 +209,10 @@ static err_t build_modrm_rm_addr_32_into(
             }
             case 0b10: {
                 // 32 bit displacement
-                u32 disp = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+                u32 disp = 0;
+                CHECK_RETHROW(
+                    cursor_next_4(ctx->lift_ctx->machine_code, &disp, PIS_ENDIANNESS_LITTLE)
+                );
                 LIFT_CTX_EMIT(
                     ctx->lift_ctx,
                     PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
@@ -220,11 +235,13 @@ static err_t build_modrm_rm_addr_64_into(
 
     if (modrm->rm == 0b101 && modrm->mod == 0b00) {
         // rip relative with 32-bit displacement
-        i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+        u32 disp32 = 0;
+        CHECK_RETHROW(cursor_next_4(ctx->lift_ctx->machine_code, &disp32, PIS_ENDIANNESS_LITTLE));
         // sign extend it to 64 bits
-        u64 disp64 = (i64) disp32;
+        u64 disp64 = (i64) (i32) disp32;
 
-        u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
+        u64 cur_insn_end_addr =
+            ctx->lift_ctx->machine_code_addr + cursor_index(ctx->lift_ctx->machine_code);
         u64 mem_addr = cur_insn_end_addr + disp64;
 
         LIFT_CTX_EMIT(
@@ -251,9 +268,10 @@ static err_t build_modrm_rm_addr_64_into(
                 break;
             case 0b01: {
                 // 8 bit displacement
-                i8 disp8 = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+                u8 disp8 = 0;
+                CHECK_RETHROW(cursor_next_1(ctx->lift_ctx->machine_code, &disp8));
                 // sign extend it to 64 bits
-                u64 disp64 = (i64) disp8;
+                u64 disp64 = (i64) (i8) disp8;
                 LIFT_CTX_EMIT(
                     ctx->lift_ctx,
                     PIS_INSN3(
@@ -267,9 +285,12 @@ static err_t build_modrm_rm_addr_64_into(
             }
             case 0b10: {
                 // 32 bit displacement
-                i32 disp32 = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
+                u32 disp32 = 0;
+                CHECK_RETHROW(
+                    cursor_next_4(ctx->lift_ctx->machine_code, &disp32, PIS_ENDIANNESS_LITTLE)
+                );
                 // sign extend it to 64 bits
-                u64 disp64 = (i64) disp32;
+                u64 disp64 = (i64) (i32) disp32;
                 LIFT_CTX_EMIT(
                     ctx->lift_ctx,
                     PIS_INSN3(
@@ -358,7 +379,10 @@ err_t modrm_fetch_and_process_with_operand_sizes(
 ) {
     err_t err = SUCCESS;
 
-    modrm_t modrm = modrm_decode_byte(LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx));
+    u8 modrm_byte = 0;
+    CHECK_RETHROW(cursor_next_1(ctx->lift_ctx->machine_code, &modrm_byte));
+
+    modrm_t modrm = modrm_decode_byte(modrm_byte);
 
     u8 reg_encoding = apply_rex_bit_to_reg_encoding(modrm.reg, ctx->prefixes->rex.r);
     pis_operand_t reg_operand = reg_get_operand(reg_encoding, reg_size, ctx->prefixes);

@@ -944,76 +944,6 @@ cleanup:
     return err;
 }
 
-/// fetches and immediate of the given size and zero extends it.
-static err_t fetch_imm_of_op_size_zext(const insn_ctx_t* ctx, op_size_t size, u64* operand) {
-    err_t err = SUCCESS;
-    switch (size) {
-        case OP_SIZE_8:
-            *operand = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-            break;
-        case OP_SIZE_16:
-            *operand = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
-            break;
-        case OP_SIZE_32:
-            *operand = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
-            break;
-        case OP_SIZE_64:
-            *operand = LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx);
-            break;
-        default:
-            UNREACHABLE();
-    }
-cleanup:
-    return err;
-}
-
-/// fetches and immediate of the given size and zero extends it.
-static err_t
-    fetch_imm_of_pis_size_zext(const insn_ctx_t* ctx, pis_operand_size_t size, u64* operand) {
-    err_t err = SUCCESS;
-    switch (size) {
-        case PIS_OPERAND_SIZE_1:
-            *operand = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-            break;
-        case PIS_OPERAND_SIZE_2:
-            *operand = LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
-            break;
-        case PIS_OPERAND_SIZE_4:
-            *operand = LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
-            break;
-        case PIS_OPERAND_SIZE_8:
-            *operand = LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx);
-            break;
-        default:
-            UNREACHABLE();
-    }
-cleanup:
-    return err;
-}
-
-/// fetches and immediate of the given size and sign extends it.
-static err_t fetch_imm_of_op_size_sext(const insn_ctx_t* ctx, op_size_t size, u64* operand) {
-    err_t err = SUCCESS;
-    switch (size) {
-        case OP_SIZE_8:
-            *operand = (i64) (i8) LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
-            break;
-        case OP_SIZE_16:
-            *operand = (i64) (i16) LIFT_CTX_CUR2_ADVANCE(ctx->lift_ctx);
-            break;
-        case OP_SIZE_32:
-            *operand = (i64) (i32) LIFT_CTX_CUR4_ADVANCE(ctx->lift_ctx);
-            break;
-        case OP_SIZE_64:
-            *operand = LIFT_CTX_CUR8_ADVANCE(ctx->lift_ctx);
-            break;
-        default:
-            UNREACHABLE();
-    }
-cleanup:
-    return err;
-}
-
 /// generates a ternary expression with conditional expressions.
 static err_t cond_expr_ternary(
     const insn_ctx_t* ctx,
@@ -1542,7 +1472,8 @@ cleanup:
 /// sizes of the instruction.
 static err_t push_ip(const insn_ctx_t* ctx) {
     err_t err = SUCCESS;
-    u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
+    u64 cur_insn_end_addr =
+        ctx->lift_ctx->machine_code_addr + cursor_index(ctx->lift_ctx->machine_code);
     u64 push_value = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr);
     CHECK_RETHROW(
         push(ctx, &PIS_OPERAND_CONST(push_value, near_branch_operand_default_operand_size(ctx)))
@@ -1907,7 +1838,7 @@ static u64 op_size_max_unsigned_value(op_size_t op_size) {
 static err_t get_or_fetch_modrm(insn_ctx_t* ctx, modrm_t* modrm) {
     err_t err = SUCCESS;
     if (!ctx->has_modrm) {
-        ctx->modrm_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        CHECK_RETHROW(cursor_next_1(ctx->lift_ctx->machine_code, &ctx->modrm_byte));
         ctx->has_modrm = true;
     }
     *modrm = modrm_decode_byte(ctx->modrm_byte);
@@ -1955,14 +1886,16 @@ static err_t lift_op(
             op_size_t extended_size = calc_size(ctx, op_info->imm.extended_size_info_index);
 
             u64 imm = 0;
-            switch (op_info->imm.extend_kind) {
-                case IMM_EXT_SIGN_EXTEND:
-                    CHECK_RETHROW(fetch_imm_of_op_size_sext(ctx, encoded_size, &imm));
-                    break;
-                case IMM_EXT_ZERO_EXTEND:
-                    CHECK_RETHROW(fetch_imm_of_op_size_zext(ctx, encoded_size, &imm));
-                    break;
-            }
+            cursor_imm_ext_kind_t extend_kind = op_info->imm.extend_kind == IMM_EXT_SIGN_EXTEND
+                                                    ? CURSOR_IMM_EXT_KIND_SIGN
+                                                    : CURSOR_IMM_EXT_KIND_ZERO;
+            CHECK_RETHROW(cursor_next_imm(
+                ctx->lift_ctx->machine_code,
+                op_size_to_pis_operand_size(encoded_size),
+                PIS_ENDIANNESS_LITTLE,
+                &imm,
+                extend_kind
+            ));
 
             CHECK(extended_size >= encoded_size);
 
@@ -2080,9 +2013,16 @@ static err_t lift_op(
             op_size_t size = calc_size(ctx, op_info->rel.size_info_index);
 
             u64 rel_offset = 0;
-            CHECK_RETHROW(fetch_imm_of_op_size_sext(ctx, size, &rel_offset));
+            CHECK_RETHROW(cursor_next_imm(
+                ctx->lift_ctx->machine_code,
+                op_size_to_pis_operand_size(size),
+                PIS_ENDIANNESS_LITTLE,
+                &rel_offset,
+                CURSOR_IMM_EXT_KIND_SIGN
+            ));
 
-            u64 cur_insn_end_addr = ctx->lift_ctx->cur_insn_addr + lift_ctx_index(ctx->lift_ctx);
+            u64 cur_insn_end_addr =
+                ctx->lift_ctx->machine_code_addr + cursor_index(ctx->lift_ctx->machine_code);
             u64 target_addr = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr + rel_offset);
 
             *lifted_operand = (lifted_op_t) {
@@ -2094,7 +2034,13 @@ static err_t lift_op(
         }
         case OP_KIND_MEM_OFFSET: {
             u64 addr = 0;
-            CHECK_RETHROW(fetch_imm_of_pis_size_zext(ctx, ctx->addr_size, &addr));
+            CHECK_RETHROW(cursor_next_imm(
+                ctx->lift_ctx->machine_code,
+                ctx->addr_size,
+                PIS_ENDIANNESS_LITTLE,
+                &addr,
+                CURSOR_IMM_EXT_KIND_ZERO
+            ));
 
             *lifted_operand = (lifted_op_t) {
                 .kind = LIFTED_OP_KIND_MEM,
@@ -2800,10 +2746,12 @@ cleanup:
 static err_t post_prefixes_lift(insn_ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    u8 first_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+    u8 first_opcode_byte = 0;
+    CHECK_RETHROW(cursor_next_1(ctx->lift_ctx->machine_code, &first_opcode_byte));
     if (first_opcode_byte == 0x0f) {
         // 2 or 3 byte opcode
-        u8 second_opcode_byte = LIFT_CTX_CUR1_ADVANCE(ctx->lift_ctx);
+        u8 second_opcode_byte = 0;
+        CHECK_RETHROW(cursor_next_1(ctx->lift_ctx->machine_code, &second_opcode_byte));
         if (second_opcode_byte == 0x38 || second_opcode_byte == 0x3a) {
             // 3 byte opcode
             CHECK_FAIL_TRACE_CODE(
@@ -2851,22 +2799,18 @@ cleanup:
 /// lift the next instruction.
 err_t pis_x86_lift(
     const pis_x86_ctx_t* ctx,
-    const u8* machine_code,
-    size_t machine_code_len,
+    cursor_t* machine_code,
     u64 machine_code_addr,
     pis_lift_result_t* result
 ) {
     err_t err = SUCCESS;
 
     CHECK_CODE(machine_code != NULL, PIS_ERR_NULL_ARG);
-    CHECK_CODE(machine_code_len > 0, PIS_ERR_EARLY_EOF);
 
     lift_ctx_t lift_ctx = {
         .pis_x86_ctx = ctx,
-        .start = machine_code,
-        .cur = machine_code,
-        .end = machine_code + machine_code_len,
-        .cur_insn_addr = machine_code_addr,
+        .machine_code = machine_code,
+        .machine_code_addr = machine_code_addr,
         .cur_tmp_offset = 0,
         .result = result,
         .stack_addr_size = get_effective_stack_addr_size(ctx->cpumode),
@@ -2874,7 +2818,7 @@ err_t pis_x86_lift(
     };
     CHECK_RETHROW(lift(&lift_ctx));
 
-    result->machine_insn_len = lift_ctx_index(&lift_ctx);
+    result->machine_insn_len = cursor_index(machine_code);
 
 cleanup:
     return err;
