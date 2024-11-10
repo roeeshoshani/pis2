@@ -151,14 +151,11 @@ const arch_def_t arch_def_i386 = {
 static err_t
     run_arch_specific_shellcode(pis_emu_t* emu, const shellcode_t* shellcode, lift_fn_t lift_fn) {
     err_t err = SUCCESS;
-    pis_lift_result_t result = {};
 
     size_t code_len = shellcode->code_end - shellcode->code;
 
     u64 cur_offset = 0;
     while (cur_offset < code_len) {
-        pis_lift_result_reset(&result);
-
         pis_lift_args_t args = {
             .machine_code = CURSOR_INIT(shellcode->code + cur_offset, code_len - cur_offset),
             .machine_code_addr = SHELLCODE_BASE_ADDR + cur_offset,
@@ -171,7 +168,7 @@ static err_t
         );
 
         CHECK_RETHROW_TRACE(
-            pis_emu_run(emu, &result),
+            pis_emu_run(emu, &args.result),
             "failed to emulate insn at offset 0x%lx in shellcode %s",
             cur_offset,
             shellcode->name
@@ -188,7 +185,7 @@ static err_t
             }
         } else {
             // advance to the next instruction
-            cur_offset += result.machine_insn_len;
+            cur_offset += args.result.machine_insn_len;
         }
     }
 cleanup:
