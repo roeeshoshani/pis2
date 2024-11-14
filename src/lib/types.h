@@ -13,3 +13,10 @@ typedef int8_t i8;
 typedef int16_t i16;
 typedef int32_t i32;
 typedef int64_t i64;
+
+typedef enum {
+    /// use zero extension
+    IMM_EXT_KIND_ZERO_EXTEND,
+    /// use sign extension
+    IMM_EXT_KIND_SIGN_EXTEND,
+} imm_ext_kind_t;

@@ -254,17 +254,24 @@ cleanup:
     return err;
 }
 
-/// implements the logic for an `ADDI` instruction
-static err_t do_addiu(ctx_t* ctx) {
+static err_t do_binop_imm(ctx_t* ctx, pis_opcode_t opcode, imm_ext_kind_t ext_kind) {
     err_t err = SUCCESS;
 
     pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
     pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
-    u32 imm = insn_field_imm_sext(ctx->insn);
+    u32 imm;
+    switch (ext_kind) {
+        case IMM_EXT_KIND_SIGN_EXTEND:
+            imm = insn_field_imm_sext(ctx->insn);
+            break;
+        case IMM_EXT_KIND_ZERO_EXTEND:
+            imm = insn_field_imm_zext(ctx->insn);
+            break;
+    }
 
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_ADD, rt, rs, PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_4))
+        PIS_INSN3(opcode, rt, rs, PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_4))
     );
 
 cleanup:
@@ -276,9 +283,9 @@ static err_t opcode_handler_08(ctx_t* ctx) {
 
     // opcode 0x08 is ADDI
 
-    // in our lifting logic, addi is the same as addiu, since the only difference is that addi
-    // raises an integer overflow exception on overflow, and we ignore this exception when lifting.
-    CHECK_RETHROW(do_addiu(ctx));
+    // we ignore the addi behaviour of raising an exception if integer overflow occurs and just lift
+    // it as a regular add.
+    CHECK_RETHROW(do_binop_imm(ctx, PIS_OPCODE_ADD, IMM_EXT_KIND_SIGN_EXTEND));
 
 cleanup:
     return err;
@@ -289,7 +296,7 @@ static err_t opcode_handler_09(ctx_t* ctx) {
 
     // opcode 0x09 is ADDIU
 
-    CHECK_RETHROW(do_addiu(ctx));
+    CHECK_RETHROW(do_binop_imm(ctx, PIS_OPCODE_ADD, IMM_EXT_KIND_SIGN_EXTEND));
 
 cleanup:
     return err;
@@ -318,7 +325,8 @@ cleanup:
 static err_t opcode_handler_0b(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // opcode 0x0a is SLTIU
+    // opcode 0x0b is SLTIU
+
     pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
     pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
     u32 imm = insn_field_imm_sext(ctx->insn);
@@ -340,6 +348,17 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_0c(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x0c is ANDI
+
+    CHECK_RETHROW(do_binop_imm(ctx, PIS_OPCODE_AND, IMM_EXT_KIND_ZERO_EXTEND));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] = {
     opcode_handler_00,
     opcode_handler_01,
@@ -353,6 +372,7 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     opcode_handler_09,
     opcode_handler_0a,
     opcode_handler_0b,
+    opcode_handler_0c,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {

@@ -132,7 +132,7 @@ static err_t
                     &ctx->args->machine_code,
                     PIS_OPERAND_SIZE_1,
                     PIS_OPERAND_SIZE_2,
-                    CURSOR_IMM_EXT_KIND_SIGN,
+                    IMM_EXT_KIND_SIGN_EXTEND,
                     PIS_ENDIANNESS_LITTLE,
                     &disp
                 ));
@@ -195,7 +195,7 @@ static err_t
                     &ctx->args->machine_code,
                     PIS_OPERAND_SIZE_1,
                     PIS_OPERAND_SIZE_4,
-                    CURSOR_IMM_EXT_KIND_SIGN,
+                    IMM_EXT_KIND_SIGN_EXTEND,
                     PIS_ENDIANNESS_LITTLE,
                     &disp
                 ));
@@ -241,7 +241,7 @@ static err_t
             &ctx->args->machine_code,
             PIS_OPERAND_SIZE_4,
             PIS_OPERAND_SIZE_8,
-            CURSOR_IMM_EXT_KIND_SIGN,
+            IMM_EXT_KIND_SIGN_EXTEND,
             PIS_ENDIANNESS_LITTLE,
             &disp
         ));
@@ -279,7 +279,7 @@ static err_t
                     &ctx->args->machine_code,
                     PIS_OPERAND_SIZE_1,
                     PIS_OPERAND_SIZE_8,
-                    CURSOR_IMM_EXT_KIND_SIGN,
+                    IMM_EXT_KIND_SIGN_EXTEND,
                     PIS_ENDIANNESS_LITTLE,
                     &disp
                 ));
@@ -296,7 +296,7 @@ static err_t
                     &ctx->args->machine_code,
                     PIS_OPERAND_SIZE_4,
                     PIS_OPERAND_SIZE_8,
-                    CURSOR_IMM_EXT_KIND_SIGN,
+                    IMM_EXT_KIND_SIGN_EXTEND,
                     PIS_ENDIANNESS_LITTLE,
                     &disp
                 ));

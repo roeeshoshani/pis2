@@ -22,7 +22,11 @@ static inline u16 insn_field_imm_raw(u32 insn) {
 }
 
 static inline u32 insn_field_imm_sext(u32 insn) {
-    return (u32) (i32) (i16) GET_BITS(insn, 0, 16);
+    return (u32) (i32) (i16) insn_field_imm_raw(insn);
+}
+
+static inline u32 insn_field_imm_zext(u32 insn) {
+    return insn_field_imm_raw(insn);
 }
 
 static inline u32 insn_field_instr_index(u32 insn) {

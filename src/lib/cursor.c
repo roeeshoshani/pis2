@@ -1,6 +1,7 @@
 #include "cursor.h"
 #include "except.h"
 #include "pis.h"
+#include "types.h"
 
 bool cursor_eof(const cursor_t* cursor) {
     return cursor->cur >= cursor->end;
@@ -125,7 +126,7 @@ err_t cursor_next_imm_ext(
     cursor_t* cursor,
     pis_operand_size_t encoded_size,
     pis_operand_size_t extended_size,
-    cursor_imm_ext_kind_t ext_kind,
+    imm_ext_kind_t ext_kind,
     pis_endianness_t endianness,
     u64* imm
 ) {
@@ -138,7 +139,7 @@ err_t cursor_next_imm_ext(
         case PIS_OPERAND_SIZE_1: {
             u8 value = 0;
             CHECK_RETHROW(cursor_next_1(cursor, &value));
-            if (ext_kind == CURSOR_IMM_EXT_KIND_SIGN) {
+            if (ext_kind == IMM_EXT_KIND_SIGN_EXTEND) {
                 extended_to_64_bits = (i64) (i8) value;
             } else {
                 extended_to_64_bits = value;
@@ -148,7 +149,7 @@ err_t cursor_next_imm_ext(
         case PIS_OPERAND_SIZE_2: {
             u16 value = 0;
             CHECK_RETHROW(cursor_next_2(cursor, &value, endianness));
-            if (ext_kind == CURSOR_IMM_EXT_KIND_SIGN) {
+            if (ext_kind == IMM_EXT_KIND_SIGN_EXTEND) {
                 extended_to_64_bits = (i64) (i16) value;
             } else {
                 extended_to_64_bits = value;
@@ -158,7 +159,7 @@ err_t cursor_next_imm_ext(
         case PIS_OPERAND_SIZE_4: {
             u32 value = 0;
             CHECK_RETHROW(cursor_next_4(cursor, &value, endianness));
-            if (ext_kind == CURSOR_IMM_EXT_KIND_SIGN) {
+            if (ext_kind == IMM_EXT_KIND_SIGN_EXTEND) {
                 extended_to_64_bits = (i64) (i32) value;
             } else {
                 extended_to_64_bits = value;
@@ -168,7 +169,7 @@ err_t cursor_next_imm_ext(
         case PIS_OPERAND_SIZE_8: {
             u64 value = 0;
             CHECK_RETHROW(cursor_next_8(cursor, &value, endianness));
-            if (ext_kind == CURSOR_IMM_EXT_KIND_SIGN) {
+            if (ext_kind == IMM_EXT_KIND_SIGN_EXTEND) {
                 extended_to_64_bits = (i64) (i64) value;
             } else {
                 extended_to_64_bits = value;

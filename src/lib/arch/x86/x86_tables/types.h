@@ -102,11 +102,6 @@ typedef enum {
     OP_KIND_MAX = OP_KIND_COND,
 } op_kind_t;
 typedef enum {
-    IMM_EXT_SIGN_EXTEND,
-    IMM_EXT_ZERO_EXTEND,
-    IMM_EXT_MAX = IMM_EXT_ZERO_EXTEND,
-} imm_ext_kind_t;
-typedef enum {
     REG_ENC_MODRM,
     REG_ENC_OPCODE,
     REG_ENC_MAX = REG_ENC_OPCODE,

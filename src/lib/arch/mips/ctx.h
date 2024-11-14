@@ -2,8 +2,8 @@
 #include "../../except.h"
 #include "../../lift_args.h"
 #include "../../pis.h"
-#include "../../types.h"
 #include "../../tmp.h"
+#include "../../types.h"
 #include "cpuinfo.h"
 
 typedef struct {
@@ -13,4 +13,3 @@ typedef struct {
     bool is_in_delay_slot;
     u32 insn;
 } ctx_t;
-

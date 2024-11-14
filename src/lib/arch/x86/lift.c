@@ -1860,9 +1860,7 @@ static err_t
             op_size_t extended_size = calc_size(ctx, op_info->imm.extended_size_info_index);
 
             u64 imm = 0;
-            cursor_imm_ext_kind_t extend_kind = op_info->imm.extend_kind == IMM_EXT_SIGN_EXTEND
-                                                    ? CURSOR_IMM_EXT_KIND_SIGN
-                                                    : CURSOR_IMM_EXT_KIND_ZERO;
+            imm_ext_kind_t extend_kind = op_info->imm.extend_kind;
             CHECK_RETHROW(cursor_next_imm_ext(
                 &ctx->args->machine_code,
                 op_size_to_pis_operand_size(encoded_size),
@@ -1991,7 +1989,7 @@ static err_t
                 &ctx->args->machine_code,
                 op_size_to_pis_operand_size(size),
                 ctx->addr_size,
-                CURSOR_IMM_EXT_KIND_SIGN,
+                IMM_EXT_KIND_SIGN_EXTEND,
                 PIS_ENDIANNESS_LITTLE,
                 &rel_offset
             ));
@@ -2013,7 +2011,7 @@ static err_t
                 &ctx->args->machine_code,
                 ctx->addr_size,
                 ctx->addr_size,
-                CURSOR_IMM_EXT_KIND_ZERO,
+                IMM_EXT_KIND_ZERO_EXTEND,
                 PIS_ENDIANNESS_LITTLE,
                 &addr
             ));

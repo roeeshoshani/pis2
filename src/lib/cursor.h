@@ -14,13 +14,6 @@ typedef struct {
     const u8* end;
 } cursor_t;
 
-typedef enum {
-    /// use zero extension
-    CURSOR_IMM_EXT_KIND_ZERO,
-    /// use sign extension
-    CURSOR_IMM_EXT_KIND_SIGN,
-} cursor_imm_ext_kind_t;
-
 bool cursor_eof(const cursor_t* cursor);
 
 size_t cursor_index(const cursor_t* cursor);
@@ -51,7 +44,7 @@ err_t cursor_next_imm_ext(
     cursor_t* cursor,
     pis_operand_size_t encoded_size,
     pis_operand_size_t extended_size,
-    cursor_imm_ext_kind_t ext_kind,
+    imm_ext_kind_t ext_kind,
     pis_endianness_t endianness,
     u64* imm
 );
