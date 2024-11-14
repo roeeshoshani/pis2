@@ -488,7 +488,7 @@ cleanup:
 
 /// performs an `SBB` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
-static err_t UNUSED_ATTR
+static err_t
     binop_sbb(ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result) {
     err_t err = SUCCESS;
 
