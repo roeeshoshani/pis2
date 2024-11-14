@@ -255,6 +255,24 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_08(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x08 is ADDI
+
+    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
+    u16 imm = insn_field_immediate(ctx->insn);
+
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(PIS_OPCODE_ADD, rt, rs, PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_4))
+    );
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] = {
     opcode_handler_00,
     opcode_handler_01,
@@ -264,6 +282,7 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     opcode_handler_05,
     opcode_handler_06,
     opcode_handler_07,
+    opcode_handler_08,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
