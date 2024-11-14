@@ -151,6 +151,19 @@ cleanup:
     return err;
 }
 
+static err_t do_branch_cond(ctx_t* ctx, const pis_operand_t* cond) {
+    err_t err = SUCCESS;
+
+    pis_operand_t target = calc_pc_rel_branch_target(ctx);
+
+    CHECK_RETHROW(lift_delay_slot_insn(ctx));
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_JMP_COND, *cond, target));
+
+cleanup:
+    return err;
+}
+
 static err_t opcode_handler_04(ctx_t* ctx) {
     err_t err = SUCCESS;
 
@@ -159,14 +172,28 @@ static err_t opcode_handler_04(ctx_t* ctx) {
     pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
     pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
 
-    pis_operand_t are_equal = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_EQUALS, are_equal, rs, rt));
+    pis_operand_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_EQUALS, cond, rs, rt));
 
-    pis_operand_t target = calc_pc_rel_branch_target(ctx);
+    CHECK_RETHROW(do_branch_cond(ctx, &cond));
 
-    CHECK_RETHROW(lift_delay_slot_insn(ctx));
+cleanup:
+    return err;
+}
 
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_JMP_COND, are_equal, target));
+static err_t opcode_handler_05(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x05 is BNE
+
+    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
+
+    pis_operand_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_EQUALS, cond, rs, rt));
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_COND_NEGATE, cond, cond));
+
+    CHECK_RETHROW(do_branch_cond(ctx, &cond));
 
 cleanup:
     return err;
@@ -178,6 +205,7 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     opcode_handler_02,
     opcode_handler_03,
     opcode_handler_04,
+    opcode_handler_05,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
