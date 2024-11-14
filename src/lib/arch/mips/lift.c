@@ -359,6 +359,17 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_0d(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x0d is ORI
+
+    CHECK_RETHROW(do_binop_imm(ctx, PIS_OPCODE_OR, IMM_EXT_KIND_ZERO_EXTEND));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] = {
     opcode_handler_00,
     opcode_handler_01,
@@ -373,6 +384,7 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     opcode_handler_0a,
     opcode_handler_0b,
     opcode_handler_0c,
+    opcode_handler_0d,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
