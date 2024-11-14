@@ -9,6 +9,8 @@ typedef err_t (*opcode_handler_t)(ctx_t* ctx);
 
 static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1];
 
+static const pis_operand_t g_zero = PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_4);
+
 static pis_operand_t reg_get_operand(u8 reg_encoding) {
     return PIS_OPERAND_REG(reg_encoding * 4, PIS_OPERAND_SIZE_4);
 }
@@ -207,10 +209,17 @@ static err_t opcode_handler_06(ctx_t* ctx) {
     pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
     CHECK(insn_field_rt(ctx->insn) == 0);
 
+    pis_operand_t less_than_zero = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(PIS_OPCODE_SIGNED_LESS_THAN, less_than_zero, rs, g_zero)
+    );
+
+    pis_operand_t equals_zero = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_EQUALS, equals_zero, rs, g_zero));
+
     pis_operand_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
-    // TODO: how the fuck do i do >=???
-    // PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_BORROW, cond, rs, rt));
-    UNUSED(rs);
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_OR, cond, less_than_zero, equals_zero));
 
     CHECK_RETHROW(do_branch_cond(ctx, &cond));
 
