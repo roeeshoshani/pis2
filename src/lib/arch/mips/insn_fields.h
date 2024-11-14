@@ -17,12 +17,12 @@ static inline u8 insn_field_rt(u32 insn) {
     return GET_BITS(insn, 16, 5);
 }
 
-static inline u16 insn_field_offset(u32 insn) {
+static inline u16 insn_field_imm_raw(u32 insn) {
     return GET_BITS(insn, 0, 16);
 }
 
-static inline u16 insn_field_immediate(u32 insn) {
-    return GET_BITS(insn, 0, 16);
+static inline u32 insn_field_imm_sext(u32 insn) {
+    return (u32) (i32) (i16) GET_BITS(insn, 0, 16);
 }
 
 static inline u32 insn_field_instr_index(u32 insn) {

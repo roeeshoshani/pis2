@@ -98,9 +98,8 @@ static pis_operand_t calc_pc_region_branch_target(ctx_t* ctx) {
 }
 
 static u32 calc_pc_rel_branch_target_addr(ctx_t* ctx) {
-    u16 off = insn_field_offset(ctx->insn);
-    u32 sign_extended_off = (u32) (i32) (i16) off;
-    return delay_slot_insn_addr(ctx) + (sign_extended_off << 2);
+    u32 off = insn_field_imm_sext(ctx->insn);
+    return delay_slot_insn_addr(ctx) + (off << 2);
 }
 
 static pis_operand_t calc_pc_rel_branch_target(ctx_t* ctx) {
@@ -255,19 +254,42 @@ cleanup:
     return err;
 }
 
-static err_t opcode_handler_08(ctx_t* ctx) {
+/// implements the logic for an `ADDI` instruction
+static err_t do_addiu(ctx_t* ctx) {
     err_t err = SUCCESS;
-
-    // opcode 0x08 is ADDI
 
     pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
     pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
-    u16 imm = insn_field_immediate(ctx->insn);
+    u32 imm = insn_field_imm_sext(ctx->insn);
 
     PIS_EMIT(
         &ctx->args->result,
         PIS_INSN3(PIS_OPCODE_ADD, rt, rs, PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_4))
     );
+
+cleanup:
+    return err;
+}
+
+static err_t opcode_handler_08(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x08 is ADDI
+
+    // in our lifting logic, addi is the same as addiu, since the only difference is that addi
+    // raises an integer overflow exception on overflow, and we ignore this exception when lifting.
+    CHECK_RETHROW(do_addiu(ctx));
+
+cleanup:
+    return err;
+}
+
+static err_t opcode_handler_09(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x09 is ADDIU
+
+    CHECK_RETHROW(do_addiu(ctx));
 
 cleanup:
     return err;
@@ -283,6 +305,7 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     opcode_handler_06,
     opcode_handler_07,
     opcode_handler_08,
+    opcode_handler_09,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
