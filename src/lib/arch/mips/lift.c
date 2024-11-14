@@ -199,6 +199,24 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_06(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x06 is BLEZ
+
+    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
+    CHECK(insn_field_rt(ctx->insn) == 0);
+
+    pis_operand_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
+    // TODO: how the fuck do i do >=???
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_BORROW, cond, rs, rt));
+
+    CHECK_RETHROW(do_branch_cond(ctx, &cond));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] = {
     opcode_handler_00,
     opcode_handler_01,
