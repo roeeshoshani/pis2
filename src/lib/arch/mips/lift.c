@@ -295,6 +295,26 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_0a(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x0a is SLTI
+    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
+    u32 imm = insn_field_imm_sext(ctx->insn);
+
+    pis_operand_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(PIS_OPCODE_SIGNED_LESS_THAN, cond, rs, PIS_OPERAND_CONST(imm, PIS_OPERAND_SIZE_4))
+    );
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, rt, cond));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] = {
     opcode_handler_00,
     opcode_handler_01,
@@ -306,6 +326,7 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     opcode_handler_07,
     opcode_handler_08,
     opcode_handler_09,
+    opcode_handler_0a,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
