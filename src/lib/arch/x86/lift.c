@@ -163,12 +163,9 @@ static err_t calc_cond(ctx_t* ctx, const x86_cond_t cond, pis_operand_t* result)
     }
 
     if (cond.is_negative) {
-        pis_operand_t negated = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
-        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_COND_NEGATE, negated, tmp));
-        *result = negated;
-    } else {
-        *result = tmp;
+        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_COND_NEGATE, tmp, tmp));
     }
+    *result = tmp;
 
 cleanup:
     return err;
