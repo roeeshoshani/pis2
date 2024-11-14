@@ -54,6 +54,20 @@ typedef struct {
 
 typedef err_t (*mnemonic_handler_t)(ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount);
 
+/// the prototype for a binary operation function - that is an operation which takes 2 input
+/// operands and produces a single result, for example an `ADD` operation.
+typedef err_t (*binop_fn_t
+)(ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result);
+
+/// the prototype for a unary operation function - that is an operation which takes 1 operand and
+/// applies some operation to it, for example a `NOT` operation.
+typedef err_t (*unary_op_fn_t)(ctx_t* ctx, const pis_operand_t* operand, pis_operand_t* result);
+
+/// the prototype for a flag calculation of a binary operation. the functions takes the 2 input
+/// operands and writes out the result flag value.
+typedef err_t (*binop_calc_flag_fn_t
+)(ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, const pis_operand_t* result);
+
 /// extracts the condition encoding of an opcode which has a condition encoded in its value.
 static u8 opcode_cond_extract(u8 opcode_byte) {
     return opcode_byte & 0b1111;
@@ -132,30 +146,36 @@ static err_t calc_cond(ctx_t* ctx, const x86_cond_t cond, pis_operand_t* result)
 
     switch (cond.kind) {
         case X86_COND_CLASS_OVERFLOW:
-            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_OF));
+            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, tmp, X86_FLAGS_OF));
             break;
         case X86_COND_CLASS_BELOW:
-            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_CF));
+            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, tmp, X86_FLAGS_CF));
             break;
         case X86_COND_CLASS_EQUALS:
-            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_ZF));
+            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, tmp, X86_FLAGS_ZF));
             break;
         case X86_COND_CLASS_BELOW_EQUAL:
-            PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_OR, tmp, FLAGS_ZF, FLAGS_CF));
+            PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_OR, tmp, X86_FLAGS_ZF, X86_FLAGS_CF));
             break;
         case X86_COND_CLASS_SIGN:
-            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_SF));
+            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, tmp, X86_FLAGS_SF));
             break;
         case X86_COND_CLASS_PARITY:
-            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, tmp, FLAGS_PF));
+            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, tmp, X86_FLAGS_PF));
             break;
         case X86_COND_CLASS_LOWER:
-            PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_XOR, tmp, FLAGS_SF, FLAGS_OF));
+            PIS_EMIT(
+                &ctx->args->result,
+                PIS_INSN3(PIS_OPCODE_XOR, tmp, X86_FLAGS_SF, X86_FLAGS_OF)
+            );
             break;
         case X86_COND_CLASS_LOWER_EQUAL: {
             pis_operand_t inner_tmp = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
-            PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_XOR, inner_tmp, FLAGS_SF, FLAGS_OF));
-            PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_OR, tmp, inner_tmp, FLAGS_ZF));
+            PIS_EMIT(
+                &ctx->args->result,
+                PIS_INSN3(PIS_OPCODE_XOR, inner_tmp, X86_FLAGS_SF, X86_FLAGS_OF)
+            );
+            PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_OR, tmp, inner_tmp, X86_FLAGS_ZF));
             break;
         }
         default:
@@ -270,7 +290,7 @@ cleanup:
 static err_t calc_parity_flag(ctx_t* ctx, const pis_operand_t* calculation_result) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(calc_parity_flag_into(ctx, calculation_result, &FLAGS_PF));
+    CHECK_RETHROW(calc_parity_flag_into(ctx, calculation_result, &X86_FLAGS_PF));
 
 cleanup:
     return err;
@@ -294,7 +314,7 @@ cleanup:
 static err_t calc_zero_flag(ctx_t* ctx, const pis_operand_t* calculation_result) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(calc_zero_flag_into(ctx, calculation_result, &FLAGS_ZF));
+    CHECK_RETHROW(calc_zero_flag_into(ctx, calculation_result, &X86_FLAGS_ZF));
 
 cleanup:
     return err;
@@ -358,7 +378,7 @@ cleanup:
 static err_t calc_sign_flag(ctx_t* ctx, const pis_operand_t* calculation_result) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(extract_most_significant_bit(ctx, calculation_result, &FLAGS_SF));
+    CHECK_RETHROW(extract_most_significant_bit(ctx, calculation_result, &X86_FLAGS_SF));
 
 cleanup:
     return err;
@@ -377,6 +397,24 @@ cleanup:
     return err;
 }
 
+static err_t calc_add_carry_flag_value(
+    ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, const pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_UNSIGNED_CARRY, *result, *a, *b));
+cleanup:
+    return err;
+}
+
+static err_t calc_add_overflow_flag_value(
+    ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, const pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_CARRY, *result, *a, *b));
+cleanup:
+    return err;
+}
+
 /// performs an `ADD` operation on the 2 input operands `a` and `b` and returns an operand
 /// containing the result of the operation in `result`.
 static err_t
@@ -389,10 +427,10 @@ static err_t
     pis_operand_t res_tmp = TMP_ALLOC(&ctx->tmp_allocator, operand_size);
 
     // carry flag
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_UNSIGNED_CARRY, FLAGS_CF, *a, *b));
+    CHECK_RETHROW(calc_add_carry_flag_value(ctx, a, b, &X86_FLAGS_CF));
 
     // overflow flag
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_CARRY, FLAGS_OF, *a, *b));
+    CHECK_RETHROW(calc_add_overflow_flag_value(ctx, a, b, &X86_FLAGS_OF));
 
     // perform the actual addition
     PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, res_tmp, *a, *b));
@@ -413,8 +451,8 @@ static err_t impl_binop_with_carry(
     const pis_operand_t* b,
     pis_operand_t* result,
     pis_opcode_t binop_opcode,
-    pis_opcode_t carry_opcode,
-    pis_opcode_t overflow_opcode
+    binop_calc_flag_fn_t calc_carry_fn,
+    binop_calc_flag_fn_t calc_overflow_fn
 ) {
     err_t err = SUCCESS;
 
@@ -422,36 +460,33 @@ static err_t impl_binop_with_carry(
     pis_operand_size_t operand_size = a->size;
 
     pis_operand_t orig_cf_zext = {};
-    CHECK_RETHROW(read_resize_zext(ctx, &FLAGS_CF, operand_size, &orig_cf_zext));
+    CHECK_RETHROW(read_resize_zext(ctx, &X86_FLAGS_CF, operand_size, &orig_cf_zext));
 
     pis_operand_t a_and_b = TMP_ALLOC(&ctx->tmp_allocator, operand_size);
     PIS_EMIT(&ctx->args->result, PIS_INSN3(binop_opcode, a_and_b, *a, *b));
 
     // carry flag
     pis_operand_t carry_first_cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(carry_opcode, carry_first_cond, *a, *b));
+    CHECK_RETHROW(calc_carry_fn(ctx, a, b, &carry_first_cond));
 
     pis_operand_t carry_second_cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(carry_opcode, carry_second_cond, a_and_b, orig_cf_zext));
+    CHECK_RETHROW(calc_carry_fn(ctx, &a_and_b, &orig_cf_zext, &carry_second_cond));
 
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_OR, FLAGS_CF, carry_first_cond, carry_second_cond)
+        PIS_INSN3(PIS_OPCODE_OR, X86_FLAGS_CF, carry_first_cond, carry_second_cond)
     );
 
     // overflow flag
     pis_operand_t overflow_first_cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(overflow_opcode, overflow_first_cond, *a, *b));
+    CHECK_RETHROW(calc_overflow_fn(ctx, a, b, &overflow_first_cond));
 
     pis_operand_t overflow_second_cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
-    PIS_EMIT(
-        &ctx->args->result,
-        PIS_INSN3(overflow_opcode, overflow_second_cond, a_and_b, orig_cf_zext)
-    );
+    CHECK_RETHROW(calc_overflow_fn(ctx, &a_and_b, &orig_cf_zext, &overflow_second_cond));
 
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_OR, FLAGS_OF, overflow_first_cond, overflow_second_cond)
+        PIS_INSN3(PIS_OPCODE_OR, X86_FLAGS_OF, overflow_first_cond, overflow_second_cond)
     );
 
     // perform the actual binop
@@ -478,10 +513,58 @@ static err_t
         b,
         result,
         PIS_OPCODE_ADD,
-        PIS_OPCODE_UNSIGNED_CARRY,
-        PIS_OPCODE_SIGNED_CARRY
+        calc_add_carry_flag_value,
+        calc_add_overflow_flag_value
     ));
 
+cleanup:
+    return err;
+}
+
+static err_t calc_sub_carry_flag_value(
+    ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, const pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_UNSIGNED_LESS_THAN, *result, *a, *b));
+cleanup:
+    return err;
+}
+
+/// calculates the value of the overflow flag for a subtraction operation `a - b`.
+static err_t calc_sub_overflow_flag_value(
+    ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, const pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    CHECK(a->size == b->size);
+
+    // first calculate the subtraction result
+    pis_operand_t res_tmp = TMP_ALLOC(&ctx->tmp_allocator, a->size);
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SUB, res_tmp, *a, *b));
+
+    // calculate the sign bit of the subtraction result
+    pis_operand_t res_sign_bit = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
+    CHECK_RETHROW(extract_most_significant_bit(ctx, &res_tmp, &res_sign_bit));
+
+    // check if `a` is less than `b`
+    pis_operand_t signed_less_than = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_LESS_THAN, signed_less_than, *a, *b));
+
+    // the overflow can be calculated by xoring the less than condition with the sign bit.
+    //
+    // this is because, if the less than condition is 1, it means that `a < b`, in which case we
+    // expect the result to be negative, and if it is not then it is an overflow. so, if less than
+    // is 1 and sign is 0, it is an overflow.
+    //
+    // additionally, if the less than condition is 0, it means that `a >= b`, in which case we
+    // expect the result to be positive, and if it is not then it is an overflow. so, if less than
+    // is 0 and sign is 1, it is an overflow.
+    //
+    // both of those cases can be detected by just xoring these values together.
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(PIS_OPCODE_XOR, *result, signed_less_than, res_sign_bit)
+    );
 cleanup:
     return err;
 }
@@ -498,8 +581,8 @@ static err_t
         b,
         result,
         PIS_OPCODE_SUB,
-        PIS_OPCODE_UNSIGNED_LESS_THAN,
-        PIS_OPCODE_SIGNED_BORROW
+        calc_sub_carry_flag_value,
+        calc_add_overflow_flag_value
     ));
 
 cleanup:
@@ -518,10 +601,10 @@ static err_t
     pis_operand_t res_tmp = TMP_ALLOC(&ctx->tmp_allocator, operand_size);
 
     // carry flag
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_UNSIGNED_LESS_THAN, FLAGS_CF, *a, *b));
+    CHECK_RETHROW(calc_sub_carry_flag_value(ctx, a, b, &X86_FLAGS_CF));
 
     // overflow flag
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_BORROW, FLAGS_OF, *a, *b));
+    CHECK_RETHROW(calc_sub_overflow_flag_value(ctx, a, b, &X86_FLAGS_OF));
 
     // perform the actual subtraction
     PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SUB, res_tmp, *a, *b));
@@ -544,7 +627,7 @@ static err_t unary_op_dec(ctx_t* ctx, const pis_operand_t* operand, pis_operand_
     pis_operand_t one = PIS_OPERAND_CONST(1, operand_size);
 
     // overflow flag
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_BORROW, FLAGS_OF, *operand, one));
+    CHECK_RETHROW(calc_sub_overflow_flag_value(ctx, operand, &one, &X86_FLAGS_OF));
 
     // perform the actual subtraction
     pis_operand_t res_tmp = TMP_ALLOC(&ctx->tmp_allocator, operand_size);
@@ -568,7 +651,7 @@ static err_t unary_op_inc(ctx_t* ctx, const pis_operand_t* operand, pis_operand_
     pis_operand_t one = PIS_OPERAND_CONST(1, operand_size);
 
     // overflow flag
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_CARRY, FLAGS_OF, *operand, one));
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_CARRY, X86_FLAGS_OF, *operand, one));
 
     // perform the actual subtraction
     pis_operand_t res_tmp = TMP_ALLOC(&ctx->tmp_allocator, operand_size);
@@ -594,7 +677,7 @@ static err_t unary_op_neg(ctx_t* ctx, const pis_operand_t* operand, pis_operand_
     // carry flag
     pis_operand_t equals_zero = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
     PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_EQUALS, equals_zero, *operand, zero));
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_COND_NEGATE, FLAGS_CF, equals_zero));
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_COND_NEGATE, X86_FLAGS_CF, equals_zero));
 
     // perform the actual negation
     pis_operand_t res_tmp = TMP_ALLOC(&ctx->tmp_allocator, operand_size);
@@ -639,11 +722,11 @@ static err_t
     // set CF and OF to zero
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_CF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, X86_FLAGS_CF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
     );
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, X86_FLAGS_OF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
     );
 
     // perform the actual bitwide and operation
@@ -667,10 +750,10 @@ static err_t
     pis_operand_size_t operand_size = a->size;
 
     // update CF
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_MUL_OVERFLOW, FLAGS_CF, *a, *b));
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_MUL_OVERFLOW, X86_FLAGS_CF, *a, *b));
 
     // update OF
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, FLAGS_CF));
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, X86_FLAGS_OF, X86_FLAGS_CF));
 
     // perform the actual multiplication
     pis_operand_t res_tmp = TMP_ALLOC(&ctx->tmp_allocator, operand_size);
@@ -696,13 +779,13 @@ static err_t
     // carry flag
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_CF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, X86_FLAGS_CF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
     );
 
     // overflow flag
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, X86_FLAGS_OF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
     );
 
     // perform the actual xor operation
@@ -730,13 +813,13 @@ static err_t
     // carry flag
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_CF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, X86_FLAGS_CF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
     );
 
     // overflow flag
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, X86_FLAGS_OF, PIS_OPERAND_CONST(0, PIS_OPERAND_SIZE_1))
     );
 
     // perform the actual or operation
@@ -749,15 +832,6 @@ static err_t
 cleanup:
     return err;
 }
-
-/// the prototype for a binary operation function - that is an operation which takes 2 input
-/// operands and produces a single result, for example an `ADD` operation.
-typedef err_t (*binop_fn_t
-)(ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result);
-
-/// the prototype for a unary operation function - that is an operation which takes 1 operand and
-/// applies some operation to it, for example a `NOT` operation.
-typedef err_t (*unary_op_fn_t)(ctx_t* ctx, const pis_operand_t* operand, pis_operand_t* result);
 
 /// the default operand size for near branches.
 ///
@@ -927,7 +1001,9 @@ static err_t
         PIS_INSN3(PIS_OPCODE_EQUALS, is_count_0, *count, PIS_OPERAND_CONST(0, operand_size))
     );
 
-    CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_0, &FLAGS_CF, &last_extracted_bit, &FLAGS_CF));
+    CHECK_RETHROW(
+        cond_expr_ternary(ctx, &is_count_0, &X86_FLAGS_CF, &last_extracted_bit, &X86_FLAGS_CF)
+    );
 
 cleanup:
     return err;
@@ -967,7 +1043,9 @@ static err_t
         PIS_INSN3(PIS_OPCODE_EQUALS, is_count_0, *count, PIS_OPERAND_CONST(0, operand_size))
     );
 
-    CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_0, &FLAGS_CF, &last_extracted_bit, &FLAGS_CF));
+    CHECK_RETHROW(
+        cond_expr_ternary(ctx, &is_count_0, &X86_FLAGS_CF, &last_extracted_bit, &X86_FLAGS_CF)
+    );
 
 cleanup:
     return err;
@@ -994,7 +1072,10 @@ static err_t shl_calc_overflow_flag(
     CHECK_RETHROW(extract_most_significant_bit(ctx, shift_result, &msb));
 
     pis_operand_t new_overflow_flag_value = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_XOR, new_overflow_flag_value, msb, FLAGS_CF));
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(PIS_OPCODE_XOR, new_overflow_flag_value, msb, X86_FLAGS_CF)
+    );
 
     // we only want to set the overflow flag if the count is 1, otherwise we want to use
     // the original OF value.
@@ -1005,7 +1086,7 @@ static err_t shl_calc_overflow_flag(
     );
 
     CHECK_RETHROW(
-        cond_expr_ternary(ctx, &is_count_1, &new_overflow_flag_value, &FLAGS_OF, &FLAGS_OF)
+        cond_expr_ternary(ctx, &is_count_1, &new_overflow_flag_value, &X86_FLAGS_OF, &X86_FLAGS_OF)
     );
 
 cleanup:
@@ -1047,7 +1128,7 @@ static err_t
     );
 
     CHECK_RETHROW(
-        cond_expr_ternary(ctx, &is_count_1, &new_overflow_flag_value, &FLAGS_OF, &FLAGS_OF)
+        cond_expr_ternary(ctx, &is_count_1, &new_overflow_flag_value, &X86_FLAGS_OF, &X86_FLAGS_OF)
     );
 
 cleanup:
@@ -1074,15 +1155,15 @@ static err_t shift_calc_parity_zero_sign_flags(
 
     pis_operand_t new_pf = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
     CHECK_RETHROW(calc_parity_flag_into(ctx, shift_result, &new_pf));
-    CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_0, &FLAGS_PF, &new_pf, &FLAGS_PF));
+    CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_0, &X86_FLAGS_PF, &new_pf, &X86_FLAGS_PF));
 
     pis_operand_t new_zf = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
     CHECK_RETHROW(calc_zero_flag_into(ctx, shift_result, &new_zf));
-    CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_0, &FLAGS_ZF, &new_zf, &FLAGS_ZF));
+    CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_0, &X86_FLAGS_ZF, &new_zf, &X86_FLAGS_ZF));
 
     pis_operand_t new_sf = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
     CHECK_RETHROW(extract_most_significant_bit(ctx, shift_result, &new_sf));
-    CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_0, &FLAGS_SF, &new_sf, &FLAGS_SF));
+    CHECK_RETHROW(cond_expr_ternary(ctx, &is_count_0, &X86_FLAGS_SF, &new_sf, &X86_FLAGS_SF));
 
 cleanup:
     return err;
@@ -1222,7 +1303,7 @@ static err_t
     );
 
     CHECK_RETHROW(
-        cond_expr_ternary(ctx, &is_count_1, &new_overflow_flag_value, &FLAGS_OF, &FLAGS_OF)
+        cond_expr_ternary(ctx, &is_count_1, &new_overflow_flag_value, &X86_FLAGS_OF, &X86_FLAGS_OF)
     );
 
 cleanup:
@@ -1251,7 +1332,7 @@ static err_t
     );
 
     CHECK_RETHROW(
-        cond_expr_ternary(ctx, &is_count_1, &new_overflow_flag_value, &FLAGS_OF, &FLAGS_OF)
+        cond_expr_ternary(ctx, &is_count_1, &new_overflow_flag_value, &X86_FLAGS_OF, &X86_FLAGS_OF)
     );
 
 cleanup:
@@ -1362,7 +1443,7 @@ static err_t
         &ctx->args->result,
         PIS_INSN3(PIS_OPCODE_AND, last_extracted_bit, res_tmp, PIS_OPERAND_CONST(1, operand_size))
     );
-    CHECK_RETHROW(write_resize_zext(ctx, &FLAGS_CF, &last_extracted_bit));
+    CHECK_RETHROW(write_resize_zext(ctx, &X86_FLAGS_CF, &last_extracted_bit));
 
     // overflow flag is the same as `shl`
     CHECK_RETHROW(shl_calc_overflow_flag(ctx, a, &count, &res_tmp));
@@ -1402,25 +1483,25 @@ static err_t do_div_ax_dx(ctx_t* ctx, const pis_operand_t* divisor) {
         pis_operand_t quotient = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_8);
         PIS_EMIT(
             &ctx->args->result,
-            PIS_INSN4(PIS_OPCODE_UNSIGNED_DIV_16, quotient, RDX, RAX, *divisor)
+            PIS_INSN4(PIS_OPCODE_UNSIGNED_DIV_16, quotient, X86_RDX, X86_RAX, *divisor)
         );
 
         // perform the remainder calculation
         pis_operand_t rem = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_8);
         PIS_EMIT(
             &ctx->args->result,
-            PIS_INSN4(PIS_OPCODE_UNSIGNED_REM_16, rem, RDX, RAX, *divisor)
+            PIS_INSN4(PIS_OPCODE_UNSIGNED_REM_16, rem, X86_RDX, X86_RAX, *divisor)
         );
 
         // write the results back to RAX and RDX
-        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, RAX, quotient));
-        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, RDX, rem));
+        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, X86_RAX, quotient));
+        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, X86_RDX, rem));
 
     } else {
         // divide `dx:ax` or `edx:eax`.
 
-        pis_operand_t ax = operand_resize(&RAX, operand_size);
-        pis_operand_t dx = operand_resize(&RDX, operand_size);
+        pis_operand_t ax = operand_resize(&X86_RAX, operand_size);
+        pis_operand_t dx = operand_resize(&X86_RDX, operand_size);
 
         pis_operand_size_t double_operand_size = operand_size * 2;
 
@@ -1488,12 +1569,12 @@ static err_t do_mul_ax(ctx_t* ctx, const pis_operand_t* factor) {
         // a 16-byte result. so, we use a special opcode for it.
         PIS_EMIT(
             &ctx->args->result,
-            PIS_INSN4(PIS_OPCODE_UNSIGNED_MUL_16, result_high, result_low, RAX, *factor)
+            PIS_INSN4(PIS_OPCODE_UNSIGNED_MUL_16, result_high, result_low, X86_RAX, *factor)
         );
 
         // store the result of the multiplication
-        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, RDX, result_high));
-        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, RAX, result_low));
+        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, X86_RDX, result_high));
+        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, X86_RAX, result_low));
     } else {
         // operand size is less than 8, so we can use the regular multiplication opcode.
         pis_operand_size_t double_operand_size = operand_size * 2;
@@ -1501,7 +1582,7 @@ static err_t do_mul_ax(ctx_t* ctx, const pis_operand_t* factor) {
         pis_operand_t factor_zext = {};
         CHECK_RETHROW(read_resize_zext(ctx, factor, double_operand_size, &factor_zext));
 
-        pis_operand_t ax = operand_resize(&RAX, operand_size);
+        pis_operand_t ax = operand_resize(&X86_RAX, operand_size);
 
         pis_operand_t ax_zext = {};
         CHECK_RETHROW(read_resize_zext(ctx, &ax, double_operand_size, &ax_zext));
@@ -1513,7 +1594,7 @@ static err_t do_mul_ax(ctx_t* ctx, const pis_operand_t* factor) {
         );
         // store the result of the multiplication
         if (operand_size == PIS_OPERAND_SIZE_1) {
-            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, AX, multiplication_result));
+            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, X86_AX, multiplication_result));
         } else {
             // split the result into the low and high parts
             pis_operand_t result_low = {};
@@ -1536,7 +1617,7 @@ static err_t do_mul_ax(ctx_t* ctx, const pis_operand_t* factor) {
                 read_resize_zext(ctx, &shifted_multiplication_result, operand_size, &result_high)
             );
 
-            pis_operand_t dx = operand_resize(&RDX, operand_size);
+            pis_operand_t dx = operand_resize(&X86_RDX, operand_size);
             PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, dx, result_high));
             PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, ax, result_low));
         }
@@ -1549,8 +1630,8 @@ static err_t do_mul_ax(ctx_t* ctx, const pis_operand_t* factor) {
         PIS_INSN3(PIS_OPCODE_EQUALS, is_high_zero, result_high, PIS_OPERAND_CONST(0, operand_size))
     );
 
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_COND_NEGATE, FLAGS_CF, is_high_zero));
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, FLAGS_OF, FLAGS_CF));
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_COND_NEGATE, X86_FLAGS_CF, is_high_zero));
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, X86_FLAGS_OF, X86_FLAGS_CF));
 cleanup:
     return err;
 }
@@ -1601,7 +1682,7 @@ static err_t
     // extract the bit into the carry flag.
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, FLAGS_CF, byte, in_byte_bit_offset)
+        PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, X86_FLAGS_CF, byte, in_byte_bit_offset)
     );
 
 cleanup:
@@ -1625,7 +1706,7 @@ static err_t
         &ctx->args->result,
         PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, resulting_bit_tmp, *bit_base_reg, masked_bit_offset)
     );
-    CHECK_RETHROW(extract_least_significant_bit(ctx, &resulting_bit_tmp, &FLAGS_CF));
+    CHECK_RETHROW(extract_least_significant_bit(ctx, &resulting_bit_tmp, &X86_FLAGS_CF));
 
 cleanup:
     return err;
@@ -1652,7 +1733,7 @@ static err_t rep_begin(ctx_t* ctx, rep_ctx_t* rep_ctx) {
     rep_ctx->insn_index_at_loop_start = ctx->args->result.insns_amount;
 
     // first check if `cx` if zero
-    pis_operand_t cx = operand_resize(&RCX, ctx->addr_size);
+    pis_operand_t cx = operand_resize(&X86_RCX, ctx->addr_size);
     pis_operand_t cx_equals_zero = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
     PIS_EMIT(
         &ctx->args->result,
@@ -2009,7 +2090,7 @@ cleanup:
 
 static bool is_gpr(const pis_operand_t* operand) {
     return operand->addr.space == PIS_SPACE_REG &&
-           operand->addr.offset < R15.addr.offset + pis_operand_size_to_bytes(R15.size);
+           operand->addr.offset < X86_R15.addr.offset + pis_operand_size_to_bytes(X86_R15.size);
 }
 
 static err_t lifted_op_write(ctx_t* ctx, const lifted_op_t* op, const pis_operand_t* value) {
@@ -2475,8 +2556,8 @@ static err_t handle_mnemonic_stos(ctx_t* ctx, const lifted_op_t* ops, size_t ops
 
     pis_operand_size_t operand_size = ops[0].implicit.size;
 
-    pis_operand_t ax = operand_resize(&RAX, operand_size);
-    pis_operand_t di = operand_resize(&RDI, ctx->addr_size);
+    pis_operand_t ax = operand_resize(&X86_RAX, operand_size);
+    pis_operand_t di = operand_resize(&X86_RDI, ctx->addr_size);
 
     // copy one chunk from ax to [di].
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_STORE, di, ax));
@@ -2506,8 +2587,8 @@ static err_t handle_mnemonic_movs(ctx_t* ctx, const lifted_op_t* ops, size_t ops
 
     pis_operand_size_t operand_size = ops[0].implicit.size;
 
-    pis_operand_t si = operand_resize(&RSI, ctx->addr_size);
-    pis_operand_t di = operand_resize(&RDI, ctx->addr_size);
+    pis_operand_t si = operand_resize(&X86_RSI, ctx->addr_size);
+    pis_operand_t di = operand_resize(&X86_RDI, ctx->addr_size);
 
     // copy one chunk from [si] to [di].
     pis_operand_t byte_tmp = TMP_ALLOC(&ctx->tmp_allocator, operand_size);
@@ -2661,7 +2742,7 @@ err_t pis_x86_lift(pis_lift_args_t* args, pis_x86_cpumode_t cpumode) {
     // initialize some fields after fetching prefixes
     ctx.addr_size = get_effective_addr_size(cpumode, &ctx.prefixes);
     ctx.stack_addr_size = get_effective_stack_addr_size(cpumode);
-    ctx.sp = operand_resize(&RSP, ctx.stack_addr_size);
+    ctx.sp = operand_resize(&X86_RSP, ctx.stack_addr_size);
 
     CHECK_RETHROW(post_prefixes_lift(&ctx));
 

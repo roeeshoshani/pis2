@@ -1,4 +1,4 @@
-#include "../lib/arch/x86/ctx.h"
+#include "../lib/arch/x86/lift.h"
 #include "../lib/except.h"
 #include "../lib/pis.h"
 #include <errno.h>
@@ -62,25 +62,21 @@ int main(int argc, char** argv) {
     size_t code_len = stat_buf.st_size;
     size_t cur_offset = 0;
 
-    pis_lift_result_t result = {};
-
-    pis_x86_ctx_t ctx = {
-        .cpumode = PIS_X86_CPUMODE_64_BIT,
-    };
     while (cur_offset < code_len) {
-        pis_lift_result_reset(&result);
+        pis_lift_args_t args = {
+            .machine_code = CURSOR_INIT(code + cur_offset, code_len - cur_offset),
+            .machine_code_addr = cur_offset,
+        };
 
         TRACE("TRYING TO PARSE INSN AT OFFSET 0x%lx", (unsigned long) cur_offset);
 
-        CHECK_RETHROW(
-            pis_x86_lift(&ctx, code + cur_offset, code_len - cur_offset, cur_offset, &result)
-        );
+        CHECK_RETHROW(pis_x86_lift(&args, PIS_X86_CPUMODE_64_BIT));
 
         TRACE("INSN AT OFFSET 0x%lx", (unsigned long) cur_offset);
-        pis_lift_result_dump(&result);
+        pis_lift_result_dump(&args.result);
         TRACE();
 
-        cur_offset += result.machine_insn_len;
+        cur_offset += args.result.machine_insn_len;
     }
 
 cleanup:

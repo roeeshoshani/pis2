@@ -69,25 +69,25 @@ static err_t prepare_x86_64(pis_emu_t* emu, const shellcode_args_t* args) {
         pis_emu_write_mem_value(emu, sp, SHELLCODE_FINISH_ADDR, PIS_OPERAND_SIZE_8)
     );
 
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RSP, sp));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &X86_RSP, sp));
 
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RDI, args->arg1));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RSI, args->arg2));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RDX, args->arg3));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &RCX, args->arg4));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &X86_RDI, args->arg1));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &X86_RSI, args->arg2));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &X86_RDX, args->arg3));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &X86_RCX, args->arg4));
 
     const pis_operand_t* unused_regs[] = {
-        &RAX,
-        &RBX,
-        &RBP,
-        &R8,
-        &R9,
-        &R10,
-        &R11,
-        &R12,
-        &R13,
-        &R14,
-        &R15,
+        &X86_RAX,
+        &X86_RBX,
+        &X86_RBP,
+        &X86_R8,
+        &X86_R9,
+        &X86_R10,
+        &X86_R11,
+        &X86_R12,
+        &X86_R13,
+        &X86_R14,
+        &X86_R15,
     };
     CHECK_RETHROW_VERBOSE(init_unused_regs(emu, unused_regs, ARRAY_SIZE(unused_regs)));
 
@@ -117,16 +117,16 @@ static err_t prepare_i386(pis_emu_t* emu, const shellcode_args_t* args) {
     );
 
     // initialize the stack pointer
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &ESP, sp));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &X86_ESP, sp));
 
     const pis_operand_t* unused_regs[] = {
-        &EAX,
-        &EBX,
-        &ECX,
-        &EDX,
-        &ESI,
-        &EDI,
-        &EBP,
+        &X86_EAX,
+        &X86_EBX,
+        &X86_ECX,
+        &X86_EDX,
+        &X86_ESI,
+        &X86_EDI,
+        &X86_EBP,
     };
     CHECK_RETHROW_VERBOSE(init_unused_regs(emu, unused_regs, ARRAY_SIZE(unused_regs)));
 
@@ -138,14 +138,14 @@ const arch_def_t arch_def_x86_64 = {
     .lift = lift_x86_64,
     .prepare = prepare_x86_64,
     .endianness = PIS_ENDIANNESS_LITTLE,
-    .result_operand = &RAX,
+    .result_operand = &X86_RAX,
 };
 
 const arch_def_t arch_def_i386 = {
     .lift = lift_i386,
     .prepare = prepare_i386,
     .endianness = PIS_ENDIANNESS_LITTLE,
-    .result_operand = &EAX,
+    .result_operand = &X86_EAX,
 };
 
 static err_t

@@ -208,115 +208,124 @@ DEFINE_TEST(test_modrm_64_bit_mode) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_mov_reg_reg(CODE(0x89, 0xe5), PIS_X86_CPUMODE_64_BIT, &EBP, &ESP)
+        generic_test_mov_reg_reg(CODE(0x89, 0xe5), PIS_X86_CPUMODE_64_BIT, &X86_EBP, &X86_ESP)
     );
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_mov_reg_reg(CODE(0x48, 0x89, 0xe5), PIS_X86_CPUMODE_64_BIT, &RBP, &RSP)
+        generic_test_mov_reg_reg(CODE(0x48, 0x89, 0xe5), PIS_X86_CPUMODE_64_BIT, &X86_RBP, &X86_RSP)
     );
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_mov_reg_reg(CODE(0x4d, 0x89, 0xc8), PIS_X86_CPUMODE_64_BIT, &R8, &R9)
+        generic_test_mov_reg_reg(CODE(0x4d, 0x89, 0xc8), PIS_X86_CPUMODE_64_BIT, &X86_R8, &X86_R9)
     );
 
-    CHECK_RETHROW_VERBOSE(
-        generic_test_mov_reg_reg(CODE(0x45, 0x89, 0xf4), PIS_X86_CPUMODE_64_BIT, &R12D, &R14D)
-    );
+    CHECK_RETHROW_VERBOSE(generic_test_mov_reg_reg(
+        CODE(0x45, 0x89, 0xf4),
+        PIS_X86_CPUMODE_64_BIT,
+        &X86_R12D,
+        &X86_R14D
+    ));
 
-    CHECK_RETHROW_VERBOSE(
-        generic_test_mov_reg_reg(CODE(0x66, 0x41, 0x89, 0xe5), PIS_X86_CPUMODE_64_BIT, &R13W, &SP)
-    );
+    CHECK_RETHROW_VERBOSE(generic_test_mov_reg_reg(
+        CODE(0x66, 0x41, 0x89, 0xe5),
+        PIS_X86_CPUMODE_64_BIT,
+        &X86_R13W,
+        &X86_SP
+    ));
 
-    CHECK_RETHROW_VERBOSE(
-        generic_test_mov_reg_reg(CODE(0x44, 0x89, 0xfe), PIS_X86_CPUMODE_64_BIT, &ESI, &R15D)
-    );
+    CHECK_RETHROW_VERBOSE(generic_test_mov_reg_reg(
+        CODE(0x44, 0x89, 0xfe),
+        PIS_X86_CPUMODE_64_BIT,
+        &X86_ESI,
+        &X86_R15D
+    ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x4c, 0x89, 0x26),
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_8,
-        &RSI,
+        &X86_RSI,
         NULL,
         0,
         0,
-        &R12
+        &X86_R12
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x49, 0x89, 0x6d, 0x07),
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_8,
-        &R13,
+        &X86_R13,
         NULL,
         0,
         0x7,
-        &RBP
+        &X86_RBP
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x48, 0x89, 0x48, 0x02),
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_8,
-        &RAX,
+        &X86_RAX,
         NULL,
         0,
         0x2,
-        &RCX
+        &X86_RCX
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x4d, 0x89, 0x48, 0xfa),
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_8,
-        &R8,
+        &X86_R8,
         NULL,
         0,
         0xfffffffffffffffa,
-        &R9
+        &X86_R9
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x49, 0x89, 0x9a, 0x44, 0x33, 0x22, 0x11),
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_8,
-        &R10,
+        &X86_R10,
         NULL,
         0,
         0x11223344,
-        &RBX
+        &X86_RBX
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x4c, 0x89, 0x9a, 0xbc, 0xbc, 0xbd, 0xbe),
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_8,
-        &RDX,
+        &X86_RDX,
         NULL,
         0,
         0xffffffffbebdbcbc,
-        &R11
+        &X86_R11
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x4a, 0x89, 0x1c, 0xa0),
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_8,
-        &RAX,
-        &R12,
+        &X86_RAX,
+        &X86_R12,
         4,
         0,
-        &RBX
+        &X86_RBX
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x48, 0x89, 0x14, 0x24),
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_8,
-        &RSP,
+        &X86_RSP,
         NULL,
         0,
         0,
-        &RDX
+        &X86_RDX
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
@@ -324,98 +333,98 @@ DEFINE_TEST(test_modrm_64_bit_mode) {
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_8,
         NULL,
-        &RDI,
+        &X86_RDI,
         4,
         0,
-        &R8
+        &X86_R8
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x4a, 0x89, 0x64, 0x4d, 0x00),
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_8,
-        &RBP,
-        &R9,
+        &X86_RBP,
+        &X86_R9,
         2,
         0,
-        &RSP
+        &X86_RSP
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x4d, 0x89, 0x74, 0x4d, 0x00),
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_8,
-        &R13,
-        &RCX,
+        &X86_R13,
+        &X86_RCX,
         2,
         0,
-        &R14
+        &X86_R14
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x4f, 0x89, 0x64, 0xfa, 0xfd),
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_8,
-        &R10,
-        &R15,
+        &X86_R10,
+        &X86_R15,
         8,
         0xfffffffffffffffd,
-        &R12
+        &X86_R12
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x4e, 0x89, 0xa4, 0x06, 0xcc, 0xed, 0xcb, 0xed),
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_8,
-        &RSI,
-        &R8,
+        &X86_RSI,
+        &X86_R8,
         1,
         0xffffffffedcbedcc,
-        &R12
+        &X86_R12
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x67, 0x89, 0xa4, 0x55, 0xbc, 0xbc, 0xbd, 0xbe),
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_4,
-        &EBP,
-        &EDX,
+        &X86_EBP,
+        &X86_EDX,
         2,
         0xbebdbcbc,
-        &ESP
+        &X86_ESP
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x67, 0x4f, 0x89, 0x44, 0xf9, 0x05),
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_4,
-        &R9D,
-        &R15D,
+        &X86_R9D,
+        &X86_R15D,
         8,
         5,
-        &R8
+        &X86_R8
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x66, 0x42, 0x89, 0x44, 0xac, 0xff),
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_8,
-        &RSP,
-        &R13,
+        &X86_RSP,
+        &X86_R13,
         4,
         0xffffffffffffffff,
-        &AX
+        &X86_AX
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x66, 0x67, 0x42, 0x89, 0x74, 0x65, 0x00),
         PIS_X86_CPUMODE_64_BIT,
         PIS_OPERAND_SIZE_4,
-        &EBP,
-        &R12D,
+        &X86_EBP,
+        &X86_R12D,
         2,
         0,
-        &SI
+        &X86_SI
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg_at_addr(
@@ -427,7 +436,7 @@ DEFINE_TEST(test_modrm_64_bit_mode) {
         NULL,
         0,
         7,
-        &EAX
+        &X86_EAX
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg_at_addr(
@@ -439,7 +448,7 @@ DEFINE_TEST(test_modrm_64_bit_mode) {
         NULL,
         0,
         8,
-        &EAX
+        &X86_EAX
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg_at_addr(
@@ -451,7 +460,7 @@ DEFINE_TEST(test_modrm_64_bit_mode) {
         NULL,
         0,
         2,
-        &EAX
+        &X86_EAX
     ));
 
 cleanup:
@@ -462,11 +471,11 @@ DEFINE_TEST(test_modrm_32_bit_mode) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_mov_reg_reg(CODE(0x89, 0xe5), PIS_X86_CPUMODE_32_BIT, &EBP, &ESP)
+        generic_test_mov_reg_reg(CODE(0x89, 0xe5), PIS_X86_CPUMODE_32_BIT, &X86_EBP, &X86_ESP)
     );
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_mov_reg_reg(CODE(0x89, 0xce), PIS_X86_CPUMODE_32_BIT, &ESI, &ECX)
+        generic_test_mov_reg_reg(CODE(0x89, 0xce), PIS_X86_CPUMODE_32_BIT, &X86_ESI, &X86_ECX)
     );
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
@@ -477,84 +486,84 @@ DEFINE_TEST(test_modrm_32_bit_mode) {
         NULL,
         0,
         0x12345678,
-        &ESI
+        &X86_ESI
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x89, 0x43, 0x03),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_4,
-        &EBX,
+        &X86_EBX,
         NULL,
         0,
         3,
-        &EAX
+        &X86_EAX
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x89, 0x67, 0xfe),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_4,
-        &EDI,
+        &X86_EDI,
         NULL,
         0,
         0xfffffffe,
-        &ESP
+        &X86_ESP
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x89, 0x55, 0x7f),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_4,
-        &EBP,
+        &X86_EBP,
         NULL,
         0,
         0x7f,
-        &EDX
+        &X86_EDX
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x89, 0xa8, 0x44, 0x33, 0x22, 0x11),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_4,
-        &EAX,
+        &X86_EAX,
         NULL,
         0,
         0x11223344,
-        &EBP
+        &X86_EBP
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x89, 0x9d, 0xbc, 0xbc, 0xbd, 0xbe),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_4,
-        &EBP,
+        &X86_EBP,
         NULL,
         0,
         0xbebdbcbc,
-        &EBX
+        &X86_EBX
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x89, 0x1c, 0x06),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_4,
-        &ESI,
-        &EAX,
+        &X86_ESI,
+        &X86_EAX,
         1,
         0,
-        &EBX
+        &X86_EBX
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x89, 0x0c, 0x24),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_4,
-        &ESP,
+        &X86_ESP,
         NULL,
         0,
         0,
-        &ECX
+        &X86_ECX
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
@@ -562,10 +571,10 @@ DEFINE_TEST(test_modrm_32_bit_mode) {
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_4,
         NULL,
-        &EDX,
+        &X86_EDX,
         4,
         0x12345678,
-        &EBP
+        &X86_EBP
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
@@ -576,117 +585,117 @@ DEFINE_TEST(test_modrm_32_bit_mode) {
         NULL,
         0,
         0x12345678,
-        &EBP
+        &X86_EBP
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x89, 0x7c, 0xed, 0x01),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_4,
-        &EBP,
-        &EBP,
+        &X86_EBP,
+        &X86_EBP,
         8,
         1,
-        &EDI
+        &X86_EDI
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x89, 0x4c, 0x5d, 0xfc),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_4,
-        &EBP,
-        &EBX,
+        &X86_EBP,
+        &X86_EBX,
         2,
         0xfffffffc,
-        &ECX
+        &X86_ECX
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x89, 0xb4, 0x05, 0x44, 0x33, 0x22, 0x11),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_4,
-        &EBP,
-        &EAX,
+        &X86_EBP,
+        &X86_EAX,
         1,
         0x11223344,
-        &ESI
+        &X86_ESI
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x89, 0xa4, 0x55, 0xbc, 0xbc, 0xbd, 0xbe),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_4,
-        &EBP,
-        &EDX,
+        &X86_EBP,
+        &X86_EDX,
         2,
         0xbebdbcbc,
-        &ESP
+        &X86_ESP
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x89, 0x7c, 0xf1, 0x01),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_4,
-        &ECX,
-        &ESI,
+        &X86_ECX,
+        &X86_ESI,
         8,
         1,
-        &EDI
+        &X86_EDI
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x89, 0x6c, 0x58, 0xfd),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_4,
-        &EAX,
-        &EBX,
+        &X86_EAX,
+        &X86_EBX,
         2,
         0xfffffffd,
-        &EBP
+        &X86_EBP
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x89, 0xa4, 0x8c, 0x44, 0x33, 0x22, 0x11),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_4,
-        &ESP,
-        &ECX,
+        &X86_ESP,
+        &X86_ECX,
         4,
         0x11223344,
-        &ESP
+        &X86_ESP
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x67, 0x89, 0x82, 0x34, 0x12),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_2,
-        &BP,
-        &SI,
+        &X86_BP,
+        &X86_SI,
         1,
         0x1234,
-        &EAX
+        &X86_EAX
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x66, 0x89, 0x44, 0x58, 0xfd),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_4,
-        &EAX,
-        &EBX,
+        &X86_EAX,
+        &X86_EBX,
         2,
         0xfffffffd,
-        &AX
+        &X86_AX
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_modrm_reg(
         CODE(0x66, 0x67, 0x89, 0x88, 0x34, 0x12),
         PIS_X86_CPUMODE_32_BIT,
         PIS_OPERAND_SIZE_2,
-        &BX,
-        &SI,
+        &X86_BX,
+        &X86_SI,
         1,
         0x1234,
-        &CX
+        &X86_CX
     ));
 
 cleanup:
@@ -751,7 +760,7 @@ DEFINE_TEST(test_rel_operand_32_bit_mode) {
     CHECK_RETHROW_VERBOSE(generic_test_call(
         CODE(0xe8, 0x09, 0x00, 0x00, 0x00),
         PIS_X86_CPUMODE_32_BIT,
-        &ESP,
+        &X86_ESP,
         PIS_OPERAND_SIZE_4,
         (0xffffffffULL + 1) - 5 - 2,
         7
@@ -774,7 +783,7 @@ DEFINE_TEST(test_rel_operand_64_bit_mode) {
     CHECK_RETHROW_VERBOSE(generic_test_call(
         CODE(0xe8, 0x09, 0x00, 0x00, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-        &RSP,
+        &X86_RSP,
         PIS_OPERAND_SIZE_8,
         0ULL - 5 - 2,
         7
@@ -802,23 +811,23 @@ DEFINE_TEST(test_mov_r8_imm8_64_bit_mode) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_mov_r8_imm8(CODE(0xb7, 0xe4), PIS_X86_CPUMODE_64_BIT, &BH, 0xe4)
+        generic_test_mov_r8_imm8(CODE(0xb7, 0xe4), PIS_X86_CPUMODE_64_BIT, &X86_BH, 0xe4)
     );
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_mov_r8_imm8(CODE(0x48, 0xb7, 0xe4), PIS_X86_CPUMODE_64_BIT, &DIL, 0xe4)
+        generic_test_mov_r8_imm8(CODE(0x48, 0xb7, 0xe4), PIS_X86_CPUMODE_64_BIT, &X86_DIL, 0xe4)
     );
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_mov_r8_imm8(CODE(0x49, 0xb7, 0xe4), PIS_X86_CPUMODE_64_BIT, &R15B, 0xe4)
+        generic_test_mov_r8_imm8(CODE(0x49, 0xb7, 0xe4), PIS_X86_CPUMODE_64_BIT, &X86_R15B, 0xe4)
     );
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_mov_r8_imm8(CODE(0x41, 0xb0, 0x12), PIS_X86_CPUMODE_64_BIT, &R8B, 0x12)
+        generic_test_mov_r8_imm8(CODE(0x41, 0xb0, 0x12), PIS_X86_CPUMODE_64_BIT, &X86_R8B, 0x12)
     );
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_mov_r8_imm8(CODE(0x40, 0xb4, 0x55), PIS_X86_CPUMODE_64_BIT, &SPL, 0x55)
+        generic_test_mov_r8_imm8(CODE(0x40, 0xb4, 0x55), PIS_X86_CPUMODE_64_BIT, &X86_SPL, 0x55)
     );
 
 cleanup:
@@ -829,11 +838,11 @@ DEFINE_TEST(test_mov_r8_32_bit_mode) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_mov_r8_imm8(CODE(0xb7, 0xe4), PIS_X86_CPUMODE_32_BIT, &BH, 0xe4)
+        generic_test_mov_r8_imm8(CODE(0xb7, 0xe4), PIS_X86_CPUMODE_32_BIT, &X86_BH, 0xe4)
     );
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_mov_r8_imm8(CODE(0xb0, 0x12), PIS_X86_CPUMODE_32_BIT, &AL, 0x12)
+        generic_test_mov_r8_imm8(CODE(0xb0, 0x12), PIS_X86_CPUMODE_32_BIT, &X86_AL, 0x12)
     );
 
 cleanup:
@@ -844,7 +853,7 @@ DEFINE_TEST(test_nop_modrm) {
     err_t err = SUCCESS;
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RAX, 0));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_RAX, 0));
     CHECK_RETHROW_VERBOSE(emulate_insn(
         &g_emu,
         CODE(0x66, 0x2e, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00),
@@ -905,16 +914,16 @@ DEFINE_TEST(test_movsxd) {
     CHECK_RETHROW_VERBOSE(generic_test_mov_sign_extend_reg_modrm(
         CODE(0x48, 0x63, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-        &RAX,
-        &RAX,
+        &X86_RAX,
+        &X86_RAX,
         0x12345678,
         PIS_OPERAND_SIZE_4
     ));
     CHECK_RETHROW_VERBOSE(generic_test_mov_sign_extend_reg_modrm(
         CODE(0x48, 0x63, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-        &RAX,
-        &RAX,
+        &X86_RAX,
+        &X86_RAX,
         0x87654321,
         PIS_OPERAND_SIZE_4
     ));
@@ -922,16 +931,16 @@ DEFINE_TEST(test_movsxd) {
     CHECK_RETHROW_VERBOSE(generic_test_mov_sign_extend_reg_modrm(
         CODE(0x63, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-        &EAX,
-        &RAX,
+        &X86_EAX,
+        &X86_RAX,
         0x12345678,
         PIS_OPERAND_SIZE_4
     ));
     CHECK_RETHROW_VERBOSE(generic_test_mov_sign_extend_reg_modrm(
         CODE(0x63, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-        &EAX,
-        &RAX,
+        &X86_EAX,
+        &X86_RAX,
         0x87654321,
         PIS_OPERAND_SIZE_4
     ));
@@ -939,16 +948,16 @@ DEFINE_TEST(test_movsxd) {
     CHECK_RETHROW_VERBOSE(generic_test_mov_sign_extend_reg_modrm(
         CODE(0x66, 0x63, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-        &AX,
-        &RAX,
+        &X86_AX,
+        &X86_RAX,
         0x1234,
         PIS_OPERAND_SIZE_2
     ));
     CHECK_RETHROW_VERBOSE(generic_test_mov_sign_extend_reg_modrm(
         CODE(0x66, 0x63, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-        &AX,
-        &RAX,
+        &X86_AX,
+        &X86_RAX,
         0x8765,
         PIS_OPERAND_SIZE_2
     ));
@@ -990,16 +999,16 @@ DEFINE_TEST(test_movzx_32_bit_mode) {
     CHECK_RETHROW_VERBOSE(generic_test_mov_zero_extend_reg_modrm(
         CODE(0x0f, 0xb6, 0x00),
         PIS_X86_CPUMODE_32_BIT,
-        &EAX,
-        &EAX,
+        &X86_EAX,
+        &X86_EAX,
         PIS_OPERAND_SIZE_1
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_zero_extend_reg_modrm(
         CODE(0x66, 0x0f, 0xb6, 0x00),
         PIS_X86_CPUMODE_32_BIT,
-        &AX,
-        &EAX,
+        &X86_AX,
+        &X86_EAX,
         PIS_OPERAND_SIZE_1
     ));
 
@@ -1013,24 +1022,24 @@ DEFINE_TEST(test_movzx_64_bit_mode) {
     CHECK_RETHROW_VERBOSE(generic_test_mov_zero_extend_reg_modrm(
         CODE(0x0f, 0xb6, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-        &EAX,
-        &RAX,
+        &X86_EAX,
+        &X86_RAX,
         PIS_OPERAND_SIZE_1
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_zero_extend_reg_modrm(
         CODE(0x66, 0x0f, 0xb6, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-        &AX,
-        &RAX,
+        &X86_AX,
+        &X86_RAX,
         PIS_OPERAND_SIZE_1
     ));
 
     CHECK_RETHROW_VERBOSE(generic_test_mov_zero_extend_reg_modrm(
         CODE(0x48, 0x0f, 0xb6, 0x00),
         PIS_X86_CPUMODE_64_BIT,
-        &RAX,
-        &RAX,
+        &X86_RAX,
+        &X86_RAX,
         PIS_OPERAND_SIZE_1
     ));
 
@@ -1098,37 +1107,49 @@ DEFINE_TEST(test_push_reg_64_bit_mode) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg(&g_emu, CODE(0x55), PIS_X86_CPUMODE_64_BIT, &RSP, &RBP)
+        generic_test_push_reg(&g_emu, CODE(0x55), PIS_X86_CPUMODE_64_BIT, &X86_RSP, &X86_RBP)
     );
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg(&g_emu, CODE(0x41, 0x51), PIS_X86_CPUMODE_64_BIT, &RSP, &R9)
+        generic_test_push_reg(&g_emu, CODE(0x41, 0x51), PIS_X86_CPUMODE_64_BIT, &X86_RSP, &X86_R9)
     );
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg(&g_emu, CODE(0x66, 0x52), PIS_X86_CPUMODE_64_BIT, &RSP, &DX)
+        generic_test_push_reg(&g_emu, CODE(0x66, 0x52), PIS_X86_CPUMODE_64_BIT, &X86_RSP, &X86_DX)
     );
 
-    CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg(&g_emu, CODE(0x66, 0x41, 0x53), PIS_X86_CPUMODE_64_BIT, &RSP, &R11W)
-    );
+    CHECK_RETHROW_VERBOSE(generic_test_push_reg(
+        &g_emu,
+        CODE(0x66, 0x41, 0x53),
+        PIS_X86_CPUMODE_64_BIT,
+        &X86_RSP,
+        &X86_R11W
+    ));
 
-    CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg(&g_emu, CODE(0x66, 0x48, 0x55), PIS_X86_CPUMODE_64_BIT, &RSP, &RBP)
-    );
+    CHECK_RETHROW_VERBOSE(generic_test_push_reg(
+        &g_emu,
+        CODE(0x66, 0x48, 0x55),
+        PIS_X86_CPUMODE_64_BIT,
+        &X86_RSP,
+        &X86_RBP
+    ));
 
-    CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg(&g_emu, CODE(0x66, 0x49, 0x50), PIS_X86_CPUMODE_64_BIT, &RSP, &R8)
-    );
+    CHECK_RETHROW_VERBOSE(generic_test_push_reg(
+        &g_emu,
+        CODE(0x66, 0x49, 0x50),
+        PIS_X86_CPUMODE_64_BIT,
+        &X86_RSP,
+        &X86_R8
+    ));
 
     // push rsp
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RSP, MAGIC64_1));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_RSP, MAGIC64_1));
     CHECK_RETHROW_VERBOSE(generic_test_push(
         &g_emu,
         CODE(0x54),
         PIS_X86_CPUMODE_64_BIT,
-        &RSP,
+        &X86_RSP,
         MAGIC64_1,
         PIS_OPERAND_SIZE_8
     ));
@@ -1141,11 +1162,11 @@ DEFINE_TEST(test_push_reg_32_bit_mode) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg(&g_emu, CODE(0x50), PIS_X86_CPUMODE_32_BIT, &ESP, &EAX)
+        generic_test_push_reg(&g_emu, CODE(0x50), PIS_X86_CPUMODE_32_BIT, &X86_ESP, &X86_EAX)
     );
 
     CHECK_RETHROW_VERBOSE(
-        generic_test_push_reg(&g_emu, CODE(0x66, 0x55), PIS_X86_CPUMODE_32_BIT, &ESP, &BP)
+        generic_test_push_reg(&g_emu, CODE(0x66, 0x55), PIS_X86_CPUMODE_32_BIT, &X86_ESP, &X86_BP)
     );
 
 cleanup:
@@ -1158,12 +1179,13 @@ static bool calc_parity_bit(u64 value) {
 
 static err_t verify_parity_sign_zero_flags(u64 calculation_result) {
     err_t err = SUCCESS;
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_ZF, calculation_result == 0));
-    CHECK_RETHROW_VERBOSE(
-        emu_assert_operand_equals(&g_emu, &FLAGS_SF, ((i64) calculation_result < 0))
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_FLAGS_ZF, calculation_result == 0)
     );
     CHECK_RETHROW_VERBOSE(
-        emu_assert_operand_equals(&g_emu, &FLAGS_PF, calc_parity_bit(calculation_result))
+        emu_assert_operand_equals(&g_emu, &X86_FLAGS_SF, ((i64) calculation_result < 0))
+    );
+    CHECK_RETHROW_VERBOSE(
+        emu_assert_operand_equals(&g_emu, &X86_FLAGS_PF, calc_parity_bit(calculation_result))
     );
 cleanup:
     return err;
@@ -1174,22 +1196,22 @@ static err_t generic_test_add_flags(u64 lhs, u64 rhs, bool carry_flag, bool over
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
 
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RAX, lhs));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RBX, rhs));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_RAX, lhs));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_RBX, rhs));
 
     CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, CODE(0x48, 0x01, 0xd8), PIS_X86_CPUMODE_64_BIT, 0));
 
     // make sure that rax now contains the sum
     u64 sum = lhs + rhs;
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, sum));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_RAX, sum));
 
     // make sure that rbx is unchanged
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RBX, rhs));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_RBX, rhs));
 
     // verify flags
     CHECK_RETHROW_VERBOSE(verify_parity_sign_zero_flags(sum));
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_CF, carry_flag));
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_OF, overflow_flag));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_FLAGS_CF, carry_flag));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_FLAGS_OF, overflow_flag));
 
 cleanup:
     return err;
@@ -1228,22 +1250,22 @@ static err_t generic_test_sub_flags(u64 lhs, u64 rhs, bool carry_flag, bool over
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
 
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RAX, lhs));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RBX, rhs));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_RAX, lhs));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_RBX, rhs));
 
     CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, CODE(0x48, 0x29, 0xd8), PIS_X86_CPUMODE_64_BIT, 0));
 
     // make sure that rax now contains the result
     u64 res = lhs - rhs;
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, res));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_RAX, res));
 
     // make sure that rbx is unchanged
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RBX, rhs));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_RBX, rhs));
 
     // verify flags
     CHECK_RETHROW_VERBOSE(verify_parity_sign_zero_flags(res));
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_CF, carry_flag));
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_OF, overflow_flag));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_FLAGS_CF, carry_flag));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_FLAGS_OF, overflow_flag));
 
 cleanup:
     return err;
@@ -1276,13 +1298,13 @@ static err_t generic_prepare_shift_rax(
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
 
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RAX, lhs));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &FLAGS_CF, orig_carry_flag));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &FLAGS_OF, orig_overflow_flag));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_RAX, lhs));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_FLAGS_CF, orig_carry_flag));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_FLAGS_OF, orig_overflow_flag));
 
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &FLAGS_PF, orig_parity_flag));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &FLAGS_SF, orig_sign_flag));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &FLAGS_ZF, orig_zero_flag));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_FLAGS_PF, orig_parity_flag));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_FLAGS_SF, orig_sign_flag));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_FLAGS_ZF, orig_zero_flag));
 
 cleanup:
     return err;
@@ -1301,18 +1323,18 @@ static err_t generic_check_shift_result(
 
     // make sure that rax now contains the result
     u64 masked_shift_amount = shift_amount & 0b111111;
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, expected_result));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_RAX, expected_result));
 
     // verify flags
     if (masked_shift_amount != 0) {
         CHECK_RETHROW_VERBOSE(verify_parity_sign_zero_flags(expected_result));
     } else {
-        CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_ZF, orig_zero_flag));
-        CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_SF, orig_sign_flag));
-        CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_PF, orig_parity_flag));
+        CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_FLAGS_ZF, orig_zero_flag));
+        CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_FLAGS_SF, orig_sign_flag));
+        CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_FLAGS_PF, orig_parity_flag));
     }
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_CF, new_carry_flag));
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_OF, new_overflow_flag));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_FLAGS_CF, new_carry_flag));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_FLAGS_OF, new_overflow_flag));
 
 cleanup:
     return err;
@@ -1386,7 +1408,7 @@ static err_t generic_test_shl_cl(
         orig_sign_flag,
         orig_zero_flag
     ));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &CL, shift_amount));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_CL, shift_amount));
 
     CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, CODE(0x48, 0xd3, 0xe0), PIS_X86_CPUMODE_64_BIT, 0));
 
@@ -1517,7 +1539,7 @@ DEFINE_TEST(test_movsx_r_rm8) {
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
 
     u64 addr = MAGIC64_1;
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RBP, addr));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_RBP, addr));
 
     u8 mem_value = MAGIC64_2 & UINT8_MAX;
     CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(&g_emu, addr, mem_value, PIS_OPERAND_SIZE_1));
@@ -1528,7 +1550,7 @@ DEFINE_TEST(test_movsx_r_rm8) {
 
     u64 sign_extended_mem_value = (u64) ((i64) ((i8) mem_value));
 
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, sign_extended_mem_value));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_RAX, sign_extended_mem_value));
 
 cleanup:
     return err;
@@ -1540,7 +1562,7 @@ DEFINE_TEST(test_movsx_r_rm16) {
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
 
     u16 value = MAGIC64_1 & UINT16_MAX;
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &AX, value));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_AX, value));
 
     CHECK_RETHROW_VERBOSE(
         emulate_insn(&g_emu, CODE(0x48, 0x0f, 0xbf, 0xc0), PIS_X86_CPUMODE_64_BIT, 0)
@@ -1548,7 +1570,7 @@ DEFINE_TEST(test_movsx_r_rm16) {
 
     u64 sign_extended_value = (u64) ((i64) ((i16) value));
 
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, sign_extended_value));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_RAX, sign_extended_value));
 
 cleanup:
     return err;
@@ -1584,19 +1606,19 @@ DEFINE_TEST(test_cbw_cwde_cdqe) {
     value = MAGIC64_1 & UINT8_MAX;
     sign_extended_value = (u16) ((i16) ((i8) value));
     CHECK_RETHROW_VERBOSE(
-        generic_test_cbw_cwde_cdqe(CODE(0x66, 0x98), value, sign_extended_value, &AL, &AX)
+        generic_test_cbw_cwde_cdqe(CODE(0x66, 0x98), value, sign_extended_value, &X86_AL, &X86_AX)
     );
 
     value = MAGIC64_1 & UINT16_MAX;
     sign_extended_value = (u32) ((i32) ((i16) value));
     CHECK_RETHROW_VERBOSE(
-        generic_test_cbw_cwde_cdqe(CODE(0x98), value, sign_extended_value, &AX, &EAX)
+        generic_test_cbw_cwde_cdqe(CODE(0x98), value, sign_extended_value, &X86_AX, &X86_EAX)
     );
 
     value = MAGIC64_1 & UINT32_MAX;
     sign_extended_value = (u64) ((i64) ((i32) value));
     CHECK_RETHROW_VERBOSE(
-        generic_test_cbw_cwde_cdqe(CODE(0x48, 0x98), value, sign_extended_value, &EAX, &RAX)
+        generic_test_cbw_cwde_cdqe(CODE(0x48, 0x98), value, sign_extended_value, &X86_EAX, &X86_RAX)
     );
 
 cleanup:
@@ -1608,11 +1630,11 @@ DEFINE_TEST(test_mov_32_bit_gpr) {
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
 
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RAX, UINT64_MAX));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_RAX, UINT64_MAX));
 
     CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, CODE(0x31, 0xc0), PIS_X86_CPUMODE_64_BIT, 0));
 
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, 0));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_RAX, 0));
 
 cleanup:
     return err;
@@ -1623,14 +1645,14 @@ static err_t generic_test_dec(u64 value, bool is_overflow) {
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
 
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &RAX, value));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_RAX, value));
 
     CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, CODE(0x48, 0xff, 0xc8), PIS_X86_CPUMODE_64_BIT, 0));
 
     u64 res = value - 1;
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &RAX, res));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_RAX, res));
     CHECK_RETHROW_VERBOSE(verify_parity_sign_zero_flags(res));
-    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &FLAGS_OF, is_overflow));
+    CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, &X86_FLAGS_OF, is_overflow));
 
 cleanup:
     return err;
@@ -1714,7 +1736,7 @@ static err_t generic_test_shr_cl(
         orig_sign_flag,
         orig_zero_flag
     ));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &CL, shift_amount));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_CL, shift_amount));
 
     CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, CODE(0x48, 0xd3, 0xe8), PIS_X86_CPUMODE_64_BIT, 0));
 
@@ -1905,7 +1927,7 @@ static err_t generic_test_sar_cl(
         orig_sign_flag,
         orig_zero_flag
     ));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &CL, shift_amount));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_CL, shift_amount));
 
     CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, CODE(0x48, 0xd3, 0xf8), PIS_X86_CPUMODE_64_BIT, 0));
 

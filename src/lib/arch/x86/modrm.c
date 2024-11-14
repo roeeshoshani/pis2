@@ -91,32 +91,32 @@ static err_t
         // handle the base regs
         switch (modrm->rm) {
             case 0b000:
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, BX));
-                PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, SI));
+                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, X86_BX));
+                PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, X86_SI));
                 break;
             case 0b001:
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, BX));
-                PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, DI));
+                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, X86_BX));
+                PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, X86_DI));
                 break;
             case 0b010:
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, BP));
-                PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, SI));
+                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, X86_BP));
+                PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, X86_SI));
                 break;
             case 0b011:
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, BP));
-                PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, DI));
+                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, X86_BP));
+                PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, X86_DI));
                 break;
             case 0b100:
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, SI));
+                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, X86_SI));
                 break;
             case 0b101:
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, DI));
+                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, X86_DI));
                 break;
             case 0b110:
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, BP));
+                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, X86_BP));
                 break;
             case 0b111:
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, BX));
+                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, X86_BX));
                 break;
         }
 

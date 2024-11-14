@@ -140,7 +140,7 @@
     _(PIS_OPCODE_SHIFT_RIGHT_SIGNED, )                                                             \
     _(PIS_OPCODE_SHIFT_LEFT, )                                                                     \
     _(PIS_OPCODE_UNSIGNED_LESS_THAN, )                                                             \
-    _(PIS_OPCODE_SIGNED_BORROW, )                                                                  \
+    _(PIS_OPCODE_SIGNED_LESS_THAN, )                                                               \
     _(PIS_OPCODE_JMP_COND, )                                                                       \
     _(PIS_OPCODE_JMP, )                                                                            \
     _(PIS_OPCODE_COND_NEGATE, )                                                                    \

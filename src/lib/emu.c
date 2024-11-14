@@ -620,7 +620,7 @@ err_t pis_emu_run_one(pis_emu_t* emu, exec_ctx_t* exec_ctx, const pis_insn_t* in
 
             break;
         }
-        case PIS_OPCODE_SIGNED_BORROW: {
+        case PIS_OPCODE_SIGNED_LESS_THAN: {
             CHECK_CODE(insn->operands_amount == 3, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
 
             // check operand sizes
@@ -633,27 +633,15 @@ err_t pis_emu_run_one(pis_emu_t* emu, exec_ctx_t* exec_ctx, const pis_insn_t* in
                 PIS_ERR_EMU_OPERAND_SIZE_MISMATCH
             );
 
-            u64 lhs = 0;
-            CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &lhs));
+            i64 lhs = 0;
+            CHECK_RETHROW(pis_emu_read_operand_signed(emu, &insn->operands[1], &lhs));
 
-            u64 rhs = 0;
-            CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[2], &rhs));
+            i64 rhs = 0;
+            CHECK_RETHROW(pis_emu_read_operand_signed(emu, &insn->operands[2], &rhs));
 
-            u64 result = lhs - rhs;
+            bool result = lhs < rhs;
 
-            pis_operand_size_t src_operand_size = insn->operands[1].size;
-            u32 src_operand_size_in_bits = pis_operand_size_to_bits(src_operand_size);
-            u32 sign_bit_shift_amount = src_operand_size_in_bits - 1;
-
-            u64 lhs_sign_bit = (lhs >> sign_bit_shift_amount) & 1;
-            u64 rhs_sign_bit = (rhs >> sign_bit_shift_amount) & 1;
-            u64 result_sign_bit = (result >> sign_bit_shift_amount) & 1;
-
-            // signed overflow occurs when subtracting a rhs of a different sign than the lhs makes
-            // the sign of the lhs change.
-            bool is_overflow = lhs_sign_bit != rhs_sign_bit && lhs_sign_bit != result_sign_bit;
-
-            CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], (u64) is_overflow));
+            CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], (u64) result));
 
             break;
         }

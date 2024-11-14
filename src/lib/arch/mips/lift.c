@@ -143,7 +143,7 @@ static err_t opcode_handler_03(ctx_t* ctx) {
     // opcode 0x03 is JAL
 
     pis_operand_t ret_addr_op = calc_branch_ret_addr_op(ctx);
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, REG_RA, ret_addr_op));
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, MIPS_REG_RA, ret_addr_op));
 
     CHECK_RETHROW(do_jmp(ctx));
 
@@ -209,7 +209,8 @@ static err_t opcode_handler_06(ctx_t* ctx) {
 
     pis_operand_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
     // TODO: how the fuck do i do >=???
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_BORROW, cond, rs, rt));
+    // PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_BORROW, cond, rs, rt));
+    UNUSED(rs);
 
     CHECK_RETHROW(do_branch_cond(ctx, &cond));
 
@@ -224,6 +225,7 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     opcode_handler_03,
     opcode_handler_04,
     opcode_handler_05,
+    opcode_handler_06,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
