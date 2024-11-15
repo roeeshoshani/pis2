@@ -392,6 +392,30 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_20(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x20 is LB
+
+    pis_operand_t base = reg_get_operand(insn_field_rs(ctx->insn));
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
+    u32 offset = insn_field_imm_sext(ctx->insn);
+
+    pis_operand_t addr = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_4);
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(PIS_OPCODE_ADD, addr, base, PIS_OPERAND_CONST(offset, PIS_OPERAND_SIZE_4))
+    );
+
+    pis_operand_t byte = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, byte, addr));
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, rt, byte));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] = {
     opcode_handler_00,
     opcode_handler_01,
@@ -409,6 +433,39 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     opcode_handler_0d,
     opcode_handler_0e,
     opcode_handler_0f,
+    // 0x10
+    NULL,
+    // 0x11
+    NULL,
+    // 0x12
+    NULL,
+    // 0x13
+    NULL,
+    // 0x14
+    NULL,
+    // 0x15
+    NULL,
+    // 0x16
+    NULL,
+    // 0x17
+    NULL,
+    // 0x18
+    NULL,
+    // 0x19
+    NULL,
+    // 0x1a
+    NULL,
+    // 0x1b
+    NULL,
+    // 0x1c
+    NULL,
+    // 0x1d
+    NULL,
+    // 0x1e
+    NULL,
+    // 0x1f
+    NULL,
+    opcode_handler_20,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
