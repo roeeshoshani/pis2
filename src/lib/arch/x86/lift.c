@@ -2742,6 +2742,9 @@ err_t pis_x86_lift(pis_lift_args_t* args, pis_x86_cpumode_t cpumode) {
 
     args->result.machine_insn_len = cursor_index(&args->machine_code);
 
+    // make sure that we actually processes any bytes
+    CHECK(args->result.machine_insn_len > 0);
+
 cleanup:
     return err;
 }
