@@ -1,4 +1,6 @@
 #include "shellcodes.h"
+#include "../lib/arch/mips/lift.h"
+#include "../lib/arch/mips/regs.h"
 #include "../lib/arch/x86/lift.h"
 #include "../lib/arch/x86/regs.h"
 #include "../lib/emu.h"
@@ -40,6 +42,16 @@ cleanup:
 static err_t lift_i686(pis_lift_args_t* args) {
     err_t err = SUCCESS;
     CHECK_RETHROW_VERBOSE(pis_x86_lift(args, PIS_X86_CPUMODE_32_BIT));
+cleanup:
+    return err;
+}
+
+static err_t lift_mips(pis_lift_args_t* args) {
+    err_t err = SUCCESS;
+    pis_mips_cpuinfo_t cpuinfo = {
+        .endianness = PIS_ENDIANNESS_BIG,
+    };
+    CHECK_RETHROW_VERBOSE(pis_mips_lift(args, &cpuinfo));
 cleanup:
     return err;
 }
@@ -86,6 +98,29 @@ static err_t prepare_x86_64(pis_emu_t* emu, const shellcode_args_t* args) {
         &X86_R13,
         &X86_R14,
         &X86_R15,
+    };
+    CHECK_RETHROW_VERBOSE(init_unused_regs(emu, unused_regs, ARRAY_SIZE(unused_regs)));
+
+cleanup:
+    return err;
+}
+
+static err_t prepare_mips(pis_emu_t* emu, const shellcode_args_t* args) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &MIPS_REG_RA, SHELLCODE_FINISH_ADDR));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &MIPS_REG_SP, INITIAL_STACK_POINTER_VALUE));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &MIPS_REG_A0, args->arg1));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &MIPS_REG_A1, args->arg2));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &MIPS_REG_A2, args->arg3));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &MIPS_REG_A3, args->arg4));
+
+    const pis_operand_t* unused_regs[] = {
+        &MIPS_REG_ZERO, &MIPS_REG_AT, &MIPS_REG_V0, &MIPS_REG_V1, &MIPS_REG_T0, &MIPS_REG_T1,
+        &MIPS_REG_T2,   &MIPS_REG_T3, &MIPS_REG_T4, &MIPS_REG_T5, &MIPS_REG_T6, &MIPS_REG_T7,
+        &MIPS_REG_S0,   &MIPS_REG_S1, &MIPS_REG_S2, &MIPS_REG_S3, &MIPS_REG_S4, &MIPS_REG_S5,
+        &MIPS_REG_S6,   &MIPS_REG_S7, &MIPS_REG_T8, &MIPS_REG_T9, &MIPS_REG_K0, &MIPS_REG_K1,
+        &MIPS_REG_GP,   &MIPS_REG_FP,
     };
     CHECK_RETHROW_VERBOSE(init_unused_regs(emu, unused_regs, ARRAY_SIZE(unused_regs)));
 
@@ -142,6 +177,13 @@ const arch_def_t arch_def_i686 = {
     .prepare = prepare_i686,
     .endianness = PIS_ENDIANNESS_LITTLE,
     .result_operand = &X86_EAX,
+};
+
+const arch_def_t arch_def_mips = {
+    .lift = lift_mips,
+    .prepare = prepare_mips,
+    .endianness = PIS_ENDIANNESS_BIG,
+    .result_operand = &MIPS_REG_V0,
 };
 
 static err_t
@@ -244,6 +286,13 @@ static err_t test_shellcode_result(
     CHECK_RETHROW_VERBOSE(check_arch_specific_shellcode_result(
         &arch_def_i686,
         &shellcode->i686,
+        args,
+        expected_result
+    ));
+
+    CHECK_RETHROW_VERBOSE(check_arch_specific_shellcode_result(
+        &arch_def_mips,
+        &shellcode->mips,
         args,
         expected_result
     ));
