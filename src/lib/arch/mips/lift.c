@@ -383,8 +383,8 @@ cleanup:
     return err;
 }
 
-static err_t build_load_store_addr(
-    ctx_t* ctx, const pis_operand_t* base, u32 offset, pis_operand_t* built_addr
+static err_t calc_load_store_addr(
+    ctx_t* ctx, const pis_operand_t* base, u32 offset, pis_operand_t* calculated_addr
 ) {
     err_t err = SUCCESS;
 
@@ -394,7 +394,19 @@ static err_t build_load_store_addr(
         PIS_INSN3(PIS_OPCODE_ADD, addr, *base, PIS_OPERAND_CONST(offset, PIS_SIZE_4))
     );
 
-    *built_addr = addr;
+    *calculated_addr = addr;
+
+cleanup:
+    return err;
+}
+
+static err_t insn_decode_load_store_addr(ctx_t* ctx, pis_operand_t* addr) {
+    err_t err = SUCCESS;
+
+    pis_operand_t base = reg_get_operand(insn_field_rs(ctx->insn));
+    u32 offset = insn_field_imm_sext(ctx->insn);
+
+    CHECK_RETHROW(calc_load_store_addr(ctx, &base, offset, addr));
 
 cleanup:
     return err;
@@ -403,12 +415,10 @@ cleanup:
 static err_t do_load_ext(ctx_t* ctx, pis_size_t load_size, pis_opcode_t extend_opcode) {
     err_t err = SUCCESS;
 
-    pis_operand_t base = reg_get_operand(insn_field_rs(ctx->insn));
     pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
-    u32 offset = insn_field_imm_sext(ctx->insn);
 
     pis_operand_t addr = {};
-    CHECK_RETHROW(build_load_store_addr(ctx, &base, offset, &addr));
+    CHECK_RETHROW(insn_decode_load_store_addr(ctx, &addr));
 
     switch (load_size) {
         case PIS_SIZE_1:
@@ -433,12 +443,10 @@ cleanup:
 static err_t do_store_trunc(ctx_t* ctx, pis_size_t store_size) {
     err_t err = SUCCESS;
 
-    pis_operand_t base = reg_get_operand(insn_field_rs(ctx->insn));
     pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
-    u32 offset = insn_field_imm_sext(ctx->insn);
 
     pis_operand_t addr = {};
-    CHECK_RETHROW(build_load_store_addr(ctx, &base, offset, &addr));
+    CHECK_RETHROW(insn_decode_load_store_addr(ctx, &addr));
 
     switch (store_size) {
         case PIS_SIZE_1:
@@ -487,49 +495,87 @@ static err_t opcode_handler_22(ctx_t* ctx) {
 
     // opcode 0x22 is LWL
 
-    // decode the fields
-    u8 lwl_base_value = insn_field_rs(ctx->insn);
-    u8 lwl_rt_value = insn_field_rt(ctx->insn);
-    u32 lwl_offset = insn_field_imm_sext(ctx->insn);
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
 
-    // LWL must be followed by LWR. this simplifies the lifted code very much.
-    u32 next_insn = 0;
-    CHECK_RETHROW(cursor_next_4(&ctx->args->machine_code, &next_insn, ctx->cpuinfo->endianness));
+    pis_operand_t addr = {};
+    CHECK_RETHROW(insn_decode_load_store_addr(ctx, &addr));
 
-    // make sure that the next instruction is LWR
-    CHECK(insn_field_opcode(next_insn) == 0x26);
+    pis_operand_t aligned_addr = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(PIS_OPCODE_AND, aligned_addr, addr, PIS_OPERAND_CONST(0xfffffffc, PIS_SIZE_4))
+    );
 
-    // decode the fields of the next instruction
-    u8 lwr_base_value = insn_field_rs(next_insn);
-    u8 lwr_rt_value = insn_field_rt(next_insn);
-    u32 lwr_offset = insn_field_imm_sext(next_insn);
+    pis_operand_t offset_in_word = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(PIS_OPCODE_AND, offset_in_word, addr, PIS_OPERAND_CONST(0x3, PIS_SIZE_4))
+    );
 
-    // make sure that both instructions write to the same register.
-    CHECK(lwl_rt_value == lwr_rt_value);
-    pis_operand_t rt = reg_get_operand(lwl_rt_value);
+    pis_operand_t bit_offset_in_word = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(
+            PIS_OPCODE_UNSIGNED_MUL,
+            bit_offset_in_word,
+            offset_in_word,
+            PIS_OPERAND_CONST(8, PIS_SIZE_4)
+        )
+    );
 
-    // make sure that both instructions use the same base register.
-    CHECK(lwl_base_value == lwr_base_value);
-    pis_operand_t base = reg_get_operand(lwl_base_value);
+    pis_operand_t inverse_bit_offset_in_word = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(
+            PIS_OPCODE_SUB,
+            inverse_bit_offset_in_word,
+            PIS_OPERAND_CONST(32, PIS_SIZE_4),
+            bit_offset_in_word
+        )
+    );
 
-    // make sure that the offsets, relative to each other, form a single word in memory, so that we
-    // can combine the two loads into just a single load.
-    u32 loaded_word_offset;
+    pis_operand_t aligned_value = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, aligned_value, aligned_addr));
+
+    pis_operand_t val_shift_left_amount;
+    pis_operand_t orig_reg_mask_shift_right_amount;
     switch (ctx->cpuinfo->endianness) {
-        case PIS_ENDIANNESS_LITTLE:
-            CHECK(lwl_offset == lwr_offset + 3);
-            loaded_word_offset = lwr_offset;
+        case PIS_ENDIANNESS_LITTLE: {
+            val_shift_left_amount = inverse_bit_offset_in_word;
+            orig_reg_mask_shift_right_amount = bit_offset_in_word;
             break;
+        }
         case PIS_ENDIANNESS_BIG:
-            CHECK(lwl_offset + 3 == lwr_offset);
-            loaded_word_offset = lwl_offset;
+            val_shift_left_amount = bit_offset_in_word;
+            orig_reg_mask_shift_right_amount = inverse_bit_offset_in_word;
             break;
         default:
             UNREACHABLE();
     }
 
-    pis_operand_t addr = {};
-    CHECK_RETHROW(build_load_store_addr(ctx, &base, loaded_word_offset, &addr));
+    pis_operand_t orig_reg_mask = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
+
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(
+            PIS_OPCODE_SHIFT_RIGHT,
+            orig_reg_mask,
+            PIS_OPERAND_CONST(0xffffffff, PIS_SIZE_4),
+            orig_reg_mask_shift_right_amount
+        )
+    );
+
+    pis_operand_t shifted_value = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, shifted_value, aligned_value, val_shift_left_amount)
+    );
+
+    pis_operand_t masked_orig_reg = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_AND, masked_orig_reg, rt, orig_reg_mask));
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_OR, rt, masked_orig_reg, shifted_value));
+
 
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, rt, addr));
 
