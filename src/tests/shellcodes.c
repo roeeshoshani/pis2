@@ -65,9 +65,7 @@ static err_t prepare_x86_64(pis_emu_t* emu, const shellcode_args_t* args) {
 
     // push the return address
     sp -= 8;
-    CHECK_RETHROW_VERBOSE(
-        pis_emu_write_mem_value(emu, sp, SHELLCODE_FINISH_ADDR, PIS_OPERAND_SIZE_8)
-    );
+    CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(emu, sp, SHELLCODE_FINISH_ADDR, PIS_SIZE_8));
 
     CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &X86_RSP, sp));
 
@@ -102,19 +100,17 @@ static err_t prepare_i386(pis_emu_t* emu, const shellcode_args_t* args) {
 
     // push all arguments
     sp -= 4;
-    CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(emu, sp, args->arg4, PIS_OPERAND_SIZE_4));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(emu, sp, args->arg4, PIS_SIZE_4));
     sp -= 4;
-    CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(emu, sp, args->arg3, PIS_OPERAND_SIZE_4));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(emu, sp, args->arg3, PIS_SIZE_4));
     sp -= 4;
-    CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(emu, sp, args->arg2, PIS_OPERAND_SIZE_4));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(emu, sp, args->arg2, PIS_SIZE_4));
     sp -= 4;
-    CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(emu, sp, args->arg1, PIS_OPERAND_SIZE_4));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(emu, sp, args->arg1, PIS_SIZE_4));
 
     // push the return address
     sp -= 4;
-    CHECK_RETHROW_VERBOSE(
-        pis_emu_write_mem_value(emu, sp, SHELLCODE_FINISH_ADDR, PIS_OPERAND_SIZE_4)
-    );
+    CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(emu, sp, SHELLCODE_FINISH_ADDR, PIS_SIZE_4));
 
     // initialize the stack pointer
     CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &X86_ESP, sp));
@@ -209,12 +205,9 @@ static err_t check_arch_specific_shellcode_result(
     // its embedded data.
     size_t code_len = shellcode->code_end - shellcode->code;
     for (size_t i = 0; i < code_len; i++) {
-        CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(
-            &g_emu,
-            SHELLCODE_BASE_ADDR + i,
-            shellcode->code[i],
-            PIS_OPERAND_SIZE_1
-        ));
+        CHECK_RETHROW_VERBOSE(
+            pis_emu_write_mem_value(&g_emu, SHELLCODE_BASE_ADDR + i, shellcode->code[i], PIS_SIZE_1)
+        );
     }
 
     CHECK_RETHROW_VERBOSE(run_arch_specific_shellcode(&g_emu, shellcode, arch->lift));
@@ -223,7 +216,7 @@ static err_t check_arch_specific_shellcode_result(
     CHECK_RETHROW_VERBOSE(pis_emu_read_operand(&g_emu, arch->result_operand, &return_value));
 
     u64 truncated_expected_return_value =
-        expected_return_value & pis_operand_size_max_unsigned_value(arch->result_operand->size);
+        expected_return_value & pis_size_max_unsigned_value(arch->result_operand->size);
 
     CHECK_TRACE(
         return_value == truncated_expected_return_value,

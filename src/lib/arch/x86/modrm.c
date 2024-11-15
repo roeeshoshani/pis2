@@ -130,8 +130,8 @@ static err_t
                 u64 disp = 0;
                 CHECK_RETHROW(cursor_next_imm_ext(
                     &ctx->args->machine_code,
-                    PIS_OPERAND_SIZE_1,
-                    PIS_OPERAND_SIZE_2,
+                    PIS_SIZE_1,
+                    PIS_SIZE_2,
                     IMM_EXT_KIND_SIGN_EXTEND,
                     PIS_ENDIANNESS_LITTLE,
                     &disp
@@ -193,20 +193,15 @@ static err_t
                 u64 disp = 0;
                 CHECK_RETHROW(cursor_next_imm_ext(
                     &ctx->args->machine_code,
-                    PIS_OPERAND_SIZE_1,
-                    PIS_OPERAND_SIZE_4,
+                    PIS_SIZE_1,
+                    PIS_SIZE_4,
                     IMM_EXT_KIND_SIGN_EXTEND,
                     PIS_ENDIANNESS_LITTLE,
                     &disp
                 ));
                 PIS_EMIT(
                     &ctx->args->result,
-                    PIS_INSN3(
-                        PIS_OPCODE_ADD,
-                        *into,
-                        *into,
-                        PIS_OPERAND_CONST(disp, PIS_OPERAND_SIZE_4)
-                    )
+                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp, PIS_SIZE_4))
                 );
                 break;
             }
@@ -239,8 +234,8 @@ static err_t
         u64 disp = 0;
         CHECK_RETHROW(cursor_next_imm_ext(
             &ctx->args->machine_code,
-            PIS_OPERAND_SIZE_4,
-            PIS_OPERAND_SIZE_8,
+            PIS_SIZE_4,
+            PIS_SIZE_8,
             IMM_EXT_KIND_SIGN_EXTEND,
             PIS_ENDIANNESS_LITTLE,
             &disp
@@ -277,8 +272,8 @@ static err_t
                 u64 disp = 0;
                 CHECK_RETHROW(cursor_next_imm_ext(
                     &ctx->args->machine_code,
-                    PIS_OPERAND_SIZE_1,
-                    PIS_OPERAND_SIZE_8,
+                    PIS_SIZE_1,
+                    PIS_SIZE_8,
                     IMM_EXT_KIND_SIGN_EXTEND,
                     PIS_ENDIANNESS_LITTLE,
                     &disp
@@ -294,8 +289,8 @@ static err_t
                 u64 disp = 0;
                 CHECK_RETHROW(cursor_next_imm_ext(
                     &ctx->args->machine_code,
-                    PIS_OPERAND_SIZE_4,
-                    PIS_OPERAND_SIZE_8,
+                    PIS_SIZE_4,
+                    PIS_SIZE_8,
                     IMM_EXT_KIND_SIGN_EXTEND,
                     PIS_ENDIANNESS_LITTLE,
                     &disp
@@ -322,16 +317,16 @@ static err_t build_modrm_rm_addr_into(ctx_t* ctx, const modrm_t* modrm, const pi
     CHECK(modrm->mod != 0b11);
 
     switch (ctx->addr_size) {
-        case PIS_OPERAND_SIZE_8:
+        case PIS_SIZE_8:
             CHECK_RETHROW(build_modrm_rm_addr_64_into(ctx, modrm, into));
             break;
-        case PIS_OPERAND_SIZE_4:
+        case PIS_SIZE_4:
             CHECK_RETHROW(build_modrm_rm_addr_32_into(ctx, modrm, into));
             break;
-        case PIS_OPERAND_SIZE_2:
+        case PIS_SIZE_2:
             CHECK_RETHROW(build_modrm_rm_addr_16_into(ctx, modrm, into));
             break;
-        case PIS_OPERAND_SIZE_1:
+        case PIS_SIZE_1:
             UNREACHABLE();
     }
 cleanup:
@@ -339,10 +334,7 @@ cleanup:
 }
 
 err_t modrm_decode_rm_operand(
-    ctx_t* ctx,
-    const modrm_t* modrm,
-    pis_operand_size_t operand_size,
-    modrm_rm_operand_t* rm_operand
+    ctx_t* ctx, const modrm_t* modrm, pis_size_t operand_size, modrm_rm_operand_t* rm_operand
 ) {
     err_t err = SUCCESS;
 
@@ -374,7 +366,7 @@ cleanup:
 }
 
 err_t modrm_fetch_and_process_with_operand_sizes(
-    ctx_t* ctx, modrm_operands_t* operands, pis_operand_size_t rm_size, pis_operand_size_t reg_size
+    ctx_t* ctx, modrm_operands_t* operands, pis_size_t rm_size, pis_size_t reg_size
 ) {
     err_t err = SUCCESS;
 

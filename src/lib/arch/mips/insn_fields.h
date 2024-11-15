@@ -35,6 +35,9 @@ static inline u32 insn_field_imm_ext(u32 insn, imm_ext_kind_t ext_kind) {
             return insn_field_imm_sext(insn);
         case IMM_EXT_KIND_ZERO_EXTEND:
             return insn_field_imm_zext(insn);
+        default:
+            // unreachable
+            return 0;
     }
 }
 
