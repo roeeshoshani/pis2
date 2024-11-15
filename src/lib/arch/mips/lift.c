@@ -383,17 +383,30 @@ cleanup:
     return err;
 }
 
+static err_t
+    build_load_addr(ctx_t* ctx, const pis_operand_t* base, u32 offset, pis_operand_t* built_addr) {
+    err_t err = SUCCESS;
+
+    pis_operand_t addr = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(PIS_OPCODE_ADD, addr, *base, PIS_OPERAND_CONST(offset, PIS_SIZE_4))
+    );
+
+    *built_addr = addr;
+
+cleanup:
+    return err;
+}
+
 static err_t do_load_sext(ctx_t* ctx, pis_size_t load_size) {
     err_t err = SUCCESS;
     pis_operand_t base = reg_get_operand(insn_field_rs(ctx->insn));
     pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
     u32 offset = insn_field_imm_sext(ctx->insn);
 
-    pis_operand_t addr = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
-    PIS_EMIT(
-        &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_ADD, addr, base, PIS_OPERAND_CONST(offset, PIS_SIZE_4))
-    );
+    pis_operand_t addr = {};
+    CHECK_RETHROW(build_load_addr(ctx, &base, offset, &addr));
 
     pis_operand_t loaded = TMP_ALLOC(&ctx->tmp_allocator, load_size);
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, loaded, addr));
@@ -471,11 +484,26 @@ static err_t opcode_handler_22(ctx_t* ctx) {
             UNREACHABLE();
     }
 
-    pis_operand_t addr = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
-    PIS_EMIT(
-        &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_ADD, addr, base, PIS_OPERAND_CONST(loaded_word_offset, PIS_SIZE_4))
-    );
+    pis_operand_t addr = {};
+    CHECK_RETHROW(build_load_addr(ctx, &base, loaded_word_offset, &addr));
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, rt, addr));
+
+cleanup:
+    return err;
+}
+
+static err_t opcode_handler_24(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x24 is LW
+
+    pis_operand_t base = reg_get_operand(insn_field_rs(ctx->insn));
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
+    u32 offset = insn_field_imm_sext(ctx->insn);
+
+    pis_operand_t addr = {};
+    CHECK_RETHROW(build_load_addr(ctx, &base, offset, &addr));
 
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, rt, addr));
 
@@ -538,6 +566,7 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     // 0x23
     // LWR is handled as part of the LWL handler
     NULL,
+    opcode_handler_24,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
