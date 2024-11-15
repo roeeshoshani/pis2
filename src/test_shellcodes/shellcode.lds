@@ -11,8 +11,9 @@ SECTIONS
 	} :all
 
 	/*
-	 * the mips linker needs the _gp symbol to do its relocations properly. i'm honestly not sure what value should be put
-	 * here, but this seems to work fine.
+	 * the mips linker needs the _gp symbol to do its relocations properly. this is the value that will be put in `_gp`
+	 * at runtime, and all global variable memory accesses will be relative to it. so, just make it point to the end of
+	 * all our code, and all accesses will use negative offsets to access the stuff before it.
 	 */
 	HIDDEN (_gp = ALIGN (16));
 
