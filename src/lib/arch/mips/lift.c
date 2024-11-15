@@ -399,7 +399,7 @@ cleanup:
     return err;
 }
 
-static err_t do_load_sext(ctx_t* ctx, pis_size_t load_size) {
+static err_t do_load_ext(ctx_t* ctx, pis_size_t load_size, pis_opcode_t extend_opcode) {
     err_t err = SUCCESS;
     pis_operand_t base = reg_get_operand(insn_field_rs(ctx->insn));
     pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
@@ -411,7 +411,7 @@ static err_t do_load_sext(ctx_t* ctx, pis_size_t load_size) {
     pis_operand_t loaded = TMP_ALLOC(&ctx->tmp_allocator, load_size);
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, loaded, addr));
 
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, rt, loaded));
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(extend_opcode, rt, loaded));
 cleanup:
     return err;
 }
@@ -421,7 +421,7 @@ static err_t opcode_handler_20(ctx_t* ctx) {
 
     // opcode 0x20 is LB
 
-    CHECK_RETHROW(do_load_sext(ctx, PIS_SIZE_1));
+    CHECK_RETHROW(do_load_ext(ctx, PIS_SIZE_1, PIS_OPCODE_SIGN_EXTEND));
 
 cleanup:
     return err;
@@ -432,7 +432,7 @@ static err_t opcode_handler_21(ctx_t* ctx) {
 
     // opcode 0x20 is LH
 
-    CHECK_RETHROW(do_load_sext(ctx, PIS_SIZE_2));
+    CHECK_RETHROW(do_load_ext(ctx, PIS_SIZE_2, PIS_OPCODE_SIGN_EXTEND));
 
 cleanup:
     return err;
@@ -511,6 +511,17 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_25(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x24 is LW
+
+    CHECK_RETHROW(do_load_ext(ctx, PIS_SIZE_1, PIS_OPCODE_ZERO_EXTEND));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] = {
     opcode_handler_00,
     opcode_handler_01,
@@ -567,6 +578,7 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     // LWR is handled as part of the LWL handler
     NULL,
     opcode_handler_24,
+    opcode_handler_25,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
