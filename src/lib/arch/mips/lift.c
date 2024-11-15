@@ -591,6 +591,8 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     // 0x26
     // LWR is handled as part of the LWL handler
     NULL,
+    // 0x27
+    NULL,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
