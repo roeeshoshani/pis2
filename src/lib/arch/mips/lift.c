@@ -495,7 +495,14 @@ typedef enum {
     UNALIGNED_MEM_ACCESS_PART_RIGHT,
 } unaligned_mem_access_part_t;
 
-static err_t do_lw_unaligned(ctx_t* ctx, unaligned_mem_access_part_t part) {
+typedef enum {
+    UNALIGNED_MEM_ACCESS_KIND_STORE,
+    UNALIGNED_MEM_ACCESS_KIND_LOAD,
+} unaligned_mem_access_kind_t;
+
+static err_t do_load_store_unaligned(
+    ctx_t* ctx, unaligned_mem_access_kind_t mem_access_kind, unaligned_mem_access_part_t part
+) {
     err_t err = SUCCESS;
 
     pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
@@ -537,135 +544,58 @@ static err_t do_lw_unaligned(ctx_t* ctx, unaligned_mem_access_part_t part) {
         )
     );
 
-    pis_operand_t aligned_value = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, aligned_value, aligned_addr));
+    pis_operand_t aligned_mem_val = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, aligned_mem_val, aligned_addr));
 
-    pis_operand_t val_shift_amount;
-    pis_operand_t orig_reg_mask_shift_amount;
+    // decide which value we should use as the original value of the final value, and which value we
+    // want to use as the "added bits" to the final value.
+    pis_operand_t orig_val_to_use;
+    pis_operand_t added_val_to_use;
+    switch (mem_access_kind) {
+        case UNALIGNED_MEM_ACCESS_KIND_STORE:
+            // if this is a store to memory, use the original memory value as the orig value, and
+            // add the register value to it.
+            orig_val_to_use = aligned_mem_val;
+            added_val_to_use = rt;
+            break;
+        case UNALIGNED_MEM_ACCESS_KIND_LOAD:
+            // if this is a load from memory, use the original reg value as the orig value, and add
+            // the memory value to it.
+            orig_val_to_use = rt;
+            added_val_to_use = aligned_mem_val;
+            break;
+    }
 
+    // decide whether we want to use "regular" or "inverted" shift amounts
     bool use_inverse_shift_amounts = false;
+    // inverse the shift amounts if little endian
     use_inverse_shift_amounts ^= (ctx->cpuinfo->endianness == PIS_ENDIANNESS_LITTLE);
+    // inverse the shift amounts if using a "right" access, which is access to the least significant
+    // bytes.
     use_inverse_shift_amounts ^= (part == UNALIGNED_MEM_ACCESS_PART_RIGHT);
 
-    if (use_inverse_shift_amounts) {
-        val_shift_amount = inverse_bit_offset_in_word;
-        orig_reg_mask_shift_amount = bit_offset_in_word;
-    } else {
-        val_shift_amount = bit_offset_in_word;
-        orig_reg_mask_shift_amount = inverse_bit_offset_in_word;
-    }
-
-    pis_opcode_t val_shift_opcode;
-    pis_opcode_t mask_shift_opcode;
-    switch (part) {
-        case UNALIGNED_MEM_ACCCESS_PART_LEFT:
-            val_shift_opcode = PIS_OPCODE_SHIFT_LEFT;
-            mask_shift_opcode = PIS_OPCODE_SHIFT_RIGHT;
-            break;
-        case UNALIGNED_MEM_ACCESS_PART_RIGHT:
-            val_shift_opcode = PIS_OPCODE_SHIFT_RIGHT;
-            mask_shift_opcode = PIS_OPCODE_SHIFT_LEFT;
-            break;
-        default:
-            UNREACHABLE();
-    }
-
-    pis_operand_t orig_reg_mask = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
-    PIS_EMIT(
-        &ctx->args->result,
-        PIS_INSN3(
-            mask_shift_opcode,
-            orig_reg_mask,
-            PIS_OPERAND_CONST(0xffffffff, PIS_SIZE_4),
-            orig_reg_mask_shift_amount
-        )
-    );
-
-    pis_operand_t shifted_value = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
-    PIS_EMIT(
-        &ctx->args->result,
-        PIS_INSN3(val_shift_opcode, shifted_value, aligned_value, val_shift_amount)
-    );
-
-    pis_operand_t masked_orig_reg = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_AND, masked_orig_reg, rt, orig_reg_mask));
-
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_OR, rt, masked_orig_reg, shifted_value));
-
-cleanup:
-    return err;
-}
-
-static err_t do_sw_unaligned(ctx_t* ctx, unaligned_mem_access_part_t part) {
-    err_t err = SUCCESS;
-
-    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
-
-    pis_operand_t addr = {};
-    CHECK_RETHROW(insn_decode_load_store_addr(ctx, &addr));
-
-    pis_operand_t aligned_addr = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
-    PIS_EMIT(
-        &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_AND, aligned_addr, addr, PIS_OPERAND_CONST(0xfffffffc, PIS_SIZE_4))
-    );
-
-    pis_operand_t offset_in_word = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
-    PIS_EMIT(
-        &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_AND, offset_in_word, addr, PIS_OPERAND_CONST(0x3, PIS_SIZE_4))
-    );
-
-    pis_operand_t bit_offset_in_word = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
-    PIS_EMIT(
-        &ctx->args->result,
-        PIS_INSN3(
-            PIS_OPCODE_UNSIGNED_MUL,
-            bit_offset_in_word,
-            offset_in_word,
-            PIS_OPERAND_CONST(8, PIS_SIZE_4)
-        )
-    );
-
-    pis_operand_t inverse_bit_offset_in_word = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
-    PIS_EMIT(
-        &ctx->args->result,
-        PIS_INSN3(
-            PIS_OPCODE_SUB,
-            inverse_bit_offset_in_word,
-            PIS_OPERAND_CONST(32, PIS_SIZE_4),
-            bit_offset_in_word
-        )
-    );
-
-    pis_operand_t orig_aligned_value = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, orig_aligned_value, aligned_addr));
-
-    pis_operand_t val_shift_amount;
+    // choose the actual shift amount values
+    pis_operand_t added_val_shift_amount;
     pis_operand_t orig_val_mask_shift_amount;
-
-    bool use_inverse_shift_amounts = false;
-    use_inverse_shift_amounts ^= (ctx->cpuinfo->endianness == PIS_ENDIANNESS_LITTLE);
-    use_inverse_shift_amounts ^= (part == UNALIGNED_MEM_ACCESS_PART_RIGHT);
-
     if (use_inverse_shift_amounts) {
-        val_shift_amount = inverse_bit_offset_in_word;
+        added_val_shift_amount = inverse_bit_offset_in_word;
         orig_val_mask_shift_amount = bit_offset_in_word;
     } else {
-        val_shift_amount = bit_offset_in_word;
+        added_val_shift_amount = bit_offset_in_word;
         orig_val_mask_shift_amount = inverse_bit_offset_in_word;
     }
 
-    pis_opcode_t val_shift_opcode;
-    pis_opcode_t mask_shift_opcode;
+    // decide which opcodes we should use for creating masks for each of the values
+    pis_opcode_t added_val_shift_opcode;
+    pis_opcode_t orig_val_mask_shift_opcode;
     switch (part) {
         case UNALIGNED_MEM_ACCCESS_PART_LEFT:
-            val_shift_opcode = PIS_OPCODE_SHIFT_LEFT;
-            mask_shift_opcode = PIS_OPCODE_SHIFT_RIGHT;
+            added_val_shift_opcode = PIS_OPCODE_SHIFT_LEFT;
+            orig_val_mask_shift_opcode = PIS_OPCODE_SHIFT_RIGHT;
             break;
         case UNALIGNED_MEM_ACCESS_PART_RIGHT:
-            val_shift_opcode = PIS_OPCODE_SHIFT_RIGHT;
-            mask_shift_opcode = PIS_OPCODE_SHIFT_LEFT;
+            added_val_shift_opcode = PIS_OPCODE_SHIFT_RIGHT;
+            orig_val_mask_shift_opcode = PIS_OPCODE_SHIFT_LEFT;
             break;
         default:
             UNREACHABLE();
@@ -675,30 +605,47 @@ static err_t do_sw_unaligned(ctx_t* ctx, unaligned_mem_access_part_t part) {
     PIS_EMIT(
         &ctx->args->result,
         PIS_INSN3(
-            mask_shift_opcode,
+            orig_val_mask_shift_opcode,
             orig_val_mask,
             PIS_OPERAND_CONST(0xffffffff, PIS_SIZE_4),
             orig_val_mask_shift_amount
         )
     );
 
-    pis_operand_t shifted_value = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(val_shift_opcode, shifted_value, rt, val_shift_amount));
+    pis_operand_t added_val_shifted = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(
+            added_val_shift_opcode,
+            added_val_shifted,
+            added_val_to_use,
+            added_val_shift_amount
+        )
+    );
 
     pis_operand_t masked_orig_val = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_AND, masked_orig_val, orig_aligned_value, orig_val_mask)
+        PIS_INSN3(PIS_OPCODE_AND, masked_orig_val, orig_val_to_use, orig_val_mask)
     );
 
-    pis_operand_t new_aligned_value = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
+    pis_operand_t final_val = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_OR, new_aligned_value, masked_orig_val, shifted_value)
+        PIS_INSN3(PIS_OPCODE_OR, final_val, masked_orig_val, added_val_shifted)
     );
 
-
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_STORE, aligned_addr, new_aligned_value));
+    // write-back the final value
+    switch (mem_access_kind) {
+        case UNALIGNED_MEM_ACCESS_KIND_STORE:
+            // store it to memory
+            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_STORE, aligned_addr, final_val));
+            break;
+        case UNALIGNED_MEM_ACCESS_KIND_LOAD:
+            // load it into the register
+            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, rt, final_val));
+            break;
+    }
 
 cleanup:
     return err;
@@ -710,7 +657,11 @@ static err_t opcode_handler_22(ctx_t* ctx) {
 
     // opcode 0x22 is LWL
 
-    CHECK_RETHROW(do_lw_unaligned(ctx, UNALIGNED_MEM_ACCCESS_PART_LEFT));
+    CHECK_RETHROW(do_load_store_unaligned(
+        ctx,
+        UNALIGNED_MEM_ACCESS_KIND_LOAD,
+        UNALIGNED_MEM_ACCCESS_PART_LEFT
+    ));
 
 cleanup:
     return err;
@@ -754,7 +705,11 @@ static err_t opcode_handler_26(ctx_t* ctx) {
 
     // opcode 0x26 is LWR
 
-    CHECK_RETHROW(do_lw_unaligned(ctx, UNALIGNED_MEM_ACCESS_PART_RIGHT));
+    CHECK_RETHROW(do_load_store_unaligned(
+        ctx,
+        UNALIGNED_MEM_ACCESS_KIND_LOAD,
+        UNALIGNED_MEM_ACCESS_PART_RIGHT
+    ));
 
 cleanup:
     return err;
@@ -788,7 +743,11 @@ static err_t opcode_handler_2a(ctx_t* ctx) {
 
     // opcode 0x2a is SWL
 
-    CHECK_RETHROW(do_sw_unaligned(ctx, UNALIGNED_MEM_ACCCESS_PART_LEFT));
+    CHECK_RETHROW(do_load_store_unaligned(
+        ctx,
+        UNALIGNED_MEM_ACCESS_KIND_STORE,
+        UNALIGNED_MEM_ACCCESS_PART_LEFT
+    ));
 
 cleanup:
     return err;
