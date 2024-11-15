@@ -425,6 +425,64 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_22(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x22 is LWL
+
+    // decode the fields
+    u8 lwl_base_value = insn_field_rs(ctx->insn);
+    u8 lwl_rt_value = insn_field_rt(ctx->insn);
+    u32 lwl_offset = insn_field_imm_sext(ctx->insn);
+
+    // LWL must be followed by LWR. this simplifies the lifted code very much.
+    u32 next_insn = 0;
+    CHECK_RETHROW(cursor_next_4(&ctx->args->machine_code, &next_insn, ctx->cpuinfo->endianness));
+
+    // make sure that the next instruction is LWR
+    CHECK(insn_field_opcode(next_insn) == 0x26);
+
+    // decode the fields of the next instruction
+    u8 lwr_base_value = insn_field_rs(next_insn);
+    u8 lwr_rt_value = insn_field_rt(next_insn);
+    u32 lwr_offset = insn_field_imm_sext(next_insn);
+
+    // make sure that both instructions write to the same register.
+    CHECK(lwl_rt_value == lwr_rt_value);
+    pis_operand_t rt = reg_get_operand(lwl_rt_value);
+
+    // make sure that both instructions use the same base register.
+    CHECK(lwl_base_value == lwr_base_value);
+    pis_operand_t base = reg_get_operand(lwl_base_value);
+
+    // make sure that the offsets, relative to each other, form a single word in memory, so that we
+    // can combine the two loads into just a single load.
+    u32 loaded_word_offset;
+    switch (ctx->cpuinfo->endianness) {
+        case PIS_ENDIANNESS_LITTLE:
+            CHECK(lwl_offset == lwr_offset + 3);
+            loaded_word_offset = lwr_offset;
+            break;
+        case PIS_ENDIANNESS_BIG:
+            CHECK(lwl_offset + 3 == lwr_offset);
+            loaded_word_offset = lwl_offset;
+            break;
+        default:
+            UNREACHABLE();
+    }
+
+    pis_operand_t addr = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(PIS_OPCODE_ADD, addr, base, PIS_OPERAND_CONST(loaded_word_offset, PIS_SIZE_4))
+    );
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, rt, addr));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] = {
     opcode_handler_00,
     opcode_handler_01,
@@ -476,6 +534,10 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     NULL,
     opcode_handler_20,
     opcode_handler_21,
+    opcode_handler_22,
+    // 0x23
+    // LWR is handled as part of the LWL handler
+    NULL,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
