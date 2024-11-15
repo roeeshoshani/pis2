@@ -581,6 +581,17 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_29(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x29 is SH
+
+    CHECK_RETHROW(do_store_trunc(ctx, PIS_SIZE_2));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] = {
     opcode_handler_00,
     opcode_handler_01,
@@ -642,6 +653,7 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     // 0x27
     NULL,
     opcode_handler_28,
+    opcode_handler_29,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
