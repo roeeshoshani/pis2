@@ -29,6 +29,15 @@ static inline u32 insn_field_imm_zext(u32 insn) {
     return insn_field_imm_raw(insn);
 }
 
+static inline u32 insn_field_imm_ext(u32 insn, imm_ext_kind_t ext_kind) {
+    switch (ext_kind) {
+        case IMM_EXT_KIND_SIGN_EXTEND:
+            return insn_field_imm_sext(insn);
+        case IMM_EXT_KIND_ZERO_EXTEND:
+            return insn_field_imm_zext(insn);
+    }
+}
+
 static inline u32 insn_field_instr_index(u32 insn) {
     return GET_BITS(insn, 0, 26);
 }

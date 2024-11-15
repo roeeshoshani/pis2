@@ -259,15 +259,7 @@ static err_t do_binop_imm(ctx_t* ctx, pis_opcode_t opcode, imm_ext_kind_t ext_ki
 
     pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
     pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
-    u32 imm;
-    switch (ext_kind) {
-        case IMM_EXT_KIND_SIGN_EXTEND:
-            imm = insn_field_imm_sext(ctx->insn);
-            break;
-        case IMM_EXT_KIND_ZERO_EXTEND:
-            imm = insn_field_imm_zext(ctx->insn);
-            break;
-    }
+    u32 imm = insn_field_imm_ext(ctx->insn, ext_kind);
 
     PIS_EMIT(
         &ctx->args->result,
@@ -381,6 +373,25 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_0f(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x0f is LUI
+
+    CHECK(insn_field_rs(ctx->insn) == 0);
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
+    u32 imm = insn_field_imm_zext(ctx->insn);
+    u32 value = imm << 16;
+
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN2(PIS_OPCODE_MOVE, rt, PIS_OPERAND_CONST(value, PIS_OPERAND_SIZE_4))
+    );
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] = {
     opcode_handler_00,
     opcode_handler_01,
@@ -397,6 +408,7 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     opcode_handler_0c,
     opcode_handler_0d,
     opcode_handler_0e,
+    opcode_handler_0f,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
