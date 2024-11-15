@@ -493,10 +493,10 @@ cleanup:
     return err;
 }
 
-static err_t opcode_handler_24(ctx_t* ctx) {
+static err_t opcode_handler_23(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // opcode 0x24 is LW
+    // opcode 0x23 is LW
 
     pis_operand_t base = reg_get_operand(insn_field_rs(ctx->insn));
     pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
@@ -511,10 +511,10 @@ cleanup:
     return err;
 }
 
-static err_t opcode_handler_25(ctx_t* ctx) {
+static err_t opcode_handler_24(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // opcode 0x25 is LBU
+    // opcode 0x24 is LBU
 
     CHECK_RETHROW(do_load_ext(ctx, PIS_SIZE_1, PIS_OPCODE_ZERO_EXTEND));
 
@@ -522,10 +522,10 @@ cleanup:
     return err;
 }
 
-static err_t opcode_handler_26(ctx_t* ctx) {
+static err_t opcode_handler_25(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // opcode 0x26 is LHU
+    // opcode 0x25 is LHU
 
     CHECK_RETHROW(do_load_ext(ctx, PIS_SIZE_2, PIS_OPCODE_ZERO_EXTEND));
 
@@ -585,12 +585,12 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     opcode_handler_20,
     opcode_handler_21,
     opcode_handler_22,
-    // 0x23
-    // LWR is handled as part of the LWL handler
-    NULL,
+    opcode_handler_23,
     opcode_handler_24,
     opcode_handler_25,
-    opcode_handler_26,
+    // 0x26
+    // LWR is handled as part of the LWL handler
+    NULL,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
