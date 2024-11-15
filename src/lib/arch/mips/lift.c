@@ -490,10 +490,13 @@ cleanup:
     return err;
 }
 
-static err_t opcode_handler_22(ctx_t* ctx) {
-    err_t err = SUCCESS;
+typedef enum {
+    LW_UNALIGNED_PART_LWL,
+    LW_UNALIGNED_PART_LWR,
+} lw_unaligned_part_t;
 
-    // opcode 0x22 is LWL
+static err_t do_lw_unaligned(ctx_t* ctx, lw_unaligned_part_t part) {
+    err_t err = SUCCESS;
 
     pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
 
@@ -537,17 +540,37 @@ static err_t opcode_handler_22(ctx_t* ctx) {
     pis_operand_t aligned_value = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, aligned_value, aligned_addr));
 
-    pis_operand_t val_shift_left_amount;
-    pis_operand_t orig_reg_mask_shift_right_amount;
+    pis_operand_t val_shift_amount;
+    pis_operand_t orig_reg_mask_shift_amount;
     switch (ctx->cpuinfo->endianness) {
         case PIS_ENDIANNESS_LITTLE: {
-            val_shift_left_amount = inverse_bit_offset_in_word;
-            orig_reg_mask_shift_right_amount = bit_offset_in_word;
+            val_shift_amount = inverse_bit_offset_in_word;
+            orig_reg_mask_shift_amount = bit_offset_in_word;
             break;
         }
         case PIS_ENDIANNESS_BIG:
-            val_shift_left_amount = bit_offset_in_word;
-            orig_reg_mask_shift_right_amount = inverse_bit_offset_in_word;
+            val_shift_amount = bit_offset_in_word;
+            orig_reg_mask_shift_amount = inverse_bit_offset_in_word;
+            break;
+        default:
+            UNREACHABLE();
+    }
+
+    pis_opcode_t val_shift_opcode;
+    pis_opcode_t mask_shift_opcode;
+    switch (part) {
+        case LW_UNALIGNED_PART_LWL:
+            val_shift_opcode = PIS_OPCODE_SHIFT_LEFT;
+            mask_shift_opcode = PIS_OPCODE_SHIFT_RIGHT;
+            break;
+        case LW_UNALIGNED_PART_LWR:
+            val_shift_opcode = PIS_OPCODE_SHIFT_RIGHT;
+            mask_shift_opcode = PIS_OPCODE_SHIFT_LEFT;
+
+            // in LWR, swap the shift amounts
+            pis_operand_t tmp = val_shift_amount;
+            val_shift_amount = orig_reg_mask_shift_amount;
+            orig_reg_mask_shift_amount = tmp;
             break;
         default:
             UNREACHABLE();
@@ -558,17 +581,17 @@ static err_t opcode_handler_22(ctx_t* ctx) {
     PIS_EMIT(
         &ctx->args->result,
         PIS_INSN3(
-            PIS_OPCODE_SHIFT_RIGHT,
+            mask_shift_opcode,
             orig_reg_mask,
             PIS_OPERAND_CONST(0xffffffff, PIS_SIZE_4),
-            orig_reg_mask_shift_right_amount
+            orig_reg_mask_shift_amount
         )
     );
 
     pis_operand_t shifted_value = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, shifted_value, aligned_value, val_shift_left_amount)
+        PIS_INSN3(val_shift_opcode, shifted_value, aligned_value, val_shift_amount)
     );
 
     pis_operand_t masked_orig_reg = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
@@ -578,6 +601,17 @@ static err_t opcode_handler_22(ctx_t* ctx) {
 
 
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, rt, addr));
+
+cleanup:
+    return err;
+}
+
+static err_t opcode_handler_22(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x22 is LWL
+
+    CHECK_RETHROW(do_lw_unaligned(ctx, LW_UNALIGNED_PART_LWL));
 
 cleanup:
     return err;
@@ -615,6 +649,18 @@ static err_t opcode_handler_25(ctx_t* ctx) {
 cleanup:
     return err;
 }
+
+static err_t opcode_handler_26(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x26 is LWR
+
+    CHECK_RETHROW(do_lw_unaligned(ctx, LW_UNALIGNED_PART_LWR));
+
+cleanup:
+    return err;
+}
+
 
 static err_t opcode_handler_28(ctx_t* ctx) {
     err_t err = SUCCESS;
@@ -693,9 +739,7 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     opcode_handler_23,
     opcode_handler_24,
     opcode_handler_25,
-    // 0x26
-    // LWR is handled as part of the LWL handler
-    NULL,
+    opcode_handler_26,
     // 0x27
     NULL,
     opcode_handler_28,
