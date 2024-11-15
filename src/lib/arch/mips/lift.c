@@ -514,9 +514,20 @@ cleanup:
 static err_t opcode_handler_25(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // opcode 0x24 is LW
+    // opcode 0x25 is LBU
 
     CHECK_RETHROW(do_load_ext(ctx, PIS_SIZE_1, PIS_OPCODE_ZERO_EXTEND));
+
+cleanup:
+    return err;
+}
+
+static err_t opcode_handler_26(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x26 is LHU
+
+    CHECK_RETHROW(do_load_ext(ctx, PIS_SIZE_2, PIS_OPCODE_ZERO_EXTEND));
 
 cleanup:
     return err;
@@ -579,6 +590,7 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     NULL,
     opcode_handler_24,
     opcode_handler_25,
+    opcode_handler_26,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
