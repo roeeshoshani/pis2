@@ -6,8 +6,9 @@ SECTIONS
 		*(.shellcode_entry)
 		*(.text*)
 		*(.rodata*)
-		*(.bss*)
 		*(.data*)
+		*(.got*)
+		*(.bss*)
 	} :all
 
 	/*
@@ -18,7 +19,7 @@ SECTIONS
 	HIDDEN (_gp = ALIGN (16));
 
 	/DISCARD/ : {
-		*(.note.gnu.build-id)
+		*(.note.gnu.*)
 		*(.comment)
 	}
 }

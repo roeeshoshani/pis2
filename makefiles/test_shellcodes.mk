@@ -7,6 +7,7 @@ SHELLCODE_CFLAGS += -ffreestanding -nostdlib
 SHELLCODE_CFLAGS += -Wall -Wextra
 SHELLCODE_CFLAGS += -Werror
 SHELLCODE_CFLAGS += -Wno-unused-function
+SHELLCODE_CFLAGS += -fomit-frame-pointer -fno-exceptions -fno-asynchronous-unwind-tables -fno-unwind-tables 
 SHELLCODE_CFLAGS += -Os
 
 SHELLCODE_LDFLAGS ?=
