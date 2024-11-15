@@ -392,11 +392,8 @@ cleanup:
     return err;
 }
 
-static err_t opcode_handler_20(ctx_t* ctx) {
+static err_t do_load_sext(ctx_t* ctx, pis_operand_size_t load_size) {
     err_t err = SUCCESS;
-
-    // opcode 0x20 is LB
-
     pis_operand_t base = reg_get_operand(insn_field_rs(ctx->insn));
     pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
     u32 offset = insn_field_imm_sext(ctx->insn);
@@ -407,10 +404,31 @@ static err_t opcode_handler_20(ctx_t* ctx) {
         PIS_INSN3(PIS_OPCODE_ADD, addr, base, PIS_OPERAND_CONST(offset, PIS_OPERAND_SIZE_4))
     );
 
-    pis_operand_t byte = TMP_ALLOC(&ctx->tmp_allocator, PIS_OPERAND_SIZE_1);
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, byte, addr));
+    pis_operand_t loaded = TMP_ALLOC(&ctx->tmp_allocator, load_size);
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, loaded, addr));
 
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, rt, byte));
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, rt, loaded));
+cleanup:
+    return err;
+}
+
+static err_t opcode_handler_20(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x20 is LB
+
+    CHECK_RETHROW(do_load_sext(ctx, PIS_OPERAND_SIZE_1));
+
+cleanup:
+    return err;
+}
+
+static err_t opcode_handler_21(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x20 is LH
+
+    CHECK_RETHROW(do_load_sext(ctx, PIS_OPERAND_SIZE_2));
 
 cleanup:
     return err;
@@ -466,6 +484,7 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     // 0x1f
     NULL,
     opcode_handler_20,
+    opcode_handler_21,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
