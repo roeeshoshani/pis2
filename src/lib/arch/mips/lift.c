@@ -383,8 +383,9 @@ cleanup:
     return err;
 }
 
-static err_t
-    build_load_addr(ctx_t* ctx, const pis_operand_t* base, u32 offset, pis_operand_t* built_addr) {
+static err_t build_load_store_addr(
+    ctx_t* ctx, const pis_operand_t* base, u32 offset, pis_operand_t* built_addr
+) {
     err_t err = SUCCESS;
 
     pis_operand_t addr = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
@@ -401,17 +402,60 @@ cleanup:
 
 static err_t do_load_ext(ctx_t* ctx, pis_size_t load_size, pis_opcode_t extend_opcode) {
     err_t err = SUCCESS;
+
     pis_operand_t base = reg_get_operand(insn_field_rs(ctx->insn));
     pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
     u32 offset = insn_field_imm_sext(ctx->insn);
 
     pis_operand_t addr = {};
-    CHECK_RETHROW(build_load_addr(ctx, &base, offset, &addr));
+    CHECK_RETHROW(build_load_store_addr(ctx, &base, offset, &addr));
 
-    pis_operand_t loaded = TMP_ALLOC(&ctx->tmp_allocator, load_size);
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, loaded, addr));
+    switch (load_size) {
+        case PIS_SIZE_1:
+        case PIS_SIZE_2: {
+            pis_operand_t loaded = TMP_ALLOC(&ctx->tmp_allocator, load_size);
+            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, loaded, addr));
 
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(extend_opcode, rt, loaded));
+            PIS_EMIT(&ctx->args->result, PIS_INSN2(extend_opcode, rt, loaded));
+            break;
+        }
+        case PIS_SIZE_4:
+            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, rt, addr));
+            break;
+        default:
+            UNREACHABLE();
+    }
+
+cleanup:
+    return err;
+}
+
+static err_t do_store_trunc(ctx_t* ctx, pis_size_t store_size) {
+    err_t err = SUCCESS;
+
+    pis_operand_t base = reg_get_operand(insn_field_rs(ctx->insn));
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
+    u32 offset = insn_field_imm_sext(ctx->insn);
+
+    pis_operand_t addr = {};
+    CHECK_RETHROW(build_load_store_addr(ctx, &base, offset, &addr));
+
+    switch (store_size) {
+        case PIS_SIZE_1:
+        case PIS_SIZE_2: {
+            pis_operand_t partial = TMP_ALLOC(&ctx->tmp_allocator, store_size);
+            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, partial, rt));
+
+            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_STORE, addr, partial));
+            break;
+        }
+        case PIS_SIZE_4:
+            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_STORE, addr, rt));
+            break;
+        default:
+            UNREACHABLE();
+    }
+
 cleanup:
     return err;
 }
@@ -485,7 +529,7 @@ static err_t opcode_handler_22(ctx_t* ctx) {
     }
 
     pis_operand_t addr = {};
-    CHECK_RETHROW(build_load_addr(ctx, &base, loaded_word_offset, &addr));
+    CHECK_RETHROW(build_load_store_addr(ctx, &base, loaded_word_offset, &addr));
 
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, rt, addr));
 
@@ -498,14 +542,7 @@ static err_t opcode_handler_23(ctx_t* ctx) {
 
     // opcode 0x23 is LW
 
-    pis_operand_t base = reg_get_operand(insn_field_rs(ctx->insn));
-    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
-    u32 offset = insn_field_imm_sext(ctx->insn);
-
-    pis_operand_t addr = {};
-    CHECK_RETHROW(build_load_addr(ctx, &base, offset, &addr));
-
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LOAD, rt, addr));
+    CHECK_RETHROW(do_load_ext(ctx, PIS_SIZE_4, PIS_OPCODE_ZERO_EXTEND));
 
 cleanup:
     return err;
@@ -528,6 +565,17 @@ static err_t opcode_handler_25(ctx_t* ctx) {
     // opcode 0x25 is LHU
 
     CHECK_RETHROW(do_load_ext(ctx, PIS_SIZE_2, PIS_OPCODE_ZERO_EXTEND));
+
+cleanup:
+    return err;
+}
+
+static err_t opcode_handler_28(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x28 is SB
+
+    CHECK_RETHROW(do_store_trunc(ctx, PIS_SIZE_1));
 
 cleanup:
     return err;
@@ -593,6 +641,7 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     NULL,
     // 0x27
     NULL,
+    opcode_handler_28,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
