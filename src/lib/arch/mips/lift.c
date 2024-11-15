@@ -491,7 +491,7 @@ cleanup:
 }
 
 typedef enum {
-    UNALIGNED_MEM_ACCCESS_PART_LEFT,
+    UNALIGNED_MEM_ACCESS_PART_LEFT,
     UNALIGNED_MEM_ACCESS_PART_RIGHT,
 } unaligned_mem_access_part_t;
 
@@ -589,7 +589,7 @@ static err_t do_load_store_unaligned(
     pis_opcode_t added_val_shift_opcode;
     pis_opcode_t orig_val_mask_shift_opcode;
     switch (part) {
-        case UNALIGNED_MEM_ACCCESS_PART_LEFT:
+        case UNALIGNED_MEM_ACCESS_PART_LEFT:
             added_val_shift_opcode = PIS_OPCODE_SHIFT_LEFT;
             orig_val_mask_shift_opcode = PIS_OPCODE_SHIFT_RIGHT;
             break;
@@ -657,11 +657,9 @@ static err_t opcode_handler_22(ctx_t* ctx) {
 
     // opcode 0x22 is LWL
 
-    CHECK_RETHROW(do_load_store_unaligned(
-        ctx,
-        UNALIGNED_MEM_ACCESS_KIND_LOAD,
-        UNALIGNED_MEM_ACCCESS_PART_LEFT
-    ));
+    CHECK_RETHROW(
+        do_load_store_unaligned(ctx, UNALIGNED_MEM_ACCESS_KIND_LOAD, UNALIGNED_MEM_ACCESS_PART_LEFT)
+    );
 
 cleanup:
     return err;
@@ -746,7 +744,7 @@ static err_t opcode_handler_2a(ctx_t* ctx) {
     CHECK_RETHROW(do_load_store_unaligned(
         ctx,
         UNALIGNED_MEM_ACCESS_KIND_STORE,
-        UNALIGNED_MEM_ACCCESS_PART_LEFT
+        UNALIGNED_MEM_ACCESS_PART_LEFT
     ));
 
 cleanup:
@@ -759,6 +757,21 @@ static err_t opcode_handler_2b(ctx_t* ctx) {
     // opcode 0x2b is SW
 
     CHECK_RETHROW(do_store_trunc(ctx, PIS_SIZE_4));
+
+cleanup:
+    return err;
+}
+
+static err_t opcode_handler_2e(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x2e is SWR
+
+    CHECK_RETHROW(do_load_store_unaligned(
+        ctx,
+        UNALIGNED_MEM_ACCESS_KIND_STORE,
+        UNALIGNED_MEM_ACCESS_PART_RIGHT
+    ));
 
 cleanup:
     return err;
@@ -826,6 +839,11 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     opcode_handler_29,
     opcode_handler_2a,
     opcode_handler_2b,
+    // 0x2c
+    NULL,
+    // 0x2d
+    NULL,
+    opcode_handler_2e,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
