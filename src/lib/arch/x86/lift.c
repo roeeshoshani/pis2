@@ -1713,6 +1713,7 @@ static legacy_prefix_t group1_prefix(ctx_t* ctx) {
 
 /// the context used to implement a REP prefix.
 typedef struct {
+    bool insn_has_rep_prefix;
     size_t insn_index_at_loop_start;
     pis_insn_t* jmp_end_insn;
 } rep_ctx_t;
@@ -1722,6 +1723,14 @@ typedef struct {
 /// of the loop, and then call the rep end function to emit the second half of the rep loop.
 static err_t rep_begin(ctx_t* ctx, rep_ctx_t* rep_ctx) {
     err_t err = SUCCESS;
+
+    if (group1_prefix(ctx) != LEGACY_PREFIX_REPZ_OR_REP) {
+        // no rep prefix, no need to do anything
+        rep_ctx->insn_has_rep_prefix = false;
+        SUCCESS_CLEANUP();
+    }
+
+    rep_ctx->insn_has_rep_prefix = true;
 
     // save the instruction index at the start of the loop so that we can jump to it later.
     rep_ctx->insn_index_at_loop_start = ctx->args->result.insns_amount;
@@ -1759,6 +1768,10 @@ cleanup:
 static err_t rep_end(ctx_t* ctx, const rep_ctx_t* rep_ctx) {
     err_t err = SUCCESS;
 
+    if (!rep_ctx->insn_has_rep_prefix) {
+        // no rep prefix, no need to do anything
+        SUCCESS_CLEANUP();
+    }
 
     // now jump back to the start of the loop, for the next iteration of the loop.
     PIS_EMIT(
@@ -2537,9 +2550,6 @@ static err_t handle_mnemonic_stos(ctx_t* ctx, const lifted_op_t* ops, size_t ops
     CHECK(ops_amount == 1);
     CHECK(ops[0].kind == LIFTED_OP_KIND_IMPLICIT);
 
-    // `stos` must be used with a `rep` prefix
-    CHECK(group1_prefix(ctx) == LEGACY_PREFIX_REPZ_OR_REP);
-
     rep_ctx_t rep_ctx = {};
     CHECK_RETHROW(rep_begin(ctx, &rep_ctx));
 
@@ -2566,9 +2576,6 @@ static err_t handle_mnemonic_movs(ctx_t* ctx, const lifted_op_t* ops, size_t ops
     // we expect 1 implicit operand
     CHECK(ops_amount == 1);
     CHECK(ops[0].kind == LIFTED_OP_KIND_IMPLICIT);
-
-    // `stos` must be used with a `rep` prefix
-    CHECK(group1_prefix(ctx) == LEGACY_PREFIX_REPZ_OR_REP);
 
     rep_ctx_t rep_ctx = {};
     CHECK_RETHROW(rep_begin(ctx, &rep_ctx));
