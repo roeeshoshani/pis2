@@ -7,14 +7,14 @@ SHELLCODE_CFLAGS += -ffreestanding -nostdlib
 SHELLCODE_CFLAGS += -Wall -Wextra
 SHELLCODE_CFLAGS += -Werror
 SHELLCODE_CFLAGS += -Wno-unused-function
-SHELLCODE_CFLAGS += -mno-sse -mno-avx
-SHELLCODE_CFLAGS += -O3
+SHELLCODE_CFLAGS += -Os
 
 SHELLCODE_LDFLAGS ?=
 SHELLCODE_LDFLAGS += -Tsrc/test_shellcodes/shellcode.lds
 SHELLCODE_LDFLAGS += -Wl,--build-id=none
 
-SHELLCODE_CC ?= clang-18
+SHELLCODE_CFLAGS_i686 := -mno-sse -mno-avx
+SHELLCODE_CFLAGS_x86_64 := -mno-sse -mno-avx
 
 .PRECIOUS: build/test_shellcodes/%.bin.shellcode
 build/test_shellcodes/%.bin.shellcode: build/test_shellcodes/%.elf.shellcode
@@ -31,7 +31,14 @@ SHELLCODE_ELFS += $$(SHELLCODE_SRCS:src/%.c=build/%_$(ARCH).elf.shellcode)
 .PRECIOUS: build/test_shellcodes/%_$(ARCH).elf.shellcode
 build/test_shellcodes/%_$(ARCH).elf.shellcode: src/test_shellcodes/%.c $(SHELLCODE_UTIL_SRCS)
 	@mkdir -p $$(@D)
-	$(SHELLCODE_CC) -MMD -target $(ARCH) $(SHELLCODE_LDFLAGS) $(SHELLCODE_CFLAGS) src/test_shellcodes/$$*.c $(SHELLCODE_UTIL_SRCS) -o $$@
+	$(ARCH)-linux-gnu-gcc \
+		-MMD \
+		$(SHELLCODE_LDFLAGS) \
+		$(SHELLCODE_CFLAGS) \
+		$$(SHELLCODE_CFLAGS_$(ARCH)) \
+		src/test_shellcodes/$$*.c \
+		$(SHELLCODE_UTIL_SRCS) \
+		-o $$@
 endef
 
 $(foreach ARCH,$(ARCHS),$(eval $(SHELLCODE_IMPL_ARCH)))

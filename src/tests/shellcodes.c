@@ -37,7 +37,7 @@ cleanup:
     return err;
 }
 
-static err_t lift_i386(pis_lift_args_t* args) {
+static err_t lift_i686(pis_lift_args_t* args) {
     err_t err = SUCCESS;
     CHECK_RETHROW_VERBOSE(pis_x86_lift(args, PIS_X86_CPUMODE_32_BIT));
 cleanup:
@@ -93,7 +93,7 @@ cleanup:
     return err;
 }
 
-static err_t prepare_i386(pis_emu_t* emu, const shellcode_args_t* args) {
+static err_t prepare_i686(pis_emu_t* emu, const shellcode_args_t* args) {
     err_t err = SUCCESS;
 
     u32 sp = INITIAL_STACK_POINTER_VALUE;
@@ -137,9 +137,9 @@ const arch_def_t arch_def_x86_64 = {
     .result_operand = &X86_RAX,
 };
 
-const arch_def_t arch_def_i386 = {
-    .lift = lift_i386,
-    .prepare = prepare_i386,
+const arch_def_t arch_def_i686 = {
+    .lift = lift_i686,
+    .prepare = prepare_i686,
     .endianness = PIS_ENDIANNESS_LITTLE,
     .result_operand = &X86_EAX,
 };
@@ -242,8 +242,8 @@ static err_t test_shellcode_result(
     ));
 
     CHECK_RETHROW_VERBOSE(check_arch_specific_shellcode_result(
-        &arch_def_i386,
-        &shellcode->i386,
+        &arch_def_i686,
+        &shellcode->i686,
         args,
         expected_result
     ));

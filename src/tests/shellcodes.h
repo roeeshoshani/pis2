@@ -10,7 +10,7 @@ typedef struct {
 } shellcode_t;
 
 #define EACH_ARCH(_, ...)                                                                          \
-    _(i386, ##__VA_ARGS__)                                                                         \
+    _(i686, ##__VA_ARGS__)                                                                         \
     _(x86_64, ##__VA_ARGS__)
 
 #define _ARCH_DEFINE_SHELLCODE_FIELD(ARCH) shellcode_t ARCH;
