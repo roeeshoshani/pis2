@@ -583,7 +583,12 @@ static err_t opcode_handler_00(ctx_t* ctx) {
     u8 function = insn_field_function(ctx->insn);
 
     opcode_handler_t handler = special_opcode_func_handlers_table[function];
-    CHECK_CODE(handler != NULL, PIS_ERR_UNSUPPORTED_INSN);
+    CHECK_TRACE_CODE(
+        handler != NULL,
+        PIS_ERR_UNSUPPORTED_INSN,
+        "unsupported special function 0x%x",
+        function
+    );
 
     CHECK_RETHROW(handler(ctx));
 
