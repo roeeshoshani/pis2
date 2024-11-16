@@ -2,6 +2,8 @@
 
 #include "../../pis.h"
 
+#define MIPS_GPRS_AMOUNT (32)
+
 DECLARE_REG_OPERANDS(
     MIPS_R0,
     MIPS_R1,
@@ -71,3 +73,5 @@ DECLARE_REG_OPERANDS(
     MIPS_REG_FP,
     MIPS_REG_RA
 );
+
+DECLARE_REG_OPERANDS(MIPS_REG_HI, MIPS_REG_LO);

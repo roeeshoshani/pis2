@@ -229,6 +229,23 @@ cleanup:
     return err;
 }
 
+static err_t special_opcode_handler_func_20(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x20 is MFHI
+
+    CHECK(insn_field_rs(ctx->insn) == 0);
+    CHECK(insn_field_rt(ctx->insn) == 0);
+    CHECK(insn_field_sa(ctx->insn) == 0);
+
+    pis_operand_t rd = reg_get_operand(insn_field_rd(ctx->insn));
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, rd, MIPS_REG_HI));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
     [0x00] = special_opcode_handler_func_00,
     [0x02] = special_opcode_handler_func_02,
@@ -238,6 +255,7 @@ static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTI
     [0x07] = special_opcode_handler_func_07,
     [0x08] = special_opcode_handler_func_08,
     [0x09] = special_opcode_handler_func_09,
+    [0x20] = special_opcode_handler_func_20,
 };
 
 
