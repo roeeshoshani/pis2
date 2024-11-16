@@ -626,8 +626,26 @@ cleanup:
     return err;
 }
 
+static err_t regimm_opcode_handler_01(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // rt 0x01 is BGEZ
+
+    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
+
+    pis_operand_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_LESS_THAN, cond, rs, g_zero));
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_COND_NEGATE, cond, cond));
+
+    CHECK_RETHROW(do_branch_cond(ctx, &cond));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t regimm_opcode_handlers_table[MIPS_GPRS_AMOUNT] = {
     [0x00] = regimm_opcode_handler_00,
+    [0x01] = regimm_opcode_handler_01,
 };
 
 static err_t opcode_handler_01(ctx_t* ctx) {
