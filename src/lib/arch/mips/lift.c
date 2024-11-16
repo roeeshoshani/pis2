@@ -572,6 +572,18 @@ cleanup:
     return err;
 }
 
+/// performs the "link" part of a "branch and link operation".
+static err_t do_link(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    pis_operand_t ret_addr_op = calc_branch_ret_addr_op(ctx);
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, MIPS_REG_RA, ret_addr_op));
+
+cleanup:
+    return err;
+}
+
+
 static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
     [0x00] = special_opcode_handler_func_00, [0x02] = special_opcode_handler_func_02,
     [0x03] = special_opcode_handler_func_03, [0x04] = special_opcode_handler_func_04,
@@ -643,9 +655,28 @@ cleanup:
     return err;
 }
 
+static err_t regimm_opcode_handler_10(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // rt 0x10 is BLTZAL
+
+    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
+
+    pis_operand_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_LESS_THAN, cond, rs, g_zero));
+
+    CHECK_RETHROW(do_link(ctx));
+
+    CHECK_RETHROW(do_branch_cond(ctx, &cond));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t regimm_opcode_handlers_table[MIPS_GPRS_AMOUNT] = {
     [0x00] = regimm_opcode_handler_00,
     [0x01] = regimm_opcode_handler_01,
+    [0x10] = regimm_opcode_handler_10,
 };
 
 static err_t opcode_handler_01(ctx_t* ctx) {
@@ -699,8 +730,7 @@ static err_t opcode_handler_03(ctx_t* ctx) {
 
     // opcode 0x03 is JAL
 
-    pis_operand_t ret_addr_op = calc_branch_ret_addr_op(ctx);
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, MIPS_REG_RA, ret_addr_op));
+    CHECK_RETHROW(do_link(ctx));
 
     CHECK_RETHROW(do_jmp(ctx));
 
