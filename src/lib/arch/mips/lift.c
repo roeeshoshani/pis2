@@ -1409,6 +1409,8 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
     err_t err = SUCCESS;
 
+    CHECK(args->machine_code_addr % 4 == 0);
+
     u32 insn = 0;
     CHECK_RETHROW(cursor_next_4(&args->machine_code, &insn, cpuinfo->endianness));
 
