@@ -21,6 +21,8 @@ SECTIONS
 	/DISCARD/ : {
 		*(.note.gnu.*)
 		*(.comment)
+		*(.reginfo)
+		*(.MIPS.abiflags)
 	}
 }
 
