@@ -504,7 +504,7 @@ cleanup:
 static err_t special_opcode_handler_func_37(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x36 is NOR
+    // function 0x37 is NOR
 
     CHECK(insn_field_sa(ctx->insn) == 0);
 
@@ -514,6 +514,26 @@ static err_t special_opcode_handler_func_37(ctx_t* ctx) {
 
     PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_OR, rd, rs, rt));
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_NOT, rd, rd));
+
+cleanup:
+    return err;
+}
+
+static err_t special_opcode_handler_func_3a(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x3a is SLT
+
+    CHECK(insn_field_sa(ctx->insn) == 0);
+
+    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
+    pis_operand_t rd = reg_get_operand(insn_field_rd(ctx->insn));
+
+    pis_operand_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_LESS_THAN, cond, rs, rt));
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, rd, cond));
 
 cleanup:
     return err;
@@ -532,6 +552,7 @@ static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTI
     [0x32] = special_opcode_handler_func_32, [0x33] = special_opcode_handler_func_33,
     [0x34] = special_opcode_handler_func_34, [0x35] = special_opcode_handler_func_35,
     [0x36] = special_opcode_handler_func_36, [0x37] = special_opcode_handler_func_37,
+    [0x3a] = special_opcode_handler_func_3a,
 };
 
 
