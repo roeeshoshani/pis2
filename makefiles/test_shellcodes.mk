@@ -16,6 +16,7 @@ SHELLCODE_LDFLAGS += -Wl,--build-id=none
 
 SHELLCODE_CFLAGS_i686 := -mno-sse -mno-avx
 SHELLCODE_CFLAGS_x86_64 := -mno-sse -mno-avx
+SHELLCODE_CFLAGS_mips := -march=mips1 -mfp32
 
 .PRECIOUS: build/test_shellcodes/%.bin.shellcode
 build/test_shellcodes/%.bin.shellcode: build/test_shellcodes/%.elf.shellcode
