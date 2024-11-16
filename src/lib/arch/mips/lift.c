@@ -409,6 +409,23 @@ cleanup:
     return err;
 }
 
+static err_t special_opcode_handler_func_30(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x30 is ADD
+
+    CHECK(insn_field_sa(ctx->insn) == 0);
+
+    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
+    pis_operand_t rd = reg_get_operand(insn_field_rd(ctx->insn));
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, rd, rs, rt));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
     [0x00] = special_opcode_handler_func_00,
     [0x02] = special_opcode_handler_func_02,
@@ -426,6 +443,7 @@ static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTI
     [0x29] = special_opcode_handler_func_29,
     [0x2a] = special_opcode_handler_func_2a,
     [0x2b] = special_opcode_handler_func_2b,
+    [0x30] = special_opcode_handler_func_30,
 };
 
 
