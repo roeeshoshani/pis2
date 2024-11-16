@@ -49,8 +49,25 @@ cleanup:
     return err;
 }
 
+static err_t special_opcode_handler_func_02(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x02 is SRL
+
+    CHECK(insn_field_rs(ctx->insn) == 0);
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
+    pis_operand_t rd = reg_get_operand(insn_field_rd(ctx->insn));
+    pis_operand_t sa = PIS_OPERAND_CONST(insn_field_sa(ctx->insn), PIS_SIZE_4);
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, rd, rt, sa));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
-    special_opcode_handler_func_00,
+    [0x00] = special_opcode_handler_func_00,
+    [0x02] = special_opcode_handler_func_02,
 };
 
 
