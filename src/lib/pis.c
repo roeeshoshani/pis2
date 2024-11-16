@@ -126,3 +126,15 @@ err_t pis_addr_add(const pis_addr_t* addr, u64 amount, pis_addr_t* new_addr) {
 cleanup:
     return err;
 }
+
+bool pis_space_is_writable(pis_space_t space) {
+    return space == PIS_SPACE_REG || space == PIS_SPACE_TMP;
+}
+
+bool pis_addr_is_writable(const pis_addr_t* addr) {
+    return pis_space_is_writable(addr->space);
+}
+
+bool pis_operand_is_writable(const pis_operand_t* operand) {
+    return pis_addr_is_writable(&operand->addr);
+}

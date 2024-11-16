@@ -209,3 +209,9 @@ u64 pis_const_negate(u64 const_value, u32 operand_size);
 u64 pis_sign_extend_byte(i8 byte, pis_size_t desired_size);
 
 err_t pis_addr_add(const pis_addr_t* addr, u64 amount, pis_addr_t* new_addr);
+
+bool pis_space_is_writable(pis_space_t space);
+
+bool pis_addr_is_writable(const pis_addr_t* addr);
+
+bool pis_operand_is_writable(const pis_operand_t* operand);

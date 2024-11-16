@@ -139,6 +139,8 @@ cleanup:
 err_t pis_emu_write_operand(pis_emu_t* emu, const pis_operand_t* operand, u64 value) {
     err_t err = SUCCESS;
 
+    CHECK(pis_operand_is_writable(operand));
+
     size_t operand_size_in_bytes = pis_size_to_bytes(operand->size);
 
     u64_bytes_t converter = {.u64 = value};
