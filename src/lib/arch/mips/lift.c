@@ -367,6 +367,27 @@ cleanup:
     return err;
 }
 
+static err_t special_opcode_handler_func_2a(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x2a is DIV
+
+    CHECK(insn_field_rd(ctx->insn) == 0);
+    CHECK(insn_field_sa(ctx->insn) == 0);
+
+    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
+
+    // calculate LO
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_DIV, MIPS_REG_LO, rs, rt));
+
+    // calculate HI
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_REM, MIPS_REG_HI, rs, rt));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
     [0x00] = special_opcode_handler_func_00,
     [0x02] = special_opcode_handler_func_02,
@@ -382,6 +403,7 @@ static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTI
     [0x23] = special_opcode_handler_func_23,
     [0x28] = special_opcode_handler_func_28,
     [0x29] = special_opcode_handler_func_29,
+    [0x2a] = special_opcode_handler_func_2a,
 };
 
 
