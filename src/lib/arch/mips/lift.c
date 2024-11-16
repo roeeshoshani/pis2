@@ -59,6 +59,33 @@ cleanup:
     return err;
 }
 
+static u32 calc_pc_region_branch_target_addr(ctx_t* ctx) {
+    u32 addr_upper_bits = delay_slot_insn_addr(ctx) & 0xf0000000;
+    u32 addr_low_bits = insn_field_instr_index(ctx->insn) << 2;
+    return addr_upper_bits | addr_low_bits;
+}
+
+static pis_operand_t calc_pc_region_branch_target(ctx_t* ctx) {
+    return PIS_OPERAND_RAM(calc_pc_region_branch_target_addr(ctx), PIS_SIZE_1);
+}
+
+static u32 calc_pc_rel_branch_target_addr(ctx_t* ctx) {
+    u32 off = insn_field_imm_sext(ctx->insn);
+    return delay_slot_insn_addr(ctx) + (off << 2);
+}
+
+static pis_operand_t calc_pc_rel_branch_target(ctx_t* ctx) {
+    return PIS_OPERAND_RAM(calc_pc_rel_branch_target_addr(ctx), PIS_SIZE_1);
+}
+
+static u32 calc_branch_ret_addr(ctx_t* ctx) {
+    return ctx->args->machine_code_addr + 2 * INSN_SIZE;
+}
+
+static pis_operand_t calc_branch_ret_addr_op(ctx_t* ctx) {
+    return PIS_OPERAND_CONST(calc_branch_ret_addr(ctx), PIS_SIZE_4);
+}
+
 static err_t do_shift_imm(ctx_t* ctx, pis_opcode_t shift_opcode) {
     err_t err = SUCCESS;
 
@@ -177,6 +204,31 @@ cleanup:
     return err;
 }
 
+static err_t special_opcode_handler_func_09(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x09 is JALR
+
+    CHECK(insn_field_rt(ctx->insn) == 0);
+    CHECK(insn_field_sa(ctx->insn) == 0);
+
+    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
+    pis_operand_t rd = reg_get_operand(insn_field_rd(ctx->insn));
+
+    pis_operand_t tmp = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, tmp, rs));
+
+    pis_operand_t ret_addr_op = calc_branch_ret_addr_op(ctx);
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, rd, ret_addr_op));
+
+    CHECK_RETHROW(lift_delay_slot_insn(ctx));
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN1(PIS_OPCODE_JMP, tmp));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
     [0x00] = special_opcode_handler_func_00,
     [0x02] = special_opcode_handler_func_02,
@@ -185,6 +237,7 @@ static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTI
     [0x06] = special_opcode_handler_func_06,
     [0x07] = special_opcode_handler_func_07,
     [0x08] = special_opcode_handler_func_08,
+    [0x09] = special_opcode_handler_func_09,
 };
 
 
@@ -215,33 +268,6 @@ static err_t opcode_handler_01(ctx_t* ctx) {
 
 cleanup:
     return err;
-}
-
-static u32 calc_pc_region_branch_target_addr(ctx_t* ctx) {
-    u32 addr_upper_bits = delay_slot_insn_addr(ctx) & 0xf0000000;
-    u32 addr_low_bits = insn_field_instr_index(ctx->insn) << 2;
-    return addr_upper_bits | addr_low_bits;
-}
-
-static pis_operand_t calc_pc_region_branch_target(ctx_t* ctx) {
-    return PIS_OPERAND_RAM(calc_pc_region_branch_target_addr(ctx), PIS_SIZE_1);
-}
-
-static u32 calc_pc_rel_branch_target_addr(ctx_t* ctx) {
-    u32 off = insn_field_imm_sext(ctx->insn);
-    return delay_slot_insn_addr(ctx) + (off << 2);
-}
-
-static pis_operand_t calc_pc_rel_branch_target(ctx_t* ctx) {
-    return PIS_OPERAND_RAM(calc_pc_rel_branch_target_addr(ctx), PIS_SIZE_1);
-}
-
-static u32 calc_branch_ret_addr(ctx_t* ctx) {
-    return ctx->args->machine_code_addr + 2 * INSN_SIZE;
-}
-
-static pis_operand_t calc_branch_ret_addr_op(ctx_t* ctx) {
-    return PIS_OPERAND_CONST(calc_branch_ret_addr(ctx), PIS_SIZE_4);
 }
 
 static err_t do_jmp(ctx_t* ctx) {
