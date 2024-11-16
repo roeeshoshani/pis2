@@ -33,7 +33,7 @@ cleanup:
     return err;
 }
 
-static err_t do_shift(ctx_t* ctx, pis_opcode_t shift_opcode) {
+static err_t do_shift_imm(ctx_t* ctx, pis_opcode_t shift_opcode) {
     err_t err = SUCCESS;
 
     CHECK(insn_field_rs(ctx->insn) == 0);
@@ -53,7 +53,7 @@ static err_t special_opcode_handler_func_00(ctx_t* ctx) {
 
     // function 0x00 is SLL
 
-    CHECK_RETHROW(do_shift(ctx, PIS_OPCODE_SHIFT_LEFT));
+    CHECK_RETHROW(do_shift_imm(ctx, PIS_OPCODE_SHIFT_LEFT));
 
 cleanup:
     return err;
@@ -64,7 +64,7 @@ static err_t special_opcode_handler_func_02(ctx_t* ctx) {
 
     // function 0x02 is SRL
 
-    CHECK_RETHROW(do_shift(ctx, PIS_OPCODE_SHIFT_RIGHT));
+    CHECK_RETHROW(do_shift_imm(ctx, PIS_OPCODE_SHIFT_RIGHT));
 
 cleanup:
     return err;
@@ -73,9 +73,35 @@ cleanup:
 static err_t special_opcode_handler_func_03(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x02 is SRA
+    // function 0x03 is SRA
 
-    CHECK_RETHROW(do_shift(ctx, PIS_OPCODE_SHIFT_RIGHT_SIGNED));
+    CHECK_RETHROW(do_shift_imm(ctx, PIS_OPCODE_SHIFT_RIGHT_SIGNED));
+
+cleanup:
+    return err;
+}
+
+static err_t do_shift_reg(ctx_t* ctx, pis_opcode_t shift_opcode) {
+    err_t err = SUCCESS;
+
+    CHECK(insn_field_sa(ctx->insn) == 0);
+
+    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
+    pis_operand_t rd = reg_get_operand(insn_field_rd(ctx->insn));
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(shift_opcode, rd, rt, rs));
+
+cleanup:
+    return err;
+}
+
+static err_t special_opcode_handler_func_04(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x04 is SLLV
+
+    CHECK_RETHROW(do_shift_reg(ctx, PIS_OPCODE_SHIFT_LEFT));
 
 cleanup:
     return err;
@@ -85,6 +111,7 @@ static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTI
     [0x00] = special_opcode_handler_func_00,
     [0x02] = special_opcode_handler_func_02,
     [0x03] = special_opcode_handler_func_03,
+    [0x04] = special_opcode_handler_func_04,
 };
 
 
