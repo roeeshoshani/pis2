@@ -559,6 +559,19 @@ cleanup:
     return err;
 }
 
+static err_t do_branch_cond(ctx_t* ctx, const pis_operand_t* cond) {
+    err_t err = SUCCESS;
+
+    pis_operand_t target = calc_pc_rel_branch_target(ctx);
+
+    CHECK_RETHROW(lift_delay_slot_insn(ctx));
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_JMP_COND, *cond, target));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
     [0x00] = special_opcode_handler_func_00, [0x02] = special_opcode_handler_func_02,
     [0x03] = special_opcode_handler_func_03, [0x04] = special_opcode_handler_func_04,
@@ -580,6 +593,7 @@ static err_t opcode_handler_00(ctx_t* ctx) {
     err_t err = SUCCESS;
 
     // opcode 0x00 is the SPECIAL opcode, which is further decoded by the function field
+
     u8 function = insn_field_function(ctx->insn);
 
     opcode_handler_t handler = special_opcode_func_handlers_table[function];
@@ -596,15 +610,42 @@ cleanup:
     return err;
 }
 
+static err_t regimm_opcode_handler_00(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // rt 0x00 is BLTZ
+
+    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
+
+    pis_operand_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_LESS_THAN, cond, rs, g_zero));
+
+    CHECK_RETHROW(do_branch_cond(ctx, &cond));
+
+cleanup:
+    return err;
+}
+
+static const opcode_handler_t regimm_opcode_handlers_table[MIPS_GPRS_AMOUNT] = {
+    [0x00] = regimm_opcode_handler_00,
+};
+
 static err_t opcode_handler_01(ctx_t* ctx) {
     err_t err = SUCCESS;
 
     // opcode 0x01 is the REGIMM opcode, which is further decoded by the rt field
+
     u8 rt = insn_field_rt(ctx->insn);
 
-    UNUSED(rt);
+    opcode_handler_t handler = regimm_opcode_handlers_table[rt];
+    CHECK_TRACE_CODE(
+        handler != NULL,
+        PIS_ERR_UNSUPPORTED_INSN,
+        "unsupported regimm rt value 0x%x",
+        rt
+    );
 
-    TODO();
+    CHECK_RETHROW(handler(ctx));
 
 cleanup:
     return err;
@@ -644,19 +685,6 @@ static err_t opcode_handler_03(ctx_t* ctx) {
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, MIPS_REG_RA, ret_addr_op));
 
     CHECK_RETHROW(do_jmp(ctx));
-
-cleanup:
-    return err;
-}
-
-static err_t do_branch_cond(ctx_t* ctx, const pis_operand_t* cond) {
-    err_t err = SUCCESS;
-
-    pis_operand_t target = calc_pc_rel_branch_target(ctx);
-
-    CHECK_RETHROW(lift_delay_slot_insn(ctx));
-
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_JMP_COND, *cond, target));
 
 cleanup:
     return err;
