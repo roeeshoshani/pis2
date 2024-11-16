@@ -306,6 +306,8 @@ DEFINE_BINARY_OPERATOR(mul, *);
 DEFINE_BINARY_OPERATOR(div, /);
 DEFINE_BINARY_OPERATOR(rem, %);
 DEFINE_SIGNED_BINARY_OPERATOR(mul, *);
+DEFINE_SIGNED_BINARY_OPERATOR(div, /);
+DEFINE_SIGNED_BINARY_OPERATOR(rem, %);
 DEFINE_SIGNED_BINARY_OPERATOR(sar, >>);
 
 #define DEFINE_UNARY_OPERATOR(NAME, OP)                                                            \
@@ -712,6 +714,12 @@ err_t pis_emu_run_one(pis_emu_t* emu, exec_ctx_t* exec_ctx, const pis_insn_t* in
             break;
         case PIS_OPCODE_UNSIGNED_DIV:
             CHECK_RETHROW(run_binary_operator(emu, insn, binary_operator_div));
+            break;
+        case PIS_OPCODE_SIGNED_DIV:
+            CHECK_RETHROW(run_signed_binary_operator(emu, insn, signed_binary_operator_div));
+            break;
+        case PIS_OPCODE_SIGNED_REM:
+            CHECK_RETHROW(run_signed_binary_operator(emu, insn, signed_binary_operator_rem));
             break;
         case PIS_OPCODE_UNSIGNED_DIV_16: {
             CHECK_CODE(insn->operands_amount == 4, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
