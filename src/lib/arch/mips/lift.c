@@ -33,17 +33,27 @@ cleanup:
     return err;
 }
 
+static err_t do_shift(ctx_t* ctx, pis_opcode_t shift_opcode) {
+    err_t err = SUCCESS;
+
+    CHECK(insn_field_rs(ctx->insn) == 0);
+
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
+    pis_operand_t rd = reg_get_operand(insn_field_rd(ctx->insn));
+    pis_operand_t sa = PIS_OPERAND_CONST(insn_field_sa(ctx->insn), PIS_SIZE_4);
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(shift_opcode, rd, rt, sa));
+
+cleanup:
+    return err;
+}
+
 static err_t special_opcode_handler_func_00(ctx_t* ctx) {
     err_t err = SUCCESS;
 
     // function 0x00 is SLL
 
-    CHECK(insn_field_rs(ctx->insn) == 0);
-    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
-    pis_operand_t rd = reg_get_operand(insn_field_rd(ctx->insn));
-    pis_operand_t sa = PIS_OPERAND_CONST(insn_field_sa(ctx->insn), PIS_SIZE_4);
-
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, rd, rt, sa));
+    CHECK_RETHROW(do_shift(ctx, PIS_OPCODE_SHIFT_LEFT));
 
 cleanup:
     return err;
@@ -54,12 +64,18 @@ static err_t special_opcode_handler_func_02(ctx_t* ctx) {
 
     // function 0x02 is SRL
 
-    CHECK(insn_field_rs(ctx->insn) == 0);
-    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
-    pis_operand_t rd = reg_get_operand(insn_field_rd(ctx->insn));
-    pis_operand_t sa = PIS_OPERAND_CONST(insn_field_sa(ctx->insn), PIS_SIZE_4);
+    CHECK_RETHROW(do_shift(ctx, PIS_OPCODE_SHIFT_RIGHT));
 
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, rd, rt, sa));
+cleanup:
+    return err;
+}
+
+static err_t special_opcode_handler_func_03(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x02 is SRA
+
+    CHECK_RETHROW(do_shift(ctx, PIS_OPCODE_SHIFT_RIGHT_SIGNED));
 
 cleanup:
     return err;
@@ -68,6 +84,7 @@ cleanup:
 static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
     [0x00] = special_opcode_handler_func_00,
     [0x02] = special_opcode_handler_func_02,
+    [0x03] = special_opcode_handler_func_03,
 };
 
 
