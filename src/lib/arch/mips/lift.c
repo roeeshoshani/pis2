@@ -7,6 +7,7 @@
 
 typedef err_t (*opcode_handler_t)(ctx_t* ctx);
 
+// forward declaration
 static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1];
 
 static const pis_operand_t g_zero = PIS_OPERAND_INIT(PIS_ADDR_INIT(PIS_SPACE_CONST, 0), PIS_SIZE_4);
