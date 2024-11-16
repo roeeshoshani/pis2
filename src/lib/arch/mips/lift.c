@@ -33,15 +33,37 @@ cleanup:
     return err;
 }
 
+static err_t special_opcode_handler_func_00(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x00 is SLL
+
+    CHECK(insn_field_rs(ctx->insn) == 0);
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
+    pis_operand_t rd = reg_get_operand(insn_field_rd(ctx->insn));
+    pis_operand_t sa = PIS_OPERAND_CONST(insn_field_sa(ctx->insn), PIS_SIZE_4);
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, rd, rt, sa));
+
+cleanup:
+    return err;
+}
+
+static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
+    special_opcode_handler_func_00,
+};
+
+
 static err_t opcode_handler_00(ctx_t* ctx) {
     err_t err = SUCCESS;
 
     // opcode 0x00 is the SPECIAL opcode, which is further decoded by the function field
     u8 function = insn_field_function(ctx->insn);
 
-    UNUSED(function);
+    opcode_handler_t handler = special_opcode_func_handlers_table[function];
+    CHECK_CODE(handler != NULL, PIS_ERR_UNSUPPORTED_INSN);
 
-    TODO();
+    CHECK_RETHROW(handler(ctx));
 
 cleanup:
     return err;

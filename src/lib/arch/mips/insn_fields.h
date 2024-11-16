@@ -4,6 +4,7 @@
 #include "../../utils.h"
 
 #define MIPS_MAX_OPCODE_VALUE ((1 << 6) - 1)
+#define MIPS_MAX_FUNCTION_VALUE ((1 << 5) - 1)
 
 static inline u8 insn_field_opcode(u32 insn) {
     return GET_BITS(insn, 26, 6);
