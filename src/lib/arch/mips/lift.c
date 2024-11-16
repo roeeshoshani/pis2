@@ -33,6 +33,32 @@ cleanup:
     return err;
 }
 
+static u32 delay_slot_insn_addr(ctx_t* ctx) {
+    return ctx->args->machine_code_addr + INSN_SIZE;
+}
+
+static err_t lift_delay_slot_insn(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // instructions in delay slot can't have delay slots
+    CHECK(!ctx->is_in_delay_slot);
+
+    // prepare context for lifting delay slot
+    ctx->args->machine_code_addr += INSN_SIZE;
+    ctx->is_in_delay_slot = true;
+    u32 orig_insn = ctx->insn;
+    CHECK_RETHROW(cursor_next_4(&ctx->args->machine_code, &ctx->insn, ctx->cpuinfo->endianness));
+
+    CHECK_RETHROW(lift(ctx));
+
+    // restore context
+    ctx->args->machine_code_addr -= INSN_SIZE;
+    ctx->is_in_delay_slot = false;
+    ctx->insn = orig_insn;
+cleanup:
+    return err;
+}
+
 static err_t do_shift_imm(ctx_t* ctx, pis_opcode_t shift_opcode) {
     err_t err = SUCCESS;
 
@@ -129,6 +155,28 @@ cleanup:
     return err;
 }
 
+static err_t special_opcode_handler_func_08(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x08 is JR
+
+    CHECK(insn_field_rt(ctx->insn) == 0);
+    CHECK(insn_field_rd(ctx->insn) == 0);
+    CHECK(insn_field_sa(ctx->insn) == 0);
+
+    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
+
+    pis_operand_t tmp = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, tmp, rs));
+
+    CHECK_RETHROW(lift_delay_slot_insn(ctx));
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN1(PIS_OPCODE_JMP, tmp));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
     [0x00] = special_opcode_handler_func_00,
     [0x02] = special_opcode_handler_func_02,
@@ -136,6 +184,7 @@ static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTI
     [0x04] = special_opcode_handler_func_04,
     [0x06] = special_opcode_handler_func_06,
     [0x07] = special_opcode_handler_func_07,
+    [0x08] = special_opcode_handler_func_08,
 };
 
 
@@ -164,32 +213,6 @@ static err_t opcode_handler_01(ctx_t* ctx) {
 
     TODO();
 
-cleanup:
-    return err;
-}
-
-static u32 delay_slot_insn_addr(ctx_t* ctx) {
-    return ctx->args->machine_code_addr + INSN_SIZE;
-}
-
-static err_t lift_delay_slot_insn(ctx_t* ctx) {
-    err_t err = SUCCESS;
-
-    // instructions in delay slot can't have delay slots
-    CHECK(!ctx->is_in_delay_slot);
-
-    // prepare context for lifting delay slot
-    ctx->args->machine_code_addr += INSN_SIZE;
-    ctx->is_in_delay_slot = true;
-    u32 orig_insn = ctx->insn;
-    CHECK_RETHROW(cursor_next_4(&ctx->args->machine_code, &ctx->insn, ctx->cpuinfo->endianness));
-
-    CHECK_RETHROW(lift(ctx));
-
-    // restore context
-    ctx->args->machine_code_addr -= INSN_SIZE;
-    ctx->is_in_delay_slot = false;
-    ctx->insn = orig_insn;
 cleanup:
     return err;
 }
