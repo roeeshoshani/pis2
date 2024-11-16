@@ -229,10 +229,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_20(ctx_t* ctx) {
+static err_t special_opcode_handler_func_10(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x20 is MFHI
+    // function 0x10 is MFHI
 
     CHECK(insn_field_rs(ctx->insn) == 0);
     CHECK(insn_field_rt(ctx->insn) == 0);
@@ -246,10 +246,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_21(ctx_t* ctx) {
+static err_t special_opcode_handler_func_11(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x21 is MTHI
+    // function 0x11 is MTHI
 
     CHECK(insn_field_rt(ctx->insn) == 0);
     CHECK(insn_field_rd(ctx->insn) == 0);
@@ -263,10 +263,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_22(ctx_t* ctx) {
+static err_t special_opcode_handler_func_12(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x22 is MFLO
+    // function 0x12 is MFLO
 
     CHECK(insn_field_rs(ctx->insn) == 0);
     CHECK(insn_field_rt(ctx->insn) == 0);
@@ -280,10 +280,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_23(ctx_t* ctx) {
+static err_t special_opcode_handler_func_13(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x23 is MTLO
+    // function 0x13 is MTLO
 
     CHECK(insn_field_rt(ctx->insn) == 0);
     CHECK(insn_field_rd(ctx->insn) == 0);
@@ -345,10 +345,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_28(ctx_t* ctx) {
+static err_t special_opcode_handler_func_18(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x28 is MULT
+    // function 0x18 is MULT
 
     CHECK_RETHROW(do_mul(ctx, PIS_OPCODE_SIGN_EXTEND, PIS_OPCODE_SIGNED_MUL));
 
@@ -356,10 +356,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_29(ctx_t* ctx) {
+static err_t special_opcode_handler_func_19(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x29 is MULTU
+    // function 0x19 is MULTU
 
     CHECK_RETHROW(do_mul(ctx, PIS_OPCODE_ZERO_EXTEND, PIS_OPCODE_UNSIGNED_MUL));
 
@@ -367,10 +367,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_2a(ctx_t* ctx) {
+static err_t special_opcode_handler_func_1a(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x2a is DIV
+    // function 0x1a is DIV
 
     CHECK(insn_field_rd(ctx->insn) == 0);
     CHECK(insn_field_sa(ctx->insn) == 0);
@@ -388,10 +388,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_2b(ctx_t* ctx) {
+static err_t special_opcode_handler_func_1b(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x2b is DIVU
+    // function 0x1b is DIVU
 
     CHECK(insn_field_rd(ctx->insn) == 0);
     CHECK(insn_field_sa(ctx->insn) == 0);
@@ -424,10 +424,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_30(ctx_t* ctx) {
+static err_t special_opcode_handler_func_20(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x30 is ADD
+    // function 0x20 is ADD
 
     CHECK_RETHROW(do_binop_reg(ctx, PIS_OPCODE_ADD));
 
@@ -435,10 +435,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_31(ctx_t* ctx) {
+static err_t special_opcode_handler_func_21(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x31 is ADDU
+    // function 0x21 is ADDU
 
     CHECK_RETHROW(do_binop_reg(ctx, PIS_OPCODE_ADD));
 
@@ -446,10 +446,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_32(ctx_t* ctx) {
+static err_t special_opcode_handler_func_22(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x32 is SUB
+    // function 0x22 is SUB
 
     CHECK_RETHROW(do_binop_reg(ctx, PIS_OPCODE_SUB));
 
@@ -457,10 +457,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_33(ctx_t* ctx) {
+static err_t special_opcode_handler_func_23(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x33 is SUBU
+    // function 0x23 is SUBU
 
     CHECK_RETHROW(do_binop_reg(ctx, PIS_OPCODE_SUB));
 
@@ -468,10 +468,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_34(ctx_t* ctx) {
+static err_t special_opcode_handler_func_24(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x34 is AND
+    // function 0x24 is AND
 
     CHECK_RETHROW(do_binop_reg(ctx, PIS_OPCODE_AND));
 
@@ -479,10 +479,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_35(ctx_t* ctx) {
+static err_t special_opcode_handler_func_25(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x35 is OR
+    // function 0x25 is OR
 
     CHECK_RETHROW(do_binop_reg(ctx, PIS_OPCODE_OR));
 
@@ -490,10 +490,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_36(ctx_t* ctx) {
+static err_t special_opcode_handler_func_26(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x36 is XOR
+    // function 0x26 is XOR
 
     CHECK_RETHROW(do_binop_reg(ctx, PIS_OPCODE_OR));
 
@@ -501,10 +501,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_37(ctx_t* ctx) {
+static err_t special_opcode_handler_func_27(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x37 is NOR
+    // function 0x27 is NOR
 
     CHECK(insn_field_sa(ctx->insn) == 0);
 
@@ -519,10 +519,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_3a(ctx_t* ctx) {
+static err_t special_opcode_handler_func_2a(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x3a is SLT
+    // function 0x2a is SLT
 
     CHECK(insn_field_sa(ctx->insn) == 0);
 
@@ -539,10 +539,10 @@ cleanup:
     return err;
 }
 
-static err_t special_opcode_handler_func_3b(ctx_t* ctx) {
+static err_t special_opcode_handler_func_2b(ctx_t* ctx) {
     err_t err = SUCCESS;
 
-    // function 0x3b is SLTU
+    // function 0x2b is SLTU
 
     CHECK(insn_field_sa(ctx->insn) == 0);
 
@@ -564,15 +564,15 @@ static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTI
     [0x03] = special_opcode_handler_func_03, [0x04] = special_opcode_handler_func_04,
     [0x06] = special_opcode_handler_func_06, [0x07] = special_opcode_handler_func_07,
     [0x08] = special_opcode_handler_func_08, [0x09] = special_opcode_handler_func_09,
+    [0x10] = special_opcode_handler_func_10, [0x11] = special_opcode_handler_func_11,
+    [0x12] = special_opcode_handler_func_12, [0x13] = special_opcode_handler_func_13,
+    [0x18] = special_opcode_handler_func_18, [0x19] = special_opcode_handler_func_19,
+    [0x1a] = special_opcode_handler_func_1a, [0x1b] = special_opcode_handler_func_1b,
     [0x20] = special_opcode_handler_func_20, [0x21] = special_opcode_handler_func_21,
     [0x22] = special_opcode_handler_func_22, [0x23] = special_opcode_handler_func_23,
-    [0x28] = special_opcode_handler_func_28, [0x29] = special_opcode_handler_func_29,
+    [0x24] = special_opcode_handler_func_24, [0x25] = special_opcode_handler_func_25,
+    [0x26] = special_opcode_handler_func_26, [0x27] = special_opcode_handler_func_27,
     [0x2a] = special_opcode_handler_func_2a, [0x2b] = special_opcode_handler_func_2b,
-    [0x30] = special_opcode_handler_func_30, [0x31] = special_opcode_handler_func_31,
-    [0x32] = special_opcode_handler_func_32, [0x33] = special_opcode_handler_func_33,
-    [0x34] = special_opcode_handler_func_34, [0x35] = special_opcode_handler_func_35,
-    [0x36] = special_opcode_handler_func_36, [0x37] = special_opcode_handler_func_37,
-    [0x3a] = special_opcode_handler_func_3a, [0x3b] = special_opcode_handler_func_3b,
 };
 
 
