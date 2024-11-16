@@ -479,6 +479,28 @@ cleanup:
     return err;
 }
 
+static err_t special_opcode_handler_func_35(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x35 is OR
+
+    CHECK_RETHROW(do_binop_reg(ctx, PIS_OPCODE_OR));
+
+cleanup:
+    return err;
+}
+
+static err_t special_opcode_handler_func_36(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x36 is XOR
+
+    CHECK_RETHROW(do_binop_reg(ctx, PIS_OPCODE_OR));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
     [0x00] = special_opcode_handler_func_00, [0x02] = special_opcode_handler_func_02,
     [0x03] = special_opcode_handler_func_03, [0x04] = special_opcode_handler_func_04,
@@ -490,7 +512,8 @@ static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTI
     [0x2a] = special_opcode_handler_func_2a, [0x2b] = special_opcode_handler_func_2b,
     [0x30] = special_opcode_handler_func_30, [0x31] = special_opcode_handler_func_31,
     [0x32] = special_opcode_handler_func_32, [0x33] = special_opcode_handler_func_33,
-    [0x34] = special_opcode_handler_func_34,
+    [0x34] = special_opcode_handler_func_34, [0x35] = special_opcode_handler_func_35,
+    [0x36] = special_opcode_handler_func_36,
 };
 
 
