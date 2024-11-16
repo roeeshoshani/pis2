@@ -501,6 +501,24 @@ cleanup:
     return err;
 }
 
+static err_t special_opcode_handler_func_37(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x36 is NOR
+
+    CHECK(insn_field_sa(ctx->insn) == 0);
+
+    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
+    pis_operand_t rd = reg_get_operand(insn_field_rd(ctx->insn));
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_OR, rd, rs, rt));
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_NOT, rd, rd));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
     [0x00] = special_opcode_handler_func_00, [0x02] = special_opcode_handler_func_02,
     [0x03] = special_opcode_handler_func_03, [0x04] = special_opcode_handler_func_04,
@@ -513,7 +531,7 @@ static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTI
     [0x30] = special_opcode_handler_func_30, [0x31] = special_opcode_handler_func_31,
     [0x32] = special_opcode_handler_func_32, [0x33] = special_opcode_handler_func_33,
     [0x34] = special_opcode_handler_func_34, [0x35] = special_opcode_handler_func_35,
-    [0x36] = special_opcode_handler_func_36,
+    [0x36] = special_opcode_handler_func_36, [0x37] = special_opcode_handler_func_37,
 };
 
 
