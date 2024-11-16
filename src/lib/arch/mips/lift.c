@@ -107,11 +107,23 @@ cleanup:
     return err;
 }
 
+static err_t special_opcode_handler_func_06(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x06 is SRLV
+
+    CHECK_RETHROW(do_shift_reg(ctx, PIS_OPCODE_SHIFT_RIGHT));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
     [0x00] = special_opcode_handler_func_00,
     [0x02] = special_opcode_handler_func_02,
     [0x03] = special_opcode_handler_func_03,
     [0x04] = special_opcode_handler_func_04,
+    [0x06] = special_opcode_handler_func_06,
 };
 
 
