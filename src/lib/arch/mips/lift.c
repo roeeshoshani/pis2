@@ -13,7 +13,12 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1];
 static const pis_operand_t g_zero = PIS_OPERAND_INIT(PIS_ADDR_INIT(PIS_SPACE_CONST, 0), PIS_SIZE_4);
 
 static pis_operand_t reg_get_operand(u8 reg_encoding) {
-    return PIS_OPERAND_REG(reg_encoding * 4, PIS_SIZE_4);
+    if (reg_encoding == 0) {
+        // register 0 has a hardwired zero value
+        return PIS_OPERAND_CONST(4, PIS_SIZE_4);
+    } else {
+        return PIS_OPERAND_REG(reg_encoding * 4, PIS_SIZE_4);
+    }
 }
 
 static err_t lift(ctx_t* ctx) {
