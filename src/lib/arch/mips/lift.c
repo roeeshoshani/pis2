@@ -297,6 +297,53 @@ cleanup:
     return err;
 }
 
+/// sign extend a register to 64 bits
+static err_t reg_sext64(ctx_t* ctx, const pis_operand_t* reg, pis_operand_t* extended) {
+    err_t err = SUCCESS;
+
+    pis_operand_t tmp = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_8);
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_SIGN_EXTEND, tmp, *reg));
+
+    *extended = tmp;
+
+cleanup:
+    return err;
+}
+
+static err_t special_opcode_handler_func_28(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x28 is MULT
+
+    CHECK(insn_field_rd(ctx->insn) == 0);
+    CHECK(insn_field_sa(ctx->insn) == 0);
+
+    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn));
+    pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn));
+
+    // sign extend the operands
+    pis_operand_t rs_sext = {};
+    CHECK_RETHROW(reg_sext64(ctx, &rs, &rs_sext));
+    pis_operand_t rt_sext = {};
+    CHECK_RETHROW(reg_sext64(ctx, &rt, &rt_sext));
+
+    pis_operand_t mult_res = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_8);
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_MUL, mult_res, rs_sext, rt_sext));
+
+    // calculate LO
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, MIPS_REG_LO, mult_res));
+
+    // calculate HI
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, mult_res, mult_res, PIS_OPERAND_CONST(32, PIS_SIZE_8))
+    );
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, MIPS_REG_HI, mult_res));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
     [0x00] = special_opcode_handler_func_00,
     [0x02] = special_opcode_handler_func_02,
@@ -310,6 +357,7 @@ static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTI
     [0x21] = special_opcode_handler_func_21,
     [0x22] = special_opcode_handler_func_22,
     [0x23] = special_opcode_handler_func_23,
+    [0x28] = special_opcode_handler_func_28,
 };
 
 
