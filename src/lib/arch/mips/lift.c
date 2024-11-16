@@ -446,25 +446,39 @@ cleanup:
     return err;
 }
 
+static err_t special_opcode_handler_func_32(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x32 is SUB
+
+    CHECK_RETHROW(do_binop_reg(ctx, PIS_OPCODE_SUB));
+
+cleanup:
+    return err;
+}
+
+static err_t special_opcode_handler_func_33(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x33 is SUBU
+
+    CHECK_RETHROW(do_binop_reg(ctx, PIS_OPCODE_SUB));
+
+cleanup:
+    return err;
+}
+
 static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
-    [0x00] = special_opcode_handler_func_00,
-    [0x02] = special_opcode_handler_func_02,
-    [0x03] = special_opcode_handler_func_03,
-    [0x04] = special_opcode_handler_func_04,
-    [0x06] = special_opcode_handler_func_06,
-    [0x07] = special_opcode_handler_func_07,
-    [0x08] = special_opcode_handler_func_08,
-    [0x09] = special_opcode_handler_func_09,
-    [0x20] = special_opcode_handler_func_20,
-    [0x21] = special_opcode_handler_func_21,
-    [0x22] = special_opcode_handler_func_22,
-    [0x23] = special_opcode_handler_func_23,
-    [0x28] = special_opcode_handler_func_28,
-    [0x29] = special_opcode_handler_func_29,
-    [0x2a] = special_opcode_handler_func_2a,
-    [0x2b] = special_opcode_handler_func_2b,
-    [0x30] = special_opcode_handler_func_30,
-    [0x31] = special_opcode_handler_func_31,
+    [0x00] = special_opcode_handler_func_00, [0x02] = special_opcode_handler_func_02,
+    [0x03] = special_opcode_handler_func_03, [0x04] = special_opcode_handler_func_04,
+    [0x06] = special_opcode_handler_func_06, [0x07] = special_opcode_handler_func_07,
+    [0x08] = special_opcode_handler_func_08, [0x09] = special_opcode_handler_func_09,
+    [0x20] = special_opcode_handler_func_20, [0x21] = special_opcode_handler_func_21,
+    [0x22] = special_opcode_handler_func_22, [0x23] = special_opcode_handler_func_23,
+    [0x28] = special_opcode_handler_func_28, [0x29] = special_opcode_handler_func_29,
+    [0x2a] = special_opcode_handler_func_2a, [0x2b] = special_opcode_handler_func_2b,
+    [0x30] = special_opcode_handler_func_30, [0x31] = special_opcode_handler_func_31,
+    [0x32] = special_opcode_handler_func_32, [0x33] = special_opcode_handler_func_33,
 };
 
 
