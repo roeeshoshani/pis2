@@ -51,10 +51,7 @@ modrm_t modrm_decode_byte(u8 modrm_byte);
 sib_t sib_decode_byte(u8 sib_byte);
 
 err_t modrm_decode_rm_operand(
-    ctx_t* ctx,
-    const modrm_t* modrm,
-    pis_size_t operand_size,
-    modrm_rm_operand_t* rm_operand
+    ctx_t* ctx, const modrm_t* modrm, pis_size_t operand_size, modrm_rm_operand_t* rm_operand
 );
 
 err_t modrm_fetch_and_process_with_operand_sizes(

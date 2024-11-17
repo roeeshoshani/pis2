@@ -102,7 +102,6 @@ DECLARE_REG_OPERANDS(
     X86_FLAGS_ID
 );
 
-pis_operand_t
-    reg_get_operand(u8 reg_encoding, pis_size_t operand_size, const prefixes_t* prefixes);
+pis_operand_t reg_get_operand(u8 reg_encoding, pis_size_t operand_size, const prefixes_t* prefixes);
 
 err_t write_gpr(const ctx_t* ctx, const pis_operand_t* gpr, const pis_operand_t* value);

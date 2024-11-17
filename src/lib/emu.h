@@ -18,9 +18,7 @@ err_t pis_emu_read_operand(const pis_emu_t* emu, const pis_operand_t* operand, u
 
 err_t pis_emu_write_operand(pis_emu_t* emu, const pis_operand_t* operand, u64 value);
 
-err_t pis_emu_read_mem_value(
-    const pis_emu_t* emu, u64 addr, pis_size_t value_size, u64* value
-);
+err_t pis_emu_read_mem_value(const pis_emu_t* emu, u64 addr, pis_size_t value_size, u64* value);
 
 err_t pis_emu_write_mem_value(pis_emu_t* emu, u64 addr, u64 value, pis_size_t value_size);
 
