@@ -153,7 +153,13 @@ static err_t do_shift_reg(ctx_t* ctx, pis_opcode_t shift_opcode) {
     pis_operand_t rt = reg_get_operand(insn_field_rt(ctx->insn), REG_ACCESS_KIND_READ);
     pis_operand_t rd = reg_get_operand(insn_field_rd(ctx->insn), REG_ACCESS_KIND_WRITE);
 
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(shift_opcode, rd, rt, rs));
+    pis_operand_t shift_amount = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(PIS_OPCODE_AND, shift_amount, rs, PIS_OPERAND_CONST(0b11111, PIS_SIZE_4))
+    );
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(shift_opcode, rd, rt, shift_amount));
 
 cleanup:
     return err;
