@@ -511,7 +511,7 @@ static err_t special_opcode_handler_func_26(ctx_t* ctx) {
 
     // function 0x26 is XOR
 
-    CHECK_RETHROW(do_binop_reg(ctx, PIS_OPCODE_OR));
+    CHECK_RETHROW(do_binop_reg(ctx, PIS_OPCODE_XOR));
 
 cleanup:
     return err;
