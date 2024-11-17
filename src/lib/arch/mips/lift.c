@@ -20,7 +20,7 @@ typedef enum {
 static pis_operand_t reg_get_operand(u8 reg_encoding, reg_access_kind_t access_kind) {
     if (access_kind == REG_ACCESS_KIND_READ && reg_encoding == 0) {
         // reading register 0 always returns 0
-        return PIS_OPERAND_CONST(4, PIS_SIZE_4);
+        return PIS_OPERAND_CONST(0, PIS_SIZE_4);
     } else {
         return PIS_OPERAND_REG(reg_encoding * 4, PIS_SIZE_4);
     }
