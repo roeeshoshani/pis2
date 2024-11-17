@@ -116,13 +116,15 @@ static void chacha20_init_context(
 }
 
 static void chacha20_xor(struct chacha20_context* ctx, uint8_t* bytes, size_t n_bytes) {
-    uint8_t* keystream8 = (uint8_t*) ctx->keystream32;
     for (size_t i = 0; i < n_bytes; i++) {
         if (ctx->position >= 64) {
             chacha20_block_next(ctx);
             ctx->position = 0;
         }
-        bytes[i] ^= keystream8[ctx->position];
+        uint32_t val = ctx->keystream32[i / 4];
+        size_t byte_index = i % 4;
+        size_t shift_amount = 8 * byte_index;
+        bytes[i] ^= ((val >> shift_amount) & 0xff);
         ctx->position++;
     }
 }
