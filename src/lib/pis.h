@@ -151,6 +151,8 @@
     _(PIS_OPCODE_UNSIGNED_MUL, )                                                                   \
     _(PIS_OPCODE_UNSIGNED_DIV_16, )                                                                \
     _(PIS_OPCODE_UNSIGNED_REM_16, )                                                                \
+    _(PIS_OPCODE_SIGNED_DIV_16, )                                                                \
+    _(PIS_OPCODE_SIGNED_REM_16, )                                                                \
     _(PIS_OPCODE_UNSIGNED_MUL_16, )                                                                \
     _(PIS_OPCODE_SIGNED_REM, )                                                                     \
     _(PIS_OPCODE_SIGNED_DIV, )                                                                     \

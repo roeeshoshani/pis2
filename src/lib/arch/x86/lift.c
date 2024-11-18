@@ -1467,7 +1467,7 @@ cleanup:
 
 /// peforms a division operation that operates on the `ax` and `dx` operands and stores its
 /// results in the `ax` and `dx` operands.
-static err_t do_div_ax_dx(ctx_t* ctx, const pis_operand_t* divisor) {
+static err_t do_div_ax_dx(ctx_t* ctx, const pis_operand_t* divisor, bool is_signed) {
     err_t err = SUCCESS;
 
     pis_size_t operand_size = divisor->size;
@@ -1479,14 +1479,26 @@ static err_t do_div_ax_dx(ctx_t* ctx, const pis_operand_t* divisor) {
         pis_operand_t quotient = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_8);
         PIS_EMIT(
             &ctx->args->result,
-            PIS_INSN4(PIS_OPCODE_UNSIGNED_DIV_16, quotient, X86_RDX, X86_RAX, *divisor)
+            PIS_INSN4(
+                is_signed ? PIS_OPCODE_SIGNED_DIV_16 : PIS_OPCODE_UNSIGNED_DIV_16,
+                quotient,
+                X86_RDX,
+                X86_RAX,
+                *divisor
+            )
         );
 
         // perform the remainder calculation
         pis_operand_t rem = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_8);
         PIS_EMIT(
             &ctx->args->result,
-            PIS_INSN4(PIS_OPCODE_UNSIGNED_REM_16, rem, X86_RDX, X86_RAX, *divisor)
+            PIS_INSN4(
+                is_signed ? PIS_OPCODE_SIGNED_REM_16 : PIS_OPCODE_UNSIGNED_REM_16,
+                rem,
+                X86_RDX,
+                X86_RAX,
+                *divisor
+            )
         );
 
         // write the results back to RAX and RDX
@@ -1529,7 +1541,12 @@ static err_t do_div_ax_dx(ctx_t* ctx, const pis_operand_t* divisor) {
         pis_operand_t div_result = TMP_ALLOC(&ctx->tmp_allocator, double_operand_size);
         PIS_EMIT(
             &ctx->args->result,
-            PIS_INSN3(PIS_OPCODE_UNSIGNED_DIV, div_result, divide_lhs, zero_extended_divisor)
+            PIS_INSN3(
+                is_signed ? PIS_OPCODE_SIGNED_DIV : PIS_OPCODE_UNSIGNED_DIV,
+                div_result,
+                divide_lhs,
+                zero_extended_divisor
+            )
         );
 
         // store the division result in ax
@@ -1539,7 +1556,12 @@ static err_t do_div_ax_dx(ctx_t* ctx, const pis_operand_t* divisor) {
         pis_operand_t rem_result = TMP_ALLOC(&ctx->tmp_allocator, double_operand_size);
         PIS_EMIT(
             &ctx->args->result,
-            PIS_INSN3(PIS_OPCODE_UNSIGNED_REM, rem_result, divide_lhs, zero_extended_divisor)
+            PIS_INSN3(
+                is_signed ? PIS_OPCODE_SIGNED_REM : PIS_OPCODE_UNSIGNED_REM,
+                rem_result,
+                divide_lhs,
+                zero_extended_divisor
+            )
         );
 
         // store the division result in dx
@@ -2276,7 +2298,20 @@ static err_t handle_mnemonic_div(ctx_t* ctx, const lifted_op_t* ops, size_t ops_
     pis_operand_t divide_by = {};
     CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &divide_by));
 
-    CHECK_RETHROW(do_div_ax_dx(ctx, &divide_by));
+    CHECK_RETHROW(do_div_ax_dx(ctx, &divide_by, false));
+
+cleanup:
+    return err;
+}
+
+static err_t handle_mnemonic_idiv(ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 1);
+
+    pis_operand_t divide_by = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &divide_by));
+
+    CHECK_RETHROW(do_div_ax_dx(ctx, &divide_by, true));
 
 cleanup:
     return err;
@@ -2677,7 +2712,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_SETCC] = handle_mnemonic_setcc,   [MNEMONIC_ROL] = handle_mnemonic_rol,
     [MNEMONIC_DIV] = handle_mnemonic_div,       [MNEMONIC_MUL] = handle_mnemonic_mul,
     [MNEMONIC_ADC] = handle_mnemonic_adc,       [MNEMONIC_XCHG] = handle_mnemonic_xchg,
-    [MNEMONIC_CWD] = handle_mnemonic_cwd,
+    [MNEMONIC_CWD] = handle_mnemonic_cwd,       [MNEMONIC_IDIV] = handle_mnemonic_idiv,
 };
 
 static err_t
