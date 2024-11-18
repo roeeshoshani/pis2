@@ -854,6 +854,7 @@ DEFINE_TEST(test_nop_modrm) {
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
     CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_RAX, 0));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &X86_CS_BASE, 0));
     CHECK_RETHROW_VERBOSE(emulate_insn(
         &g_emu,
         CODE(0x66, 0x2e, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00),
