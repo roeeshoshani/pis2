@@ -2219,14 +2219,24 @@ static err_t handle_mnemonic_xchg(ctx_t* ctx, const lifted_op_t* ops, size_t ops
     err_t err = SUCCESS;
     CHECK(ops_amount == 2);
 
-    pis_operand_t a = {};
-    CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &a));
+    pis_operand_t op0 = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &op0));
 
-    pis_operand_t b = {};
-    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &b));
+    pis_operand_t op1 = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &op1));
 
-    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &b));
-    CHECK_RETHROW(lifted_op_write(ctx, &ops[1], &a));
+    // both operands should have the same size
+    CHECK(op0.size == op1.size);
+
+    // save the value of op0 in a tmp operand
+    pis_operand_t tmp = TMP_ALLOC(&ctx->tmp_allocator, op0.size);
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, tmp, op0));
+
+    // overwrite op0 with the value in op1
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &op1));
+
+    // overwrite op1 with the original value of op0
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[1], &tmp));
 
 cleanup:
     return err;
