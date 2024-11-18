@@ -335,6 +335,20 @@ void div128(u64 dividend_high, u64 dividend_low, u64 divisor, u64* quotient, u64
     *quotient = (initial_quot_high << 32) | (quot_mid << 32) | final_quot_low;
 }
 
+void idiv128(i64 dividend_high, i64 dividend_low, i64 divisor, i64* quotient, i64* rem) {
+    i64 initial_quot_high = dividend_high / divisor;
+    i64 initial_rem_high = dividend_high % divisor;
+
+    i64 upper_dividend_low = (initial_rem_high << 32) | (dividend_low >> 32);
+    i64 quot_mid = upper_dividend_low / divisor;
+    i64 rem_mid = upper_dividend_low % divisor;
+
+    i64 lower_dividend_low = (rem_mid << 32) | (dividend_low & 0xFFFFFFFF);
+    i64 final_quot_low = lower_dividend_low / divisor;
+    *rem = lower_dividend_low % divisor;
+
+    *quotient = (initial_quot_high << 32) | (quot_mid << 32) | final_quot_low;
+}
 
 void mul128(u64 a, u64 b, u64* result_high, u64* result_low) {
     u64 a_low = (u32) a;
@@ -752,6 +766,68 @@ err_t pis_emu_run_one(pis_emu_t* emu, exec_ctx_t* exec_ctx, const pis_insn_t* in
             div128(lhs_high, lhs_low, rhs, &quotient, &rem);
 
             CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], quotient));
+            break;
+        }
+        case PIS_OPCODE_SIGNED_DIV_16: {
+            CHECK_CODE(insn->operands_amount == 4, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+            // make sure that all operands are of the same size
+            CHECK_TRACE_CODE(
+                insn->operands[0].size == insn->operands[1].size &&
+                    insn->operands[1].size == insn->operands[2].size &&
+                    insn->operands[2].size == insn->operands[3].size,
+                PIS_ERR_EMU_OPERAND_SIZE_MISMATCH,
+                "operand size mismatch in opcode %s, operand sizes: %u %u %u %u",
+                pis_opcode_to_str(insn->opcode),
+                insn->operands[0].size,
+                insn->operands[1].size,
+                insn->operands[2].size,
+                insn->operands[3].size
+            );
+
+            i64 lhs_high = 0;
+            CHECK_RETHROW(pis_emu_read_operand_signed(emu, &insn->operands[1], &lhs_high));
+            i64 lhs_low = 0;
+            CHECK_RETHROW(pis_emu_read_operand_signed(emu, &insn->operands[2], &lhs_low));
+            i64 rhs = 0;
+            CHECK_RETHROW(pis_emu_read_operand_signed(emu, &insn->operands[3], &rhs));
+
+            i64 quotient = 0;
+            i64 rem = 0;
+            idiv128(lhs_high, lhs_low, rhs, &quotient, &rem);
+
+            CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], (u64) quotient));
+            break;
+        }
+        case PIS_OPCODE_SIGNED_REM_16: {
+            CHECK_CODE(insn->operands_amount == 4, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+            // make sure that all operands are of the same size
+            CHECK_TRACE_CODE(
+                insn->operands[0].size == insn->operands[1].size &&
+                    insn->operands[1].size == insn->operands[2].size &&
+                    insn->operands[2].size == insn->operands[3].size,
+                PIS_ERR_EMU_OPERAND_SIZE_MISMATCH,
+                "operand size mismatch in opcode %s, operand sizes: %u %u %u %u",
+                pis_opcode_to_str(insn->opcode),
+                insn->operands[0].size,
+                insn->operands[1].size,
+                insn->operands[2].size,
+                insn->operands[3].size
+            );
+
+            i64 lhs_high = 0;
+            CHECK_RETHROW(pis_emu_read_operand_signed(emu, &insn->operands[1], &lhs_high));
+            i64 lhs_low = 0;
+            CHECK_RETHROW(pis_emu_read_operand_signed(emu, &insn->operands[2], &lhs_low));
+            i64 rhs = 0;
+            CHECK_RETHROW(pis_emu_read_operand_signed(emu, &insn->operands[3], &rhs));
+
+            i64 quotient = 0;
+            i64 rem = 0;
+            idiv128(lhs_high, lhs_low, rhs, &quotient, &rem);
+
+            CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], (u64) rem));
             break;
         }
         case PIS_OPCODE_UNSIGNED_REM_16: {
