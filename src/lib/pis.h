@@ -204,7 +204,7 @@ void pis_lift_result_reset(pis_lift_result_t* result);
 
 err_t pis_lift_result_get_last_emitted_insn(pis_lift_result_t* result, pis_insn_t** insn);
 
-u64 pis_const_negate(u64 const_value, u32 operand_size);
+u64 pis_const_negate(u64 const_value, pis_size_t operand_size);
 
 u64 pis_sign_extend_byte(i8 byte, pis_size_t desired_size);
 
