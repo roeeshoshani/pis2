@@ -102,6 +102,15 @@ DECLARE_REG_OPERANDS(
     X86_FLAGS_ID
 );
 
+DECLARE_REG_OPERANDS(
+    X86_CS_BASE,
+    X86_SS_BASE,
+    X86_DS_BASE,
+    X86_ES_BASE,
+    X86_FS_BASE,
+    X86_GS_BASE
+);
+
 pis_operand_t reg_get_operand(u8 reg_encoding, pis_size_t operand_size, const prefixes_t* prefixes);
 
 err_t write_gpr(const ctx_t* ctx, const pis_operand_t* gpr, const pis_operand_t* value);
