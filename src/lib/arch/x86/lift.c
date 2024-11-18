@@ -56,8 +56,9 @@ typedef err_t (*mnemonic_handler_t)(ctx_t* ctx, const lifted_op_t* ops, size_t o
 
 /// the prototype for a binary operation function - that is an operation which takes 2 input
 /// operands and produces a single result, for example an `ADD` operation.
-typedef err_t (*binop_fn_t
-)(ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result);
+typedef err_t (*binop_fn_t)(
+    ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
+);
 
 /// the prototype for a unary operation function - that is an operation which takes 1 operand and
 /// applies some operation to it, for example a `NOT` operation.
@@ -65,8 +66,9 @@ typedef err_t (*unary_op_fn_t)(ctx_t* ctx, const pis_operand_t* operand, pis_ope
 
 /// the prototype for a flag calculation of a binary operation. the functions takes the 2 input
 /// operands and writes out the result flag value.
-typedef err_t (*binop_calc_flag_fn_t
-)(ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, const pis_operand_t* result);
+typedef err_t (*binop_calc_flag_fn_t)(
+    ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, const pis_operand_t* result
+);
 
 /// extracts the condition encoding of an opcode which has a condition encoded in its value.
 static u8 opcode_cond_extract(u8 opcode_byte) {
@@ -2213,6 +2215,23 @@ cleanup:
     return err;
 }
 
+static err_t handle_mnemonic_xchg(ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 2);
+
+    pis_operand_t a = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &a));
+
+    pis_operand_t b = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &b));
+
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &b));
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[1], &a));
+
+cleanup:
+    return err;
+}
+
 static err_t handle_mnemonic_div(ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
     CHECK(ops_amount == 1);
@@ -2620,7 +2639,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_NEG] = handle_mnemonic_neg,       [MNEMONIC_MOVSX] = handle_mnemonic_movsx,
     [MNEMONIC_SETCC] = handle_mnemonic_setcc,   [MNEMONIC_ROL] = handle_mnemonic_rol,
     [MNEMONIC_DIV] = handle_mnemonic_div,       [MNEMONIC_MUL] = handle_mnemonic_mul,
-    [MNEMONIC_ADC] = handle_mnemonic_adc,
+    [MNEMONIC_ADC] = handle_mnemonic_adc,       [MNEMONIC_XCHG] = handle_mnemonic_xchg,
 };
 
 static err_t
