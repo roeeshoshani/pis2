@@ -2232,6 +2232,33 @@ cleanup:
     return err;
 }
 
+static err_t handle_mnemonic_cwd(ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 2);
+
+    pis_operand_t src = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &src));
+
+    pis_operand_t sign_bit = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
+    CHECK_RETHROW(extract_most_significant_bit(ctx, &src, &sign_bit));
+
+    // zero extend the sign bit to the correct size
+    pis_size_t dst_size = lifted_op_size(&ops[0]);
+    pis_operand_t sign_bit_zext = TMP_ALLOC(&ctx->tmp_allocator, dst_size);
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, sign_bit_zext, sign_bit));
+
+    // arithmetically negate the sign bit to convert it to a value full of that bit.
+    // if the condition is 1, negating it will produce an all 1s value, and if it is zero, it will
+    // produce an all 0s value.
+    pis_operand_t final_value = TMP_ALLOC(&ctx->tmp_allocator, dst_size);
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_NEG, final_value, sign_bit_zext));
+
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &final_value));
+
+cleanup:
+    return err;
+}
+
 static err_t handle_mnemonic_div(ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
     err_t err = SUCCESS;
     CHECK(ops_amount == 1);
@@ -2640,6 +2667,7 @@ static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_SETCC] = handle_mnemonic_setcc,   [MNEMONIC_ROL] = handle_mnemonic_rol,
     [MNEMONIC_DIV] = handle_mnemonic_div,       [MNEMONIC_MUL] = handle_mnemonic_mul,
     [MNEMONIC_ADC] = handle_mnemonic_adc,       [MNEMONIC_XCHG] = handle_mnemonic_xchg,
+    [MNEMONIC_CWD] = handle_mnemonic_cwd,
 };
 
 static err_t
