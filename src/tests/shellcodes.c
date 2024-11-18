@@ -98,6 +98,12 @@ static err_t prepare_x86_64(pis_emu_t* emu, const shellcode_args_t* args) {
         &X86_R13,
         &X86_R14,
         &X86_R15,
+        &X86_CS_BASE,
+        &X86_SS_BASE,
+        &X86_DS_BASE,
+        &X86_ES_BASE,
+        &X86_FS_BASE,
+        &X86_GS_BASE,
     };
     CHECK_RETHROW_VERBOSE(init_unused_regs(emu, unused_regs, ARRAY_SIZE(unused_regs)));
 
@@ -158,6 +164,12 @@ static err_t prepare_i686(pis_emu_t* emu, const shellcode_args_t* args) {
         &X86_ESI,
         &X86_EDI,
         &X86_EBP,
+        &X86_CS_BASE,
+        &X86_SS_BASE,
+        &X86_DS_BASE,
+        &X86_ES_BASE,
+        &X86_FS_BASE,
+        &X86_GS_BASE,
     };
     CHECK_RETHROW_VERBOSE(init_unused_regs(emu, unused_regs, ARRAY_SIZE(unused_regs)));
 
