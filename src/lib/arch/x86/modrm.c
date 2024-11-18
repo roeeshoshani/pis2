@@ -5,6 +5,7 @@
 #include "ctx.h"
 #include "prefixes.h"
 #include "regs.h"
+#include "segment_override.h"
 
 modrm_t modrm_decode_byte(u8 modrm_byte) {
     return (modrm_t) {
@@ -330,39 +331,9 @@ static err_t build_modrm_rm_addr_into(ctx_t* ctx, const modrm_t* modrm, const pi
             UNREACHABLE();
     }
 
-    // account for segment prefixes
-    pis_addr_t segment_base_op_addr = {};
-    bool has_segment_override = false;
-    switch (ctx->prefixes.legacy.by_group[LEGACY_PREFIX_GROUP_2]) {
-        case LEGACY_PREFIX_CS_SEGMENT_OR_BRANCH_NOT_TAKEN:
-            segment_base_op_addr = X86_CS_BASE.addr;
-            has_segment_override = true;
-            break;
-        case LEGACY_PREFIX_SS_SEGMENT:
-            segment_base_op_addr = X86_SS_BASE.addr;
-            has_segment_override = true;
-            break;
-        case LEGACY_PREFIX_DS_SEGMENT_OR_BRANCH_TAKEN:
-            segment_base_op_addr = X86_DS_BASE.addr;
-            has_segment_override = true;
-            break;
-        case LEGACY_PREFIX_ES_SEGMENT:
-            segment_base_op_addr = X86_ES_BASE.addr;
-            has_segment_override = true;
-            break;
-        case LEGACY_PREFIX_FS_SEGMENT:
-            segment_base_op_addr = X86_FS_BASE.addr;
-            has_segment_override = true;
-            break;
-        case LEGACY_PREFIX_GS_SEGMENT:
-            segment_base_op_addr = X86_GS_BASE.addr;
-            has_segment_override = true;
-            break;
-        default:
-            break;
-    }
-    if (has_segment_override) {
-        pis_operand_t segment_base = PIS_OPERAND(segment_base_op_addr, ctx->addr_size);
+    // account for segment override prefixes
+    pis_operand_t segment_base = {};
+    if (insn_has_segment_override(ctx, &segment_base)) {
         PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, segment_base));
     }
 
