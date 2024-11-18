@@ -2691,29 +2691,354 @@ cleanup:
     return err;
 }
 
-static const mnemonic_handler_t mnemonic_handler_table[MNEMONIC_MAX + 1] = {
-    [MNEMONIC_SHR] = handle_mnemonic_shr,       [MNEMONIC_XOR] = handle_mnemonic_xor,
-    [MNEMONIC_ADD] = handle_mnemonic_add,       [MNEMONIC_AND] = handle_mnemonic_and,
-    [MNEMONIC_SUB] = handle_mnemonic_sub,       [MNEMONIC_OR] = handle_mnemonic_or,
-    [MNEMONIC_MOV] = handle_mnemonic_mov,       [MNEMONIC_ENDBR] = handle_mnemonic_endbr,
-    [MNEMONIC_POP] = handle_mnemonic_pop,       [MNEMONIC_PUSH] = handle_mnemonic_push,
-    [MNEMONIC_LEA] = handle_mnemonic_lea,       [MNEMONIC_STOS] = handle_mnemonic_stos,
-    [MNEMONIC_CMP] = handle_mnemonic_cmp,       [MNEMONIC_JCC] = handle_mnemonic_jcc,
-    [MNEMONIC_CALL] = handle_mnemonic_call,     [MNEMONIC_JMP] = handle_mnemonic_jmp,
-    [MNEMONIC_TEST] = handle_mnemonic_test,     [MNEMONIC_DEC] = handle_mnemonic_dec,
-    [MNEMONIC_CMOVCC] = handle_mnemonic_cmovcc, [MNEMONIC_MOVZX] = handle_mnemonic_movzx,
-    [MNEMONIC_BT] = handle_mnemonic_bt,         [MNEMONIC_SBB] = handle_mnemonic_sbb,
-    [MNEMONIC_INC] = handle_mnemonic_inc,       [MNEMONIC_MOVSXD] = handle_mnemonic_movsxd,
-    [MNEMONIC_RET] = handle_mnemonic_ret,       [MNEMONIC_NOP] = handle_mnemonic_nop,
-    [MNEMONIC_HLT] = handle_mnemonic_hlt,       [MNEMONIC_SAR] = handle_mnemonic_sar,
-    [MNEMONIC_SHL] = handle_mnemonic_shl,       [MNEMONIC_IMUL] = handle_mnemonic_imul,
-    [MNEMONIC_MOVS] = handle_mnemonic_movs,     [MNEMONIC_NOT] = handle_mnemonic_not,
-    [MNEMONIC_NEG] = handle_mnemonic_neg,       [MNEMONIC_MOVSX] = handle_mnemonic_movsx,
-    [MNEMONIC_SETCC] = handle_mnemonic_setcc,   [MNEMONIC_ROL] = handle_mnemonic_rol,
-    [MNEMONIC_DIV] = handle_mnemonic_div,       [MNEMONIC_MUL] = handle_mnemonic_mul,
-    [MNEMONIC_ADC] = handle_mnemonic_adc,       [MNEMONIC_XCHG] = handle_mnemonic_xchg,
-    [MNEMONIC_CWD] = handle_mnemonic_cwd,       [MNEMONIC_IDIV] = handle_mnemonic_idiv,
+typedef struct __attribute__((packed)) {
+    mnemonic_handler_t handler;
+    u8 allow_lock_prefix : 1;
+    u8 allow_repz_or_rep_prefix : 1;
+    u8 allow_repnz_or_bnd_prefix : 1;
+} mnemonic_info_t;
+
+static const mnemonic_info_t mnemonics_table[MNEMONIC_MAX + 1] = {
+    [MNEMONIC_SHR] =
+        {
+            .handler = handle_mnemonic_shr,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_XOR] =
+        {
+            .handler = handle_mnemonic_xor,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_ADD] =
+        {
+            .handler = handle_mnemonic_add,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_AND] =
+        {
+            .handler = handle_mnemonic_and,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_SUB] =
+        {
+            .handler = handle_mnemonic_sub,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_OR] =
+        {
+            .handler = handle_mnemonic_or,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_MOV] =
+        {
+            .handler = handle_mnemonic_mov,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_ENDBR] =
+        {
+            .handler = handle_mnemonic_endbr,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_POP] =
+        {
+            .handler = handle_mnemonic_pop,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_PUSH] =
+        {
+            .handler = handle_mnemonic_push,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_LEA] =
+        {
+            .handler = handle_mnemonic_lea,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_STOS] =
+        {
+            .handler = handle_mnemonic_stos,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = true,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_CMP] =
+        {
+            .handler = handle_mnemonic_cmp,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_JCC] =
+        {
+            .handler = handle_mnemonic_jcc,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_CALL] =
+        {
+            .handler = handle_mnemonic_call,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_JMP] =
+        {
+            .handler = handle_mnemonic_jmp,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_TEST] =
+        {
+            .handler = handle_mnemonic_test,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_DEC] =
+        {
+            .handler = handle_mnemonic_dec,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_CMOVCC] =
+        {
+            .handler = handle_mnemonic_cmovcc,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_MOVZX] =
+        {
+            .handler = handle_mnemonic_movzx,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_BT] =
+        {
+            .handler = handle_mnemonic_bt,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_SBB] =
+        {
+            .handler = handle_mnemonic_sbb,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_INC] =
+        {
+            .handler = handle_mnemonic_inc,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_MOVSXD] =
+        {
+            .handler = handle_mnemonic_movsxd,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_RET] =
+        {
+            .handler = handle_mnemonic_ret,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_NOP] =
+        {
+            .handler = handle_mnemonic_nop,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_HLT] =
+        {
+            .handler = handle_mnemonic_hlt,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_SAR] =
+        {
+            .handler = handle_mnemonic_sar,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_SHL] =
+        {
+            .handler = handle_mnemonic_shl,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_IMUL] =
+        {
+            .handler = handle_mnemonic_imul,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_MOVS] =
+        {
+            .handler = handle_mnemonic_movs,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = true,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_NOT] =
+        {
+            .handler = handle_mnemonic_not,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_NEG] =
+        {
+            .handler = handle_mnemonic_neg,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_MOVSX] =
+        {
+            .handler = handle_mnemonic_movsx,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_SETCC] =
+        {
+            .handler = handle_mnemonic_setcc,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_ROL] =
+        {
+            .handler = handle_mnemonic_rol,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_DIV] =
+        {
+            .handler = handle_mnemonic_div,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_MUL] =
+        {
+            .handler = handle_mnemonic_mul,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_ADC] =
+        {
+            .handler = handle_mnemonic_adc,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_XCHG] =
+        {
+            .handler = handle_mnemonic_xchg,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_CWD] =
+        {
+            .handler = handle_mnemonic_cwd,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_IDIV] =
+        {
+            .handler = handle_mnemonic_idiv,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
 };
+
+static err_t lift_mnemonic(
+    ctx_t* ctx,
+    u32 mnemonic,
+    mnemonic_info_t mnemonic_info,
+    const lifted_op_t* ops,
+    size_t ops_amount
+) {
+    err_t err = SUCCESS;
+
+    // make sure that the group 1 prefix of the instruction is allowed for this mnemonic.
+    switch (ctx->prefixes.legacy.by_group[LEGACY_PREFIX_GROUP_1]) {
+        case LEGACY_PREFIX_LOCK:
+            CHECK_TRACE_CODE(
+                mnemonic_info.allow_lock_prefix,
+                PIS_ERR_UNSUPPORTED_INSN,
+                "mnemonic %u is not allowed with a lock prefix",
+                mnemonic
+            );
+            break;
+        case LEGACY_PREFIX_REPZ_OR_REP:
+            CHECK_TRACE_CODE(
+                mnemonic_info.allow_repz_or_rep_prefix,
+                PIS_ERR_UNSUPPORTED_INSN,
+                "mnemonic %u is not allowed with a repz/rep prefix",
+                mnemonic
+            );
+            break;
+        case LEGACY_PREFIX_REPNZ_OR_BND:
+            CHECK_TRACE_CODE(
+                mnemonic_info.allow_repnz_or_bnd_prefix,
+                PIS_ERR_UNSUPPORTED_INSN,
+                "mnemonic %u is not allowed with a repnz/bnd prefix",
+                mnemonic
+            );
+            break;
+        default:
+            break;
+    }
+
+    CHECK_RETHROW(mnemonic_info.handler(ctx, ops, ops_amount));
+
+cleanup:
+    return err;
+}
 
 static err_t
     lift_regular_insn_info(ctx_t* ctx, uint8_t opcode_byte, const regular_insn_info_t* insn_info) {
@@ -2728,21 +3053,21 @@ static err_t
 
     lifted_op_t lifted_ops[X86_TABLES_INSN_MAX_OPS] = {};
     const uint8_t* op_info_indexes = &laid_out_ops_infos_table[insn_info->first_op_index];
-    u8 ops_amount = insn_info->ops_amount;
-    u8 mnemonic = insn_info->mnemonic;
+    size_t ops_amount = insn_info->ops_amount;
+    u32 mnemonic = insn_info->mnemonic;
     for (size_t i = 0; i < ops_amount; i++) {
         uint8_t op_info_index = op_info_indexes[i];
         const op_info_t* op_info = &op_infos_table[op_info_index];
         CHECK_RETHROW(lift_op(ctx, opcode_byte, op_info, &lifted_ops[i]));
     }
-    mnemonic_handler_t mnemonic_handler = mnemonic_handler_table[mnemonic];
+    mnemonic_info_t mnemonic_info = mnemonics_table[mnemonic];
     CHECK_TRACE_CODE(
-        mnemonic_handler != NULL,
+        mnemonic_info.handler != NULL,
         PIS_ERR_UNSUPPORTED_INSN,
         "unsupported mnemonic %d",
         mnemonic
     );
-    CHECK_RETHROW(mnemonic_handler(ctx, lifted_ops, ops_amount));
+    CHECK_RETHROW(lift_mnemonic(ctx, mnemonic, mnemonic_info, lifted_ops, ops_amount));
 cleanup:
     return err;
 }
