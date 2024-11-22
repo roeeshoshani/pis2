@@ -1274,6 +1274,105 @@ cleanup:
     return err;
 }
 
+
+/// calculates the overflow flag of a `SHRD` operation. `to_shift` is the value to be shifted,
+/// `count` is the masked shift count, `shifted` is the result of this `SHRD` operation.
+static err_t shrd_calc_overflow_flag(
+    ctx_t* ctx,
+    const pis_operand_t* to_shift,
+    const pis_operand_t* count,
+    const pis_operand_t* shifted
+) {
+    err_t err = SUCCESS;
+
+    CHECK(shifted->size == to_shift->size);
+    CHECK(count->size == to_shift->size);
+
+    pis_size_t operand_size = to_shift->size;
+
+    // the overflow flag is set if the sign bit changed
+
+    pis_operand_t orig_msb = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
+    CHECK_RETHROW(extract_most_significant_bit(ctx, to_shift, &orig_msb));
+
+    pis_operand_t new_msb = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
+    CHECK_RETHROW(extract_most_significant_bit(ctx, shifted, &new_msb));
+
+    pis_operand_t new_overflow_flag = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_XOR, new_overflow_flag, orig_msb, new_msb));
+
+    // we only want to set the overflow flag if the count is 1, otherwise we want to use
+    // the original OF value.
+    pis_operand_t is_count_1 = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_CONST(1, operand_size))
+    );
+
+    CHECK_RETHROW(
+        cond_expr_ternary(ctx, &is_count_1, &new_overflow_flag, &X86_FLAGS_OF, &X86_FLAGS_OF)
+    );
+
+cleanup:
+    return err;
+}
+
+static err_t do_shrd(
+    ctx_t* ctx,
+    const pis_operand_t* dst,
+    const pis_operand_t* src,
+    const pis_operand_t* count_operand,
+    pis_operand_t* result
+) {
+    err_t err = SUCCESS;
+
+    CHECK(dst->size == src->size);
+    pis_size_t operand_size = dst->size;
+
+    pis_operand_t res_tmp = TMP_ALLOC(&ctx->tmp_allocator, operand_size);
+
+    pis_operand_t count = TMP_ALLOC(&ctx->tmp_allocator, operand_size);
+    CHECK_RETHROW(mask_shift_count(ctx, count_operand, &count, operand_size));
+
+    // carry flag
+    CHECK_RETHROW(shr_calc_carry_flag(ctx, dst, &count));
+
+    // perform the actual shift
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, res_tmp, *dst, count));
+
+    // copy the bits shifted in from the src operand.
+    // to do that, we shift the src operand `size - count` bits, and then OR the result into the
+    // result.
+    pis_operand_t src_shift_count = TMP_ALLOC(&ctx->tmp_allocator, operand_size);
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(
+            PIS_OPCODE_SUB,
+            src_shift_count,
+            PIS_OPERAND_CONST(pis_size_to_bytes(operand_size), operand_size),
+            count
+        )
+    );
+
+    pis_operand_t shifted_src = TMP_ALLOC(&ctx->tmp_allocator, operand_size);
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, shifted_src, *src, src_shift_count)
+    );
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_OR, res_tmp, res_tmp, shifted_src));
+
+    // overflow flag
+    CHECK_RETHROW(shrd_calc_overflow_flag(ctx, dst, &count, &res_tmp));
+
+    CHECK_RETHROW(shift_calc_parity_zero_sign_flags(ctx, &count, &res_tmp));
+
+    *result = res_tmp;
+
+cleanup:
+    return err;
+}
+
 /// calculates the overflow flag of a `SHR` operation. `to_shift` is the value to be shifted,
 /// `count` is the masked shift count.
 static err_t
@@ -2183,6 +2282,27 @@ cleanup:
     return err;
 }
 
+static err_t handle_mnemonic_shrd(ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 3);
+
+    pis_operand_t dst = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &dst));
+
+    pis_operand_t src = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &src));
+
+    pis_operand_t count = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &count));
+
+    pis_operand_t res = {};
+    CHECK_RETHROW(do_shrd(ctx, &dst, &src, &count, &res));
+
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &res));
+cleanup:
+    return err;
+}
+
 static err_t handle_mnemonic_unary_op(
     ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount, unary_op_fn_t unary_op
 ) {
@@ -3015,6 +3135,13 @@ static const mnemonic_info_t mnemonics_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_SHLD] =
         {
             .handler = handle_mnemonic_shld,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_SHRD] =
+        {
+            .handler = handle_mnemonic_shrd,
             .allow_lock_prefix = false,
             .allow_repz_or_rep_prefix = false,
             .allow_repnz_or_bnd_prefix = false,

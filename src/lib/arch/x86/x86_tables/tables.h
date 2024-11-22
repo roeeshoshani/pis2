@@ -4479,17 +4479,17 @@ const insn_info_t
             {
                 .regular =
                     {
-                        .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 12,
-                        .ops_amount = 0,
+                        .mnemonic = MNEMONIC_SHRD,
+                        .first_op_index = 75,
+                        .ops_amount = 3,
                     },
             },
             {
                 .regular =
                     {
-                        .mnemonic = MNEMONIC_UNSUPPORTED,
-                        .first_op_index = 12,
-                        .ops_amount = 0,
+                        .mnemonic = MNEMONIC_SHRD,
+                        .first_op_index = 78,
+                        .ops_amount = 3,
                     },
             },
             {
