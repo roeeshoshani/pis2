@@ -221,3 +221,5 @@ bool pis_space_is_writable(pis_space_t space);
 bool pis_addr_is_writable(const pis_addr_t* addr);
 
 bool pis_operand_is_writable(const pis_operand_t* operand);
+
+bool pis_opcode_is_jmp(pis_opcode_t opcode);

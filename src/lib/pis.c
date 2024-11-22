@@ -138,3 +138,16 @@ bool pis_addr_is_writable(const pis_addr_t* addr) {
 bool pis_operand_is_writable(const pis_operand_t* operand) {
     return pis_addr_is_writable(&operand->addr);
 }
+
+bool pis_opcode_is_jmp(pis_opcode_t opcode) {
+    switch (opcode) {
+        case PIS_OPCODE_JMP:
+        case PIS_OPCODE_JMP_CALL:
+        case PIS_OPCODE_JMP_RET:
+        case PIS_OPCODE_JMP_COND:
+        case PIS_OPCODE_JMP_CALL_COND:
+            return true;
+        default:
+            return false;
+    }
+}
