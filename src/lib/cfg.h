@@ -41,6 +41,7 @@ typedef struct {
     u16 units_amount;
 } pis_cfg_block_t;
 
+/// a CFG. it is basically just a collection of CFG blocks, but provides a centralized storage location for all CFG objects.
 typedef struct {
     pis_insn_t insn_storage[PIS_CFG_MAX_INSNS];
     size_t insns_amount;
@@ -52,6 +53,16 @@ typedef struct {
     size_t blocks_amount;
 } pis_cfg_t;
 
-void pis_cfg_init(pis_cfg_t* cfg);
+typedef struct {
+    /// the id of the block currently being built.
+    pis_cfg_item_id_t cur_block_id;
 
-err_t build_cfg_wip(pis_cfg_t* cfg, pis_lifter_t lifter, cursor_t code, u64 code_addr);
+    /// the built cfg.
+    pis_cfg_t cfg;
+} pis_cfg_builder_t;
+
+void pis_cfg_reset(pis_cfg_t* cfg);
+
+err_t build_cfg_wip(
+    pis_cfg_builder_t* builder, pis_lifter_t lifter, const u8* code, size_t code_len, u64 code_addr
+);

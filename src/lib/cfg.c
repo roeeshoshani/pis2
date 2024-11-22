@@ -6,7 +6,7 @@
 
 #include <string.h>
 
-void pis_cfg_init(pis_cfg_t* cfg) {
+void pis_cfg_reset(pis_cfg_t* cfg) {
     memset(cfg, 0, sizeof(*cfg));
 }
 
@@ -109,49 +109,117 @@ static err_t
     block_append_unit(pis_cfg_t* cfg, pis_cfg_item_id_t block_id, pis_cfg_item_id_t unit_id) {
     err_t err = SUCCESS;
 
-    // appending a unit to a block is done by just increasing the amount of units in the block,
-    // since all units in the block are allocated adjacently.
+    pis_cfg_block_t* block = &cfg->block_storage[block_id];
 
-    // first, make sure that the unit adjacency assumption holds.
-    pis_cfg_item_id_t last_unit_id =
-        cfg->block_storage[block_id].first_unit_id + cfg->block_storage[block_id].units_amount - 1;
-    CHECK(last_unit_id + 1 == unit_id);
+    if (block->units_amount == 0) {
+        // no units currently in the block
+        block->units_amount = 1;
+        block->first_unit_id = unit_id;
+    } else {
+        // the block already has some units in it. appending a unit to a block is done by just
+        // increasing the amount of units in the block, since all units in the block are allocated
+        // adjacently, due to how we are building the cfg.
 
-    // add the unit to the block by just increasing the units amount
-    cfg->block_storage[block_id].units_amount++;
+        // first, make sure that the unit adjacency assumption holds.
+        pis_cfg_item_id_t last_unit_id = block->first_unit_id + block->units_amount - 1;
+        CHECK(last_unit_id + 1 == unit_id);
+
+        // add the unit to the block by just increasing the units amount
+        block->units_amount++;
+    }
 
 cleanup:
     return err;
 }
 
-err_t build_cfg_wip(pis_cfg_t* cfg, pis_lifter_t lifter, cursor_t code, u64 code_addr) {
+/// checks if the given lift result represent a CFG jump machine instruction, and if so, returns
+/// the pis opcode inside of it that is responsible for performing the jump.
+static err_t find_cfg_jump(const pis_lift_res_t* lift_res, const pis_insn_t** jmp_insn) {
     err_t err = SUCCESS;
 
-    pis_cfg_item_id_t cur_block_id = PIS_CFG_ITEM_ID_INVALID;
+    *jmp_insn = NULL;
 
+    for (size_t i = 0; i < lift_res->insns_amount; i++) {
+        const pis_insn_t* cur_insn = &lift_res->insns[i];
+        if (cur_insn->opcode == PIS_OPCODE_JMP || cur_insn->opcode == PIS_OPCODE_JMP_COND) {
+            // the machine instruction contains a pis jump instruction.
+            //
+            // this might mean that this machine instruction is a CFG jump instruction, or it might
+            // just be an inter-instruction jump. check if the target of the branch is inside of the
+            // current instruction.
+            CHECK(cur_insn->operands_amount >= 1);
+            const pis_operand_t* jmp_target = &cur_insn->operands[0];
+            if (jmp_target->addr.space == PIS_SPACE_CONST) {
+                // this jump is an inter-instruction jump. this is used for example to implement the
+                // x86 `REP` prefix, and does not represent an actual CFG jump instruction.
+            } else {
+                // this jump is an actual CFG jump.
+
+                // such a jump must be the last pis instruction in the lifted representation of the
+                // machine instruction, because otherwise it is unclear how we should handle the pis
+                // instructions following it when building the cfg.
+                CHECK(i + 1 == lift_res->insns_amount);
+
+                *jmp_insn = cur_insn;
+            }
+        }
+    }
+cleanup:
+    return err;
+}
+
+/// appaneds the given unit to the current block.
+static err_t
+    cfg_builder_append_to_cur_block(pis_cfg_builder_t* builder, pis_cfg_item_id_t unit_id) {
+    err_t err = SUCCESS;
+
+    if (builder->cur_block_id == PIS_CFG_ITEM_ID_INVALID) {
+        // no current block, so create a new one.
+        CHECK_RETHROW(next_block_id(&builder->cfg, &builder->cur_block_id));
+    }
+
+    // append the unit to the current block
+    CHECK_RETHROW(block_append_unit(&builder->cfg, builder->cur_block_id, unit_id));
+
+cleanup:
+    return err;
+}
+
+err_t build_cfg_wip(
+    pis_cfg_builder_t* builder, pis_lifter_t lifter, const u8* code, size_t code_len, u64 code_addr
+) {
+    err_t err = SUCCESS;
+
+    // reset the fields of the CFG builder.
+    pis_cfg_reset(&builder->cfg);
+    builder->cur_block_id = PIS_CFG_ITEM_ID_INVALID;
+
+    size_t cur_offset = 0;
     while (1) {
-        pis_lift_args_t args = {
-            .machine_code = code,
-            .machine_code_addr = code_addr,
+        pis_lift_args_t lift_args = {
+            .machine_code = CURSOR_INIT(code + cur_offset, code_len - cur_offset),
+            .machine_code_addr = code_addr + cur_offset,
         };
-        CHECK_RETHROW(lifter(&args));
+
+        CHECK_RETHROW(lifter(&lift_args));
 
         // create a cfg unit for this machine instruction
         pis_cfg_item_id_t unit_id = PIS_CFG_ITEM_ID_INVALID;
-        CHECK_RETHROW(make_unit(cfg, &args.result, code_addr, &unit_id));
+        CHECK_RETHROW(
+            make_unit(&builder->cfg, &lift_args.result, lift_args.machine_code_addr, &unit_id)
+        );
 
-        if (cur_block_id == PIS_CFG_ITEM_ID_INVALID) {
-            // create a new block and append the unit to it
-            CHECK_RETHROW(next_block_id(cfg, &cur_block_id));
-            cfg->block_storage[cur_block_id].first_unit_id = unit_id;
-            cfg->block_storage[cur_block_id].units_amount = 1;
-        } else {
-            // append the unit to the current block
-            CHECK_RETHROW(block_append_unit(cfg, cur_block_id, unit_id));
+        const pis_insn_t* cfg_jmp_insn = NULL;
+        CHECK_RETHROW(find_cfg_jump(&lift_args.result, &cfg_jmp_insn));
+
+        CHECK_RETHROW(cfg_builder_append_to_cur_block(builder, unit_id));
+
+        if (cfg_jmp_insn != NULL) {
+            // this is a cfg jump instruction. this will mark the end of the current block.
         }
 
-        // update the current instruction address to the next address
-        code_addr += args.result.machine_insn_len;
+        // advance to the next instruction
+        cur_offset += lift_args.result.machine_insn_len;
     }
 cleanup:
     return err;
