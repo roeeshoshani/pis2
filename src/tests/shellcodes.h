@@ -12,7 +12,8 @@ typedef struct {
 #define EACH_ARCH(_, ...)                                                                          \
     _(i686, ##__VA_ARGS__)                                                                         \
     _(x86_64, ##__VA_ARGS__)                                                                       \
-    _(mips, ##__VA_ARGS__)
+    _(mipsbe32r1, ##__VA_ARGS__)                                                                     \
+    _(mipsel32r1, ##__VA_ARGS__)
 
 #define _ARCH_DEFINE_SHELLCODE_FIELD(ARCH) shellcode_t ARCH;
 

@@ -1,3 +1,5 @@
+SHELLCODE_ARCHS := x86_64 i686 mipsbe32r1 mipsel32r1
+
 SHELLCODE_SRCS := $(wildcard src/test_shellcodes/*.c)
 SHELLCODE_UTIL_SRCS := $(shell find src/test_shellcodes/utils/ -type f -name "*.c")
 
@@ -15,9 +17,17 @@ SHELLCODE_LDFLAGS ?=
 SHELLCODE_LDFLAGS += -Tsrc/test_shellcodes/shellcode.lds
 SHELLCODE_LDFLAGS += -Wl,--build-id=none
 
+CC_i686 := i686-linux-gnu-gcc
 SHELLCODE_CFLAGS_i686 := -mno-sse -mno-avx
+
+CC_x86_64 := x86_64-linux-gnu-gcc
 SHELLCODE_CFLAGS_x86_64 := -mno-sse -mno-avx
-SHELLCODE_CFLAGS_mips := -march=mips1 -mfp32
+
+CC_mipsbe32r1 := mips-linux-gnu-gcc
+SHELLCODE_CFLAGS_mipsbe32r1 := -march=mips1 -mfp32
+
+CC_mipsel32r1 := mipsel-linux-gnu-gcc
+SHELLCODE_CFLAGS_mipsel32r1 := -march=mips1 -mfp32
 
 .PRECIOUS: build/test_shellcodes/%.bin.shellcode
 build/test_shellcodes/%.bin.shellcode: build/test_shellcodes/%.elf.shellcode
@@ -34,7 +44,7 @@ SHELLCODE_ELFS += $$(SHELLCODE_SRCS:src/%.c=build/%_$(ARCH).elf.shellcode)
 .PRECIOUS: build/test_shellcodes/%_$(ARCH).elf.shellcode
 build/test_shellcodes/%_$(ARCH).elf.shellcode: src/test_shellcodes/%.c $(SHELLCODE_UTIL_SRCS)
 	@mkdir -p $$(@D)
-	$(ARCH)-linux-gnu-gcc \
+	$$(CC_$(ARCH)) \
 		-MMD \
 		$(SHELLCODE_LDFLAGS) \
 		$(SHELLCODE_CFLAGS) \
@@ -45,7 +55,7 @@ build/test_shellcodes/%_$(ARCH).elf.shellcode: src/test_shellcodes/%.c $(SHELLCO
 		-o $$@
 endef
 
-$(foreach ARCH,$(ARCHS),$(eval $(SHELLCODE_IMPL_ARCH)))
+$(foreach ARCH,$(SHELLCODE_ARCHS),$(eval $(SHELLCODE_IMPL_ARCH)))
 
 SHELLCODE_BIN_OBJS := $(SHELLCODE_ELFS:build/%.elf.shellcode=build/%.bin.o.shellcode)
 

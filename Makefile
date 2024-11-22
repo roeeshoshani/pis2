@@ -5,8 +5,6 @@ SRCS := $(shell find src -type f -name "*.c")
 HDRS := $(shell find src -type f -name "*.h")
 DEPS := $(shell find build -type f -name "*.d")
 
-ARCHS := x86_64 i686 mips
-
 CC := gcc
 OBJCOPY := llvm-objcopy
 

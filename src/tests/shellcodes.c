@@ -46,10 +46,20 @@ cleanup:
     return err;
 }
 
-static err_t lift_mips(pis_lift_args_t* args) {
+static err_t lift_mipsbe32r1(pis_lift_args_t* args) {
     err_t err = SUCCESS;
     pis_mips_cpuinfo_t cpuinfo = {
         .endianness = PIS_ENDIANNESS_BIG,
+    };
+    CHECK_RETHROW_VERBOSE(pis_mips_lift(args, &cpuinfo));
+cleanup:
+    return err;
+}
+
+static err_t lift_mipsel32r1(pis_lift_args_t* args) {
+    err_t err = SUCCESS;
+    pis_mips_cpuinfo_t cpuinfo = {
+        .endianness = PIS_ENDIANNESS_LITTLE,
     };
     CHECK_RETHROW_VERBOSE(pis_mips_lift(args, &cpuinfo));
 cleanup:
@@ -111,7 +121,7 @@ cleanup:
     return err;
 }
 
-static err_t prepare_mips(pis_emu_t* emu, const shellcode_args_t* args) {
+static err_t prepare_mips32(pis_emu_t* emu, const shellcode_args_t* args) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &MIPS_REG_RA, SHELLCODE_FINISH_ADDR));
@@ -191,10 +201,17 @@ const arch_def_t arch_def_i686 = {
     .result_operand = &X86_EAX,
 };
 
-const arch_def_t arch_def_mips = {
-    .lift = lift_mips,
-    .prepare = prepare_mips,
+const arch_def_t arch_def_mipsbe32r1 = {
+    .lift = lift_mipsbe32r1,
+    .prepare = prepare_mips32,
     .endianness = PIS_ENDIANNESS_BIG,
+    .result_operand = &MIPS_REG_V0,
+};
+
+const arch_def_t arch_def_mipsel32r1 = {
+    .lift = lift_mipsel32r1,
+    .prepare = prepare_mips32,
+    .endianness = PIS_ENDIANNESS_LITTLE,
     .result_operand = &MIPS_REG_V0,
 };
 
@@ -303,8 +320,8 @@ static err_t test_shellcode_result(
     ));
 
     CHECK_RETHROW_VERBOSE(check_arch_specific_shellcode_result(
-        &arch_def_mips,
-        &shellcode->mips,
+        &arch_def_mipsbe32r1,
+        &shellcode->mipsbe32r1,
         args,
         expected_result
     ));
