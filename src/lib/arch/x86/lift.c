@@ -1868,7 +1868,7 @@ static err_t rep_begin(ctx_t* ctx, rep_ctx_t* rep_ctx) {
     // don't know the size of the code, but it will be filled with the correct value later on.
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN2(PIS_OPCODE_JMP_COND, cx_equals_zero, PIS_OPERAND_CONST(0, PIS_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_JMP_COND, PIS_OPERAND_CONST(0, PIS_SIZE_1), cx_equals_zero)
     );
     CHECK_RETHROW(pis_lift_res_get_last_emitted_insn(&ctx->args->result, &rep_ctx->jmp_end_insn));
 
@@ -1901,7 +1901,7 @@ static err_t rep_end(ctx_t* ctx, const rep_ctx_t* rep_ctx) {
 
     // now that we finished emitting the code, update the offset of the jmp instruction at the start
     // of the loop which should jump to the end of the instruction.
-    rep_ctx->jmp_end_insn->operands[1] =
+    rep_ctx->jmp_end_insn->operands[0] =
         PIS_OPERAND_CONST(ctx->args->result.insns_amount, PIS_SIZE_1);
 
 cleanup:
@@ -2643,7 +2643,7 @@ static err_t handle_mnemonic_jcc(ctx_t* ctx, const lifted_op_t* ops, size_t ops_
     pis_operand_t target = {};
     CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &target));
 
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_JMP_COND, cond, target));
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_JMP_COND, target, cond));
 
 cleanup:
     return err;
@@ -3292,6 +3292,8 @@ cleanup:
 err_t pis_x86_lift(pis_lift_args_t* args, pis_x86_cpumode_t cpumode) {
     err_t err = SUCCESS;
 
+    size_t start_index = cursor_index(&args->machine_code);
+
     ctx_t ctx = {
         .args = args,
         .prefixes = {},
@@ -3313,9 +3315,9 @@ err_t pis_x86_lift(pis_lift_args_t* args, pis_x86_cpumode_t cpumode) {
 
     CHECK_RETHROW(post_prefixes_lift(&ctx));
 
-    args->result.machine_insn_len = cursor_index(&args->machine_code);
+    args->result.machine_insn_len = cursor_index(&args->machine_code) - start_index;
 
-    // make sure that we actually processes any bytes
+    // make sure that we actually processed any bytes
     CHECK(args->result.machine_insn_len > 0);
 
 cleanup:

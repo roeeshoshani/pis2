@@ -583,7 +583,7 @@ static err_t do_branch_cond(ctx_t* ctx, const pis_operand_t* cond) {
 
     CHECK_RETHROW(lift_delay_slot_insn(ctx));
 
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_JMP_COND, *cond, target));
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_JMP_COND, target, *cond));
 
 cleanup:
     return err;
@@ -1456,6 +1456,8 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
     err_t err = SUCCESS;
 
+    size_t start_index = cursor_index(&args->machine_code);
+
     CHECK(args->machine_code_addr % 4 == 0);
 
     u32 insn = 0;
@@ -1471,7 +1473,7 @@ err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
 
     CHECK_RETHROW(lift(&ctx));
 
-    args->result.machine_insn_len = cursor_index(&args->machine_code);
+    args->result.machine_insn_len = cursor_index(&args->machine_code) - start_index;
 
 cleanup:
     return err;

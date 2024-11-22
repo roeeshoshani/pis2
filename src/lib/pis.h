@@ -9,7 +9,7 @@
 
 #define PIS_INSN_MAX_OPERANDS_AMOUNT (4)
 
-#define PIS_LIFT_MAX_INSNS_AMOUNT (64)
+#define PIS_LIFT_MAX_INSNS_AMOUNT (128)
 
 #define PIS_INSN0(OPCODE)                                                                          \
     ((pis_insn_t) {                                                                                \

@@ -661,16 +661,16 @@ err_t pis_emu_run_one(pis_emu_t* emu, exec_ctx_t* exec_ctx, const pis_insn_t* in
             CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
 
             // check operand sizes
-            CHECK_CODE(insn->operands[0].size == PIS_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
+            CHECK_CODE(insn->operands[1].size == PIS_SIZE_1, PIS_ERR_EMU_OPERAND_SIZE_MISMATCH);
 
             u64 cond = 0;
-            CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[0], &cond));
+            CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &cond));
 
             // the input should be a conditional expression, verify its value
             CHECK_RETHROW(check_cond_expr_value(cond));
 
             if (cond) {
-                CHECK_RETHROW(do_jmp(emu, exec_ctx, &insn->operands[1]));
+                CHECK_RETHROW(do_jmp(emu, exec_ctx, &insn->operands[0]));
             }
             break;
         }
