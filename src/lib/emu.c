@@ -657,7 +657,8 @@ err_t pis_emu_run_one(pis_emu_t* emu, exec_ctx_t* exec_ctx, const pis_insn_t* in
 
             break;
         }
-        case PIS_OPCODE_JMP_COND: {
+        case PIS_OPCODE_JMP_COND:
+        case PIS_OPCODE_JMP_CALL_COND: {
             CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
 
             // check operand sizes
@@ -696,7 +697,9 @@ err_t pis_emu_run_one(pis_emu_t* emu, exec_ctx_t* exec_ctx, const pis_insn_t* in
 
             break;
         }
-        case PIS_OPCODE_JMP: {
+        case PIS_OPCODE_JMP:
+        case PIS_OPCODE_JMP_CALL:
+        case PIS_OPCODE_JMP_RET: {
             CHECK_CODE(insn->operands_amount == 1, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
 
             CHECK_RETHROW(do_jmp(emu, exec_ctx, &insn->operands[0]));

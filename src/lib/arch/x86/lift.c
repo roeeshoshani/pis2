@@ -2662,7 +2662,7 @@ static err_t handle_mnemonic_call(ctx_t* ctx, const lifted_op_t* ops, size_t ops
 
     CHECK_RETHROW(push_ip(ctx));
 
-    PIS_EMIT(&ctx->args->result, PIS_INSN1(PIS_OPCODE_JMP, target));
+    PIS_EMIT(&ctx->args->result, PIS_INSN1(PIS_OPCODE_JMP_CALL, target));
 
 cleanup:
     return err;
@@ -2755,7 +2755,7 @@ static err_t handle_mnemonic_ret(ctx_t* ctx, const lifted_op_t* ops, size_t ops_
     pis_operand_t popped_value = {};
     CHECK_RETHROW(pop(ctx, operand_size, &popped_value));
 
-    PIS_EMIT(&ctx->args->result, PIS_INSN1(PIS_OPCODE_JMP, popped_value));
+    PIS_EMIT(&ctx->args->result, PIS_INSN1(PIS_OPCODE_JMP_RET, popped_value));
 
 cleanup:
     return err;

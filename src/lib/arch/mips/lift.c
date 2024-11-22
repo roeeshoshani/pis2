@@ -13,6 +13,9 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1];
 
 static const pis_operand_t g_zero = PIS_OPERAND_INIT(PIS_ADDR_INIT(PIS_SPACE_CONST, 0), PIS_SIZE_4);
 
+/// the encoding of the mips `ra` register
+#define MIPS_REG_ENCODING_RA (0b11111)
+
 typedef enum {
     REG_ACCESS_KIND_READ,
     REG_ACCESS_KIND_WRITE,
@@ -208,14 +211,18 @@ static err_t special_opcode_handler_func_08(ctx_t* ctx) {
     CHECK(insn_field_rd(ctx->insn) == 0);
     CHECK(insn_field_sa(ctx->insn) == 0);
 
-    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn), REG_ACCESS_KIND_READ);
+    u8 rs_encoding = insn_field_rs(ctx->insn);
+    pis_operand_t rs = reg_get_operand(rs_encoding, REG_ACCESS_KIND_READ);
 
     pis_operand_t tmp = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, tmp, rs));
 
     CHECK_RETHROW(lift_delay_slot_insn(ctx));
 
-    PIS_EMIT(&ctx->args->result, PIS_INSN1(PIS_OPCODE_JMP, tmp));
+    // if the jump is to the `ra` return address register, add a `ret` hint to it.
+    pis_opcode_t opcode =
+        (rs_encoding == MIPS_REG_ENCODING_RA) ? PIS_OPCODE_JMP_RET : PIS_OPCODE_JMP;
+    PIS_EMIT(&ctx->args->result, PIS_INSN1(opcode, tmp));
 
 cleanup:
     return err;
@@ -240,7 +247,7 @@ static err_t special_opcode_handler_func_09(ctx_t* ctx) {
 
     CHECK_RETHROW(lift_delay_slot_insn(ctx));
 
-    PIS_EMIT(&ctx->args->result, PIS_INSN1(PIS_OPCODE_JMP, tmp));
+    PIS_EMIT(&ctx->args->result, PIS_INSN1(PIS_OPCODE_JMP_CALL, tmp));
 
 cleanup:
     return err;
@@ -576,14 +583,15 @@ cleanup:
     return err;
 }
 
-static err_t do_branch_cond(ctx_t* ctx, const pis_operand_t* cond) {
+static err_t do_branch_cond(ctx_t* ctx, const pis_operand_t* cond, bool is_call) {
     err_t err = SUCCESS;
 
     pis_operand_t target = calc_pc_rel_branch_target(ctx);
 
     CHECK_RETHROW(lift_delay_slot_insn(ctx));
 
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_JMP_COND, target, *cond));
+    pis_opcode_t opcode = is_call ? PIS_OPCODE_JMP_CALL_COND : PIS_OPCODE_JMP_COND;
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(opcode, target, *cond));
 
 cleanup:
     return err;
@@ -668,7 +676,7 @@ static err_t regimm_opcode_handler_00(ctx_t* ctx) {
     pis_operand_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
     PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_LESS_THAN, cond, rs, g_zero));
 
-    CHECK_RETHROW(do_branch_cond(ctx, &cond));
+    CHECK_RETHROW(do_branch_cond(ctx, &cond, false));
 
 cleanup:
     return err;
@@ -685,7 +693,7 @@ static err_t regimm_opcode_handler_01(ctx_t* ctx) {
     PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_SIGNED_LESS_THAN, cond, rs, g_zero));
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_COND_NEGATE, cond, cond));
 
-    CHECK_RETHROW(do_branch_cond(ctx, &cond));
+    CHECK_RETHROW(do_branch_cond(ctx, &cond, false));
 
 cleanup:
     return err;
@@ -703,7 +711,7 @@ static err_t regimm_opcode_handler_10(ctx_t* ctx) {
 
     CHECK_RETHROW(do_link(ctx));
 
-    CHECK_RETHROW(do_branch_cond(ctx, &cond));
+    CHECK_RETHROW(do_branch_cond(ctx, &cond, true));
 
 cleanup:
     return err;
@@ -722,7 +730,7 @@ static err_t regimm_opcode_handler_11(ctx_t* ctx) {
 
     CHECK_RETHROW(do_link(ctx));
 
-    CHECK_RETHROW(do_branch_cond(ctx, &cond));
+    CHECK_RETHROW(do_branch_cond(ctx, &cond, true));
 
 cleanup:
     return err;
@@ -756,7 +764,7 @@ cleanup:
     return err;
 }
 
-static err_t do_jmp(ctx_t* ctx) {
+static err_t do_jmp(ctx_t* ctx, bool is_call) {
     err_t err = SUCCESS;
 
     pis_operand_t target = calc_pc_region_branch_target(ctx);
@@ -764,7 +772,8 @@ static err_t do_jmp(ctx_t* ctx) {
     // run the delay slot instruction
     CHECK_RETHROW(lift_delay_slot_insn(ctx));
 
-    PIS_EMIT(&ctx->args->result, PIS_INSN1(PIS_OPCODE_JMP, target));
+    pis_opcode_t opcode = is_call ? PIS_OPCODE_JMP_CALL : PIS_OPCODE_JMP;
+    PIS_EMIT(&ctx->args->result, PIS_INSN1(opcode, target));
 
 cleanup:
     return err;
@@ -775,7 +784,7 @@ static err_t opcode_handler_02(ctx_t* ctx) {
 
     // opcode 0x02 is J
 
-    CHECK_RETHROW(do_jmp(ctx));
+    CHECK_RETHROW(do_jmp(ctx, false));
 
 cleanup:
     return err;
@@ -788,7 +797,7 @@ static err_t opcode_handler_03(ctx_t* ctx) {
 
     CHECK_RETHROW(do_link(ctx));
 
-    CHECK_RETHROW(do_jmp(ctx));
+    CHECK_RETHROW(do_jmp(ctx, true));
 
 cleanup:
     return err;
@@ -805,7 +814,7 @@ static err_t opcode_handler_04(ctx_t* ctx) {
     pis_operand_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
     PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_EQUALS, cond, rs, rt));
 
-    CHECK_RETHROW(do_branch_cond(ctx, &cond));
+    CHECK_RETHROW(do_branch_cond(ctx, &cond, false));
 
 cleanup:
     return err;
@@ -823,7 +832,7 @@ static err_t opcode_handler_05(ctx_t* ctx) {
     PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_EQUALS, cond, rs, rt));
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_COND_NEGATE, cond, cond));
 
-    CHECK_RETHROW(do_branch_cond(ctx, &cond));
+    CHECK_RETHROW(do_branch_cond(ctx, &cond, false));
 
 cleanup:
     return err;
@@ -849,7 +858,7 @@ static err_t opcode_handler_06(ctx_t* ctx) {
     pis_operand_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
     PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_OR, cond, less_than_zero, equals_zero));
 
-    CHECK_RETHROW(do_branch_cond(ctx, &cond));
+    CHECK_RETHROW(do_branch_cond(ctx, &cond, false));
 
 cleanup:
     return err;
@@ -876,7 +885,7 @@ static err_t opcode_handler_07(ctx_t* ctx) {
     PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_OR, cond, less_than_zero, equals_zero));
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_COND_NEGATE, cond, cond));
 
-    CHECK_RETHROW(do_branch_cond(ctx, &cond));
+    CHECK_RETHROW(do_branch_cond(ctx, &cond, false));
 
 cleanup:
     return err;
