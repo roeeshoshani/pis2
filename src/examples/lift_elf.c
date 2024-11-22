@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
         CHECK_RETHROW(pis_x86_lift(&args, PIS_X86_CPUMODE_64_BIT));
 
         TRACE("INSN AT OFFSET 0x%lx", (unsigned long) cur_offset);
-        pis_lift_result_dump(&args.result);
+        pis_lift_res_dump(&args.result);
         TRACE();
 
         cur_offset += args.result.machine_insn_len;

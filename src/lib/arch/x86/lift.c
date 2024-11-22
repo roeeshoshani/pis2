@@ -1870,8 +1870,7 @@ static err_t rep_begin(ctx_t* ctx, rep_ctx_t* rep_ctx) {
         &ctx->args->result,
         PIS_INSN2(PIS_OPCODE_JMP_COND, cx_equals_zero, PIS_OPERAND_CONST(0, PIS_SIZE_1))
     );
-    CHECK_RETHROW(pis_lift_result_get_last_emitted_insn(&ctx->args->result, &rep_ctx->jmp_end_insn)
-    );
+    CHECK_RETHROW(pis_lift_res_get_last_emitted_insn(&ctx->args->result, &rep_ctx->jmp_end_insn));
 
     // now that we know that `cx` is not zero, decrement it.
     PIS_EMIT(

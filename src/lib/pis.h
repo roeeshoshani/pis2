@@ -67,7 +67,7 @@
 #define PIS_OPERAND_CONST_NEG(ABS_VALUE, SIZE)                                                     \
     (PIS_OPERAND(PIS_ADDR(PIS_SPACE_CONST, pis_const_negate(ABS_VALUE, SIZE)), SIZE))
 
-#define PIS_EMIT(LIFT_RESULT, INSN) CHECK_RETHROW(pis_lift_result_emit((LIFT_RESULT), &(INSN)))
+#define PIS_EMIT(LIFT_RES, INSN) CHECK_RETHROW(pis_lift_res_emit((LIFT_RES), &(INSN)))
 
 #define DECLARE_REG_OPERAND(NAME) extern const pis_operand_t NAME;
 
@@ -188,7 +188,7 @@ typedef struct {
     pis_insn_t insns[PIS_LIFT_MAX_INSNS_AMOUNT];
     size_t insns_amount;
     size_t machine_insn_len;
-} pis_lift_result_t;
+} pis_lift_res_t;
 
 void pis_addr_dump(const pis_addr_t* addr);
 bool pis_addr_equals(const pis_addr_t* a, const pis_addr_t* b);
@@ -199,13 +199,13 @@ bool pis_operand_equals(const pis_operand_t* a, const pis_operand_t* b);
 void pis_insn_dump(const pis_insn_t* insn);
 bool pis_insn_equals(const pis_insn_t* a, const pis_insn_t* b);
 
-err_t pis_lift_result_emit(pis_lift_result_t* result, const pis_insn_t* insn);
+err_t pis_lift_res_emit(pis_lift_res_t* result, const pis_insn_t* insn);
 
-void pis_lift_result_dump(const pis_lift_result_t* result);
+void pis_lift_res_dump(const pis_lift_res_t* result);
 
-void pis_lift_result_reset(pis_lift_result_t* result);
+void pis_lift_res_reset(pis_lift_res_t* result);
 
-err_t pis_lift_result_get_last_emitted_insn(pis_lift_result_t* result, pis_insn_t** insn);
+err_t pis_lift_res_get_last_emitted_insn(pis_lift_res_t* result, pis_insn_t** insn);
 
 u64 pis_const_negate(u64 const_value, pis_size_t operand_size);
 

@@ -959,16 +959,16 @@ cleanup:
     return err;
 }
 
-err_t pis_emu_run(pis_emu_t* emu, const pis_lift_result_t* lift_result) {
+err_t pis_emu_run(pis_emu_t* emu, const pis_lift_res_t* lift_res) {
     err_t err = SUCCESS;
     size_t cursor = 0;
 
     // reset the did jump flag
     emu->did_jump = false;
 
-    while (cursor < lift_result->insns_amount) {
+    while (cursor < lift_res->insns_amount) {
         exec_ctx_t exec_ctx = {};
-        CHECK_RETHROW(pis_emu_run_one(emu, &exec_ctx, &lift_result->insns[cursor]));
+        CHECK_RETHROW(pis_emu_run_one(emu, &exec_ctx, &lift_res->insns[cursor]));
         if (emu->did_jump) {
             // if we jumped, then we are done with this instruction.
             break;

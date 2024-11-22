@@ -53,7 +53,7 @@ bool pis_insn_equals(const pis_insn_t* a, const pis_insn_t* b) {
     return true;
 }
 
-err_t pis_lift_result_emit(pis_lift_result_t* result, const pis_insn_t* insn) {
+err_t pis_lift_res_emit(pis_lift_res_t* result, const pis_insn_t* insn) {
     err_t err = SUCCESS;
 
     CHECK_CODE(result->insns_amount < PIS_LIFT_MAX_INSNS_AMOUNT, PIS_ERR_TOO_MANY_INSNS);
@@ -65,7 +65,7 @@ cleanup:
     return err;
 }
 
-void pis_lift_result_dump(const pis_lift_result_t* result) {
+void pis_lift_res_dump(const pis_lift_res_t* result) {
     for (size_t i = 0; i < result->insns_amount; i++) {
         pis_insn_dump(&result->insns[i]);
 
@@ -74,12 +74,12 @@ void pis_lift_result_dump(const pis_lift_result_t* result) {
     }
 }
 
-void pis_lift_result_reset(pis_lift_result_t* result) {
+void pis_lift_res_reset(pis_lift_res_t* result) {
     result->insns_amount = 0;
     result->machine_insn_len = 0;
 }
 
-err_t pis_lift_result_get_last_emitted_insn(pis_lift_result_t* result, pis_insn_t** insn) {
+err_t pis_lift_res_get_last_emitted_insn(pis_lift_res_t* result, pis_insn_t** insn) {
     err_t err = SUCCESS;
 
     CHECK(result->insns_amount > 0);

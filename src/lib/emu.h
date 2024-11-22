@@ -26,4 +26,4 @@ err_t pis_emu_read_operand_signed(
     const pis_emu_t* emu, const pis_operand_t* operand, i64* operand_value
 );
 
-err_t pis_emu_run(pis_emu_t* emu, const pis_lift_result_t* lift_result);
+err_t pis_emu_run(pis_emu_t* emu, const pis_lift_res_t* lift_res);
