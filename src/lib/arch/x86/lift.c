@@ -3157,6 +3157,10 @@ static err_t lift_mnemonic(
 ) {
     err_t err = SUCCESS;
 
+    // under some configurations, this argument is unused, so tell the compiler that we are ok with
+    // this.
+    UNUSED(mnemonic);
+
     // make sure that the group 1 prefix of the instruction is allowed for this mnemonic.
     switch (ctx->prefixes.legacy.by_group[LEGACY_PREFIX_GROUP_1]) {
         case LEGACY_PREFIX_LOCK:
