@@ -51,7 +51,6 @@ build/test_shellcodes/%_$(ARCH).elf.shellcode: src/test_shellcodes/%.c $(SHELLCO
 		$$(SHELLCODE_CFLAGS_$(ARCH)) \
 		src/test_shellcodes/$$*.c \
 		$(SHELLCODE_UTIL_SRCS) \
-		-lgcc \
 		-o $$@
 endef
 
