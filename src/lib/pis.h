@@ -143,6 +143,9 @@
     _(PIS_OPCODE_SIGNED_LESS_THAN, )                                                               \
     _(PIS_OPCODE_JMP_COND, )                                                                       \
     _(PIS_OPCODE_JMP, )                                                                            \
+    _(PIS_OPCODE_JMP_CALL_COND, )                                                                  \
+    _(PIS_OPCODE_JMP_CALL, )                                                                       \
+    _(PIS_OPCODE_JMP_RET, )                                                                        \
     _(PIS_OPCODE_COND_NEGATE, )                                                                    \
     _(PIS_OPCODE_SIGN_EXTEND, )                                                                    \
     _(PIS_OPCODE_ZERO_EXTEND, )                                                                    \
