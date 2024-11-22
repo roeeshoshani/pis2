@@ -599,7 +599,6 @@ cleanup:
     return err;
 }
 
-
 static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
     [0x00] = special_opcode_handler_func_00, [0x02] = special_opcode_handler_func_02,
     [0x03] = special_opcode_handler_func_03, [0x04] = special_opcode_handler_func_04,
@@ -616,6 +615,26 @@ static const opcode_handler_t special_opcode_func_handlers_table[MIPS_MAX_FUNCTI
     [0x2a] = special_opcode_handler_func_2a, [0x2b] = special_opcode_handler_func_2b,
 };
 
+static err_t special2_opcode_handler_func_20(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // function 0x20 is CLZ
+
+    CHECK(insn_field_sa(ctx->insn) == 0);
+    CHECK(insn_field_rt(ctx->insn) == insn_field_rd(ctx->insn));
+
+    pis_operand_t rs = reg_get_operand(insn_field_rs(ctx->insn), REG_ACCESS_KIND_READ);
+    pis_operand_t rd = reg_get_operand(insn_field_rd(ctx->insn), REG_ACCESS_KIND_WRITE);
+
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_LEADING_ZEROES, rd, rs));
+
+cleanup:
+    return err;
+}
+
+static const opcode_handler_t special2_opcode_func_handlers_table[MIPS_MAX_FUNCTION_VALUE + 1] = {
+    [0x20] = special2_opcode_handler_func_20,
+};
 
 static err_t opcode_handler_00(ctx_t* ctx) {
     err_t err = SUCCESS;
@@ -987,6 +1006,27 @@ static err_t opcode_handler_0f(ctx_t* ctx) {
         &ctx->args->result,
         PIS_INSN2(PIS_OPCODE_MOVE, rt, PIS_OPERAND_CONST(value, PIS_SIZE_4))
     );
+
+cleanup:
+    return err;
+}
+
+static err_t opcode_handler_1c(ctx_t* ctx) {
+    err_t err = SUCCESS;
+
+    // opcode 0x1c is the SPECIAL2 opcode, which is further decoded by the function field
+
+    u8 function = insn_field_function(ctx->insn);
+
+    opcode_handler_t handler = special2_opcode_func_handlers_table[function];
+    CHECK_TRACE_CODE(
+        handler != NULL,
+        PIS_ERR_UNSUPPORTED_INSN,
+        "unsupported special2 function 0x%x",
+        function
+    );
+
+    CHECK_RETHROW(handler(ctx));
 
 cleanup:
     return err;
@@ -1405,11 +1445,11 @@ static const opcode_handler_t opcode_handlers_table[MIPS_MAX_OPCODE_VALUE + 1] =
     [0x06] = opcode_handler_06, [0x07] = opcode_handler_07, [0x08] = opcode_handler_08,
     [0x09] = opcode_handler_09, [0x0a] = opcode_handler_0a, [0x0b] = opcode_handler_0b,
     [0x0c] = opcode_handler_0c, [0x0d] = opcode_handler_0d, [0x0e] = opcode_handler_0e,
-    [0x0f] = opcode_handler_0f, [0x20] = opcode_handler_20, [0x21] = opcode_handler_21,
-    [0x22] = opcode_handler_22, [0x23] = opcode_handler_23, [0x24] = opcode_handler_24,
-    [0x25] = opcode_handler_25, [0x26] = opcode_handler_26, [0x28] = opcode_handler_28,
-    [0x29] = opcode_handler_29, [0x2a] = opcode_handler_2a, [0x2b] = opcode_handler_2b,
-    [0x2e] = opcode_handler_2e,
+    [0x0f] = opcode_handler_0f, [0x1c] = opcode_handler_1c, [0x20] = opcode_handler_20,
+    [0x21] = opcode_handler_21, [0x22] = opcode_handler_22, [0x23] = opcode_handler_23,
+    [0x24] = opcode_handler_24, [0x25] = opcode_handler_25, [0x26] = opcode_handler_26,
+    [0x28] = opcode_handler_28, [0x29] = opcode_handler_29, [0x2a] = opcode_handler_2a,
+    [0x2b] = opcode_handler_2b, [0x2e] = opcode_handler_2e,
 };
 
 err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {

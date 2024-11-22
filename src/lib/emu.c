@@ -2,6 +2,7 @@
 #include "emu/mem_storage.h"
 #include "errors.h"
 #include "except.h"
+#include "operand_size.h"
 #include "pis.h"
 #include "utils.h"
 #include <endian.h>
@@ -319,6 +320,19 @@ DEFINE_SIGNED_BINARY_OPERATOR(sar, >>);
 
 DEFINE_UNARY_OPERATOR(not, ~);
 DEFINE_UNARY_OPERATOR(neg, -);
+
+static u64 leading_zeroes(u64 x, u64 bit_size) {
+    for (u64 i = 0; i < bit_size; i++) {
+        u64 cur_bit_index = bit_size - 1 - i;
+        u64 cur_bit = 1ULL << cur_bit_index;
+        if (x & cur_bit) {
+            return i;
+        }
+    }
+
+    // all zeroes
+    return bit_size;
+}
 
 void div128(u64 dividend_high, u64 dividend_low, u64 divisor, u64* quotient, u64* rem) {
     u64 initial_quot_high = dividend_high / divisor;
@@ -658,6 +672,28 @@ err_t pis_emu_run_one(pis_emu_t* emu, exec_ctx_t* exec_ctx, const pis_insn_t* in
             if (cond) {
                 CHECK_RETHROW(do_jmp(emu, exec_ctx, &insn->operands[1]));
             }
+            break;
+        }
+        case PIS_OPCODE_LEADING_ZEROES: {
+            CHECK_CODE(insn->operands_amount == 2, PIS_ERR_EMU_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+            // make sure that all operands are of the same size
+            CHECK_TRACE_CODE(
+                insn->operands[0].size == insn->operands[1].size,
+                PIS_ERR_EMU_OPERAND_SIZE_MISMATCH,
+                "operand size mismatch in opcode %s, operand sizes: %u %u",
+                pis_opcode_to_str(insn->opcode),
+                insn->operands[0].size,
+                insn->operands[1].size
+            );
+
+            u64 x = 0;
+            CHECK_RETHROW(pis_emu_read_operand(emu, &insn->operands[1], &x));
+
+            u64 result = leading_zeroes(x, pis_size_to_bits(insn->operands[0].size));
+
+            CHECK_RETHROW(pis_emu_write_operand(emu, &insn->operands[0], result));
+
             break;
         }
         case PIS_OPCODE_JMP: {

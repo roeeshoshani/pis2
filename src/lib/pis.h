@@ -146,13 +146,14 @@
     _(PIS_OPCODE_COND_NEGATE, )                                                                    \
     _(PIS_OPCODE_SIGN_EXTEND, )                                                                    \
     _(PIS_OPCODE_ZERO_EXTEND, )                                                                    \
+    _(PIS_OPCODE_LEADING_ZEROES, )                                                                 \
     _(PIS_OPCODE_SIGNED_MUL, )                                                                     \
     _(PIS_OPCODE_SIGNED_MUL_OVERFLOW, )                                                            \
     _(PIS_OPCODE_UNSIGNED_MUL, )                                                                   \
     _(PIS_OPCODE_UNSIGNED_DIV_16, )                                                                \
     _(PIS_OPCODE_UNSIGNED_REM_16, )                                                                \
-    _(PIS_OPCODE_SIGNED_DIV_16, )                                                                \
-    _(PIS_OPCODE_SIGNED_REM_16, )                                                                \
+    _(PIS_OPCODE_SIGNED_DIV_16, )                                                                  \
+    _(PIS_OPCODE_SIGNED_REM_16, )                                                                  \
     _(PIS_OPCODE_UNSIGNED_MUL_16, )                                                                \
     _(PIS_OPCODE_SIGNED_REM, )                                                                     \
     _(PIS_OPCODE_SIGNED_DIV, )                                                                     \
