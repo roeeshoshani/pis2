@@ -1218,7 +1218,7 @@ cleanup:
 }
 
 /// performs a `SHLD` operation.
-static err_t UNUSED_ATTR do_shld(
+static err_t do_shld(
     ctx_t* ctx,
     const pis_operand_t* dst,
     const pis_operand_t* src,
@@ -2162,6 +2162,27 @@ cleanup:
     return err;
 }
 
+static err_t handle_mnemonic_shld(ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount) {
+    err_t err = SUCCESS;
+    CHECK(ops_amount == 3);
+
+    pis_operand_t dst = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[0], &dst));
+
+    pis_operand_t src = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &src));
+
+    pis_operand_t count = {};
+    CHECK_RETHROW(lifted_op_read(ctx, &ops[1], &count));
+
+    pis_operand_t res = {};
+    CHECK_RETHROW(do_shld(ctx, &dst, &src, &count, &res));
+
+    CHECK_RETHROW(lifted_op_write(ctx, &ops[0], &res));
+cleanup:
+    return err;
+}
+
 static err_t handle_mnemonic_unary_op(
     ctx_t* ctx, const lifted_op_t* ops, size_t ops_amount, unary_op_fn_t unary_op
 ) {
@@ -2987,6 +3008,13 @@ static const mnemonic_info_t mnemonics_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_IDIV] =
         {
             .handler = handle_mnemonic_idiv,
+            .allow_lock_prefix = false,
+            .allow_repz_or_rep_prefix = false,
+            .allow_repnz_or_bnd_prefix = false,
+        },
+    [MNEMONIC_SHLD] =
+        {
+            .handler = handle_mnemonic_shld,
             .allow_lock_prefix = false,
             .allow_repz_or_rep_prefix = false,
             .allow_repnz_or_bnd_prefix = false,
