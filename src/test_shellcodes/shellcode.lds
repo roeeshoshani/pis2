@@ -9,6 +9,7 @@ SECTIONS
 		*(.data*)
 		*(.got*)
 		*(.bss*)
+		*(.eh_frame)
 	} :all
 
 	/*
