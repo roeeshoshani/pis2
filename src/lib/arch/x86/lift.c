@@ -56,9 +56,8 @@ typedef err_t (*mnemonic_handler_t)(ctx_t* ctx, const lifted_op_t* ops, size_t o
 
 /// the prototype for a binary operation function - that is an operation which takes 2 input
 /// operands and produces a single result, for example an `ADD` operation.
-typedef err_t (*binop_fn_t)(
-    ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result
-);
+typedef err_t (*binop_fn_t
+)(ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, pis_operand_t* result);
 
 /// the prototype for a unary operation function - that is an operation which takes 1 operand and
 /// applies some operation to it, for example a `NOT` operation.
@@ -66,9 +65,8 @@ typedef err_t (*unary_op_fn_t)(ctx_t* ctx, const pis_operand_t* operand, pis_ope
 
 /// the prototype for a flag calculation of a binary operation. the functions takes the 2 input
 /// operands and writes out the result flag value.
-typedef err_t (*binop_calc_flag_fn_t)(
-    ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, const pis_operand_t* result
-);
+typedef err_t (*binop_calc_flag_fn_t
+)(ctx_t* ctx, const pis_operand_t* a, const pis_operand_t* b, const pis_operand_t* result);
 
 /// extracts the condition encoding of an opcode which has a condition encoded in its value.
 static u8 opcode_cond_extract(u8 opcode_byte) {
@@ -2752,7 +2750,7 @@ static const mnemonic_info_t mnemonics_table[MNEMONIC_MAX + 1] = {
         {
             .handler = handle_mnemonic_endbr,
             .allow_lock_prefix = false,
-            .allow_repz_or_rep_prefix = false,
+            .allow_repz_or_rep_prefix = true,
             .allow_repnz_or_bnd_prefix = false,
         },
     [MNEMONIC_POP] =
