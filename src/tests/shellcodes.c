@@ -50,6 +50,7 @@ static err_t lift_mipsbe32r1(pis_lift_args_t* args) {
     err_t err = SUCCESS;
     pis_mips_cpuinfo_t cpuinfo = {
         .endianness = PIS_ENDIANNESS_BIG,
+        .rev = MIPS_REVISION_1,
     };
     CHECK_RETHROW_VERBOSE(pis_mips_lift(args, &cpuinfo));
 cleanup:
@@ -60,6 +61,7 @@ static err_t lift_mipsel32r1(pis_lift_args_t* args) {
     err_t err = SUCCESS;
     pis_mips_cpuinfo_t cpuinfo = {
         .endianness = PIS_ENDIANNESS_LITTLE,
+        .rev = MIPS_REVISION_1,
     };
     CHECK_RETHROW_VERBOSE(pis_mips_lift(args, &cpuinfo));
 cleanup:
