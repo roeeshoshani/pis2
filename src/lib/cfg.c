@@ -132,6 +132,27 @@ cleanup:
     return err;
 }
 
+static bool pis_opcode_is_cfg_jmp(pis_opcode_t opcode) {
+    switch (opcode) {
+        case PIS_OPCODE_JMP:
+            // a regular jump is a CFG jump which is just treated as an inter-function jump.
+        case PIS_OPCODE_JMP_RET:
+            // a ret is a CFG jump which marks the end of an execution path.
+        case PIS_OPCODE_JMP_COND:
+            // a condition jump is a CFG jump which splits the CFG and is treater as an
+            // inter-function jump.
+            return true;
+        case PIS_OPCODE_JMP_CALL:
+            // a call is not a CFG jump, we assume that the function will return and continue
+            // execution on the next instruction.
+        case PIS_OPCODE_JMP_CALL_COND:
+            // a conditional call is also not a CFG jump, because whether the call was taken or
+            // not, execution will continue at the next instruction.
+        default:
+            return false;
+    }
+}
+
 /// checks if the given lift result represent a CFG jump machine instruction, and if so, returns
 /// the pis opcode inside of it that is responsible for performing the jump.
 static err_t find_cfg_jump(const pis_lift_res_t* lift_res, const pis_insn_t** jmp_insn) {
@@ -141,14 +162,15 @@ static err_t find_cfg_jump(const pis_lift_res_t* lift_res, const pis_insn_t** jm
 
     for (size_t i = 0; i < lift_res->insns_amount; i++) {
         const pis_insn_t* cur_insn = &lift_res->insns[i];
-        if (cur_insn->opcode == PIS_OPCODE_JMP || cur_insn->opcode == PIS_OPCODE_JMP_COND) {
-            // the machine instruction contains a pis jump instruction.
+        if (pis_opcode_is_cfg_jmp(cur_insn->opcode)) {
+            // the machine instruction contains a pis jump instruction which looks like a CFG jump.
             //
-            // this might mean that this machine instruction is a CFG jump instruction, or it might
-            // just be an inter-instruction jump. check if the target of the branch is inside of the
-            // current instruction.
+            // this doesn't necessarily mean that this machine instruction is a CFG jump
+            // instruction, since it might also be an inter-instruction jump.
+
             CHECK(cur_insn->operands_amount >= 1);
             const pis_operand_t* jmp_target = &cur_insn->operands[0];
+
             if (jmp_target->addr.space == PIS_SPACE_CONST) {
                 // this jump is an inter-instruction jump. this is used for example to implement the
                 // x86 `REP` prefix, and does not represent an actual CFG jump instruction.
@@ -185,23 +207,73 @@ cleanup:
     return err;
 }
 
-err_t build_cfg_wip(
-    pis_cfg_builder_t* builder, pis_lifter_t lifter, const u8* code, size_t code_len, u64 code_addr
+/// enqueue an unexplored path that should explored when building a CFG.
+static err_t enqueue_unexplored_path(pis_cfg_builder_t* builder, size_t path_start_offset) {
+    err_t err = SUCCESS;
+
+    // make sure that we have more space in our queue.
+    CHECK(builder->unexplored_paths_amount < PIS_CFG_BUILDER_MAX_UNEXPLORED_PATHS);
+
+    // store the unexplored path
+    builder->unexplored_paths_queue[builder->unexplored_paths_amount++].start_offset =
+        path_start_offset;
+
+cleanup:
+    return err;
+}
+
+/// enqueue an unexplored path that should explored when building a CFG.
+static err_t dequeue_unexplored_path(pis_cfg_builder_t* builder, size_t* path_start_offset) {
+    err_t err = SUCCESS;
+
+    // make sure that we have more space in our queue.
+    CHECK(builder->unexplored_paths_amount > 0);
+
+    // store the unexplored path
+    *path_start_offset =
+        builder->unexplored_paths_queue[builder->unexplored_paths_amount--].start_offset;
+
+cleanup:
+    return err;
+}
+
+/// queue an unexplored path that should explored when building a CFG.
+static err_t enqueue_unexplored_path_by_jmp_target(
+    pis_cfg_builder_t* builder, const pis_operand_t* jmp_target
 ) {
     err_t err = SUCCESS;
 
-    // reset the fields of the CFG builder.
-    pis_cfg_reset(&builder->cfg);
-    builder->cur_block_id = PIS_CFG_ITEM_ID_INVALID;
+    CHECK(jmp_target->addr.space == PIS_SPACE_RAM);
 
-    size_t cur_offset = 0;
+    u64 ram_addr = jmp_target->addr.offset;
+    CHECK(ram_addr >= builder->machine_code_start_addr);
+
+    u64 offset = ram_addr - builder->machine_code_start_addr;
+    CHECK(offset < builder->machine_code_len);
+
+    CHECK_RETHROW(enqueue_unexplored_path(builder, offset));
+
+cleanup:
+    return err;
+}
+
+/// explore a single path of the CFG.
+static err_t explore_path(pis_cfg_builder_t* builder, size_t path_start_offset) {
+    err_t err = SUCCESS;
+
+    size_t cur_offset = path_start_offset;
     while (1) {
+        CHECK(cur_offset < builder->machine_code_len);
+
         pis_lift_args_t lift_args = {
-            .machine_code = CURSOR_INIT(code + cur_offset, code_len - cur_offset),
-            .machine_code_addr = code_addr + cur_offset,
+            .machine_code = CURSOR_INIT(
+                builder->machine_code_start + cur_offset,
+                builder->machine_code_len - cur_offset
+            ),
+            .machine_code_addr = builder->machine_code_start_addr + cur_offset,
         };
 
-        CHECK_RETHROW(lifter(&lift_args));
+        CHECK_RETHROW(builder->lifter(&lift_args));
 
         // create a cfg unit for this machine instruction
         pis_cfg_item_id_t unit_id = PIS_CFG_ITEM_ID_INVALID;
@@ -209,17 +281,97 @@ err_t build_cfg_wip(
             make_unit(&builder->cfg, &lift_args.result, lift_args.machine_code_addr, &unit_id)
         );
 
+        // check if this machine instruction is a CFG jump instruction, and if so, find the relevant
+        // pis instruction.
         const pis_insn_t* cfg_jmp_insn = NULL;
         CHECK_RETHROW(find_cfg_jump(&lift_args.result, &cfg_jmp_insn));
 
         CHECK_RETHROW(cfg_builder_append_to_cur_block(builder, unit_id));
 
         if (cfg_jmp_insn != NULL) {
-            // this is a cfg jump instruction. this will mark the end of the current block.
+            // this is a cfg jump instruction. handle it accordingly.
+
+            // find the target of the jump
+            CHECK(cfg_jmp_insn->operands_amount >= 1);
+            const pis_operand_t* jmp_target = &cfg_jmp_insn->operands[0];
+
+            bool continue_exploring_current_path;
+            switch (cfg_jmp_insn->opcode) {
+                case PIS_OPCODE_JMP:
+                    // regular jump. this is assumed to be a jump into somewhere inside the current
+                    // function. queue exploration of the branch target.
+                    CHECK_RETHROW(enqueue_unexplored_path_by_jmp_target(builder, jmp_target));
+
+                    // we finished exploring the current path.
+                    continue_exploring_current_path = false;
+
+                    break;
+                case PIS_OPCODE_JMP_RET:
+                    // ret. this marks the end of a path, and doesn't require any further
+                    // exploration.
+
+                    // we finished exploring the current path.
+                    continue_exploring_current_path = false;
+
+                    break;
+                case PIS_OPCODE_JMP_COND:
+                    // conditional jump. this is assumed to be a jump into somewhere inside the
+                    // current function. queue exploration of the branch target.
+                    CHECK_RETHROW(enqueue_unexplored_path_by_jmp_target(builder, jmp_target));
+
+                    // the jump is conditional, so also continue exploration of the current path, in
+                    // case the branch is not taken.
+                    continue_exploring_current_path = true;
+
+                    break;
+                default:
+                    UNREACHABLE();
+                    break;
+            }
+
+            if (!continue_exploring_current_path) {
+                // stop exploring.
+                break;
+            }
         }
 
         // advance to the next instruction
         cur_offset += lift_args.result.machine_insn_len;
+    }
+cleanup:
+    return err;
+}
+
+void pis_cfg_builder_init(
+    pis_cfg_builder_t* builder,
+    pis_lifter_t lifter,
+    const u8* machine_code_start,
+    size_t machine_code_len,
+    u64 machine_code_start_addr
+) {
+    builder->lifter = lifter;
+    builder->machine_code_start = machine_code_start;
+    builder->machine_code_len = machine_code_len;
+    builder->machine_code_start_addr = machine_code_start_addr;
+
+    pis_cfg_reset(&builder->cfg);
+    builder->cur_block_id = PIS_CFG_ITEM_ID_INVALID;
+    builder->unexplored_paths_amount = 0;
+}
+
+err_t build_cfg_wip(pis_cfg_builder_t* builder) {
+    err_t err = SUCCESS;
+
+    // reset the fields of the CFG builder.
+    pis_cfg_reset(&builder->cfg);
+    builder->cur_block_id = PIS_CFG_ITEM_ID_INVALID;
+
+    CHECK_RETHROW(enqueue_unexplored_path(builder, 0));
+
+    while (builder->unexplored_paths_amount > 0) {
+        size_t path_start_offset = 0;
+        CHECK_RETHROW(dequeue_unexplored_path(builder, &path_start_offset));
+        CHECK_RETHROW(explore_path(builder, path_start_offset));
     }
 cleanup:
     return err;
