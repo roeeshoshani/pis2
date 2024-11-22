@@ -5,6 +5,7 @@
 #include "../lib/arch/x86/regs.h"
 #include "../lib/emu.h"
 #include "../lib/except.h"
+#include "../lib/lifter.h"
 #include "../lib/pis.h"
 #include "../lib/utils.h"
 #include "test_utils.h"
@@ -22,51 +23,14 @@ typedef struct {
     u64 arg4;
 } shellcode_args_t;
 
-typedef err_t (*lift_fn_t)(pis_lift_args_t* args);
 typedef err_t (*prepare_fn_t)(pis_emu_t* emu, const shellcode_args_t* args);
 
 typedef struct {
-    lift_fn_t lift;
+    pis_lifter_t lift;
     prepare_fn_t prepare;
     pis_endianness_t endianness;
     const pis_operand_t* result_operand;
 } arch_def_t;
-
-static err_t lift_x86_64(pis_lift_args_t* args) {
-    err_t err = SUCCESS;
-    CHECK_RETHROW_VERBOSE(pis_x86_lift(args, PIS_X86_CPUMODE_64_BIT));
-cleanup:
-    return err;
-}
-
-static err_t lift_i686(pis_lift_args_t* args) {
-    err_t err = SUCCESS;
-    CHECK_RETHROW_VERBOSE(pis_x86_lift(args, PIS_X86_CPUMODE_32_BIT));
-cleanup:
-    return err;
-}
-
-static err_t lift_mipsbe32r1(pis_lift_args_t* args) {
-    err_t err = SUCCESS;
-    pis_mips_cpuinfo_t cpuinfo = {
-        .endianness = PIS_ENDIANNESS_BIG,
-        .rev = MIPS_REVISION_1,
-    };
-    CHECK_RETHROW_VERBOSE(pis_mips_lift(args, &cpuinfo));
-cleanup:
-    return err;
-}
-
-static err_t lift_mipsel32r1(pis_lift_args_t* args) {
-    err_t err = SUCCESS;
-    pis_mips_cpuinfo_t cpuinfo = {
-        .endianness = PIS_ENDIANNESS_LITTLE,
-        .rev = MIPS_REVISION_1,
-    };
-    CHECK_RETHROW_VERBOSE(pis_mips_lift(args, &cpuinfo));
-cleanup:
-    return err;
-}
 
 /// initialize registers that should be unused by the shellcode.
 /// we need to initialize them since the shellcode may still sometimes read them, for example when
@@ -190,35 +154,35 @@ cleanup:
 }
 
 const arch_def_t arch_def_x86_64 = {
-    .lift = lift_x86_64,
+    .lift = pis_lifter_x86_64,
     .prepare = prepare_x86_64,
     .endianness = PIS_ENDIANNESS_LITTLE,
     .result_operand = &X86_RAX,
 };
 
 const arch_def_t arch_def_i686 = {
-    .lift = lift_i686,
+    .lift = pis_lifter_i686,
     .prepare = prepare_i686,
     .endianness = PIS_ENDIANNESS_LITTLE,
     .result_operand = &X86_EAX,
 };
 
 const arch_def_t arch_def_mipsbe32r1 = {
-    .lift = lift_mipsbe32r1,
+    .lift = pis_lifter_mipsbe32r1,
     .prepare = prepare_mips32,
     .endianness = PIS_ENDIANNESS_BIG,
     .result_operand = &MIPS_REG_V0,
 };
 
 const arch_def_t arch_def_mipsel32r1 = {
-    .lift = lift_mipsel32r1,
+    .lift = pis_lifter_mipsel32r1,
     .prepare = prepare_mips32,
     .endianness = PIS_ENDIANNESS_LITTLE,
     .result_operand = &MIPS_REG_V0,
 };
 
 static err_t
-    run_arch_specific_shellcode(pis_emu_t* emu, const shellcode_t* shellcode, lift_fn_t lift_fn) {
+    run_arch_specific_shellcode(pis_emu_t* emu, const shellcode_t* shellcode, pis_lifter_t lifter) {
     err_t err = SUCCESS;
 
     size_t code_len = shellcode->code_end - shellcode->code;
@@ -230,7 +194,7 @@ static err_t
             .machine_code_addr = SHELLCODE_BASE_ADDR + cur_offset,
         };
         CHECK_RETHROW_TRACE(
-            lift_fn(&args),
+            lifter(&args),
             "failed to lift insn at offset 0x%lx in shellcode %s",
             cur_offset,
             shellcode->name
