@@ -1,4 +1,5 @@
 #include "lift.h"
+#include "cpuinfo.h"
 #include "ctx.h"
 #include "insn_fields.h"
 #include "regs.h"
@@ -1472,6 +1473,28 @@ err_t pis_mips_lift(pis_lift_args_t* args, const pis_mips_cpuinfo_t* cpuinfo) {
 
     args->result.machine_insn_len = cursor_index(&args->machine_code);
 
+cleanup:
+    return err;
+}
+
+err_t pis_lifter_mipsbe32r1(pis_lift_args_t* args) {
+    err_t err = SUCCESS;
+    pis_mips_cpuinfo_t cpuinfo = {
+        .endianness = PIS_ENDIANNESS_BIG,
+        .rev = MIPS_REVISION_1,
+    };
+    CHECK_RETHROW(pis_mips_lift(args, &cpuinfo));
+cleanup:
+    return err;
+}
+
+err_t pis_lifter_mipsel32r1(pis_lift_args_t* args) {
+    err_t err = SUCCESS;
+    pis_mips_cpuinfo_t cpuinfo = {
+        .endianness = PIS_ENDIANNESS_LITTLE,
+        .rev = MIPS_REVISION_1,
+    };
+    CHECK_RETHROW(pis_mips_lift(args, &cpuinfo));
 cleanup:
     return err;
 }

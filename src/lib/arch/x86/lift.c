@@ -3322,3 +3322,21 @@ err_t pis_x86_lift(pis_lift_args_t* args, pis_x86_cpumode_t cpumode) {
 cleanup:
     return err;
 }
+
+err_t pis_lifter_x86_64(pis_lift_args_t* args) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW(pis_x86_lift(args, PIS_X86_CPUMODE_64_BIT));
+
+cleanup:
+    return err;
+}
+
+err_t pis_lifter_i686(pis_lift_args_t* args) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW(pis_x86_lift(args, PIS_X86_CPUMODE_32_BIT));
+
+cleanup:
+    return err;
+}
