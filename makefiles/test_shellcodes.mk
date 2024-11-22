@@ -24,10 +24,10 @@ CC_x86_64 := x86_64-linux-gnu-gcc
 SHELLCODE_CFLAGS_x86_64 := -mno-sse -mno-avx
 
 CC_mipsbe32r1 := mips-linux-gnu-gcc
-SHELLCODE_CFLAGS_mipsbe32r1 := -march=mips1 -mfp32
+SHELLCODE_CFLAGS_mipsbe32r1 := -march=mips1 -mfp32 -mno-check-zero-division
 
 CC_mipsel32r1 := mipsel-linux-gnu-gcc
-SHELLCODE_CFLAGS_mipsel32r1 := -march=mips1 -mfp32
+SHELLCODE_CFLAGS_mipsel32r1 := -march=mips1 -mfp32 -mno-check-zero-division
 
 .PRECIOUS: build/test_shellcodes/%.bin.shellcode
 build/test_shellcodes/%.bin.shellcode: build/test_shellcodes/%.elf.shellcode
