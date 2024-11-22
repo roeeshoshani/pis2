@@ -2,8 +2,8 @@
 
 #include "utils.h"
 
-#define STR_ENUM(NAME, FIELDS_FN)                                                                  \
-    typedef enum {                                                                                 \
+#define STR_ENUM(NAME, FIELDS_FN, ATTRS)                                                           \
+    typedef enum ATTRS {                                                                           \
         FIELDS_FN(STR_ENUM_BODY_FIELDS_CALLBACK)                                                   \
     } NAME##_t;                                                                                    \
     const char* NAME##_to_str(NAME##_t value)

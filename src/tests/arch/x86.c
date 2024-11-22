@@ -21,7 +21,7 @@ static err_t emulate_insn(pis_emu_t* emu, code_t code, pis_x86_cpumode_t cpumode
 
     CHECK_TRACE(
         args.result.machine_insn_len == code.len,
-        "expected the instruction to be %lu bytes, instead it was %lu bytes",
+        "expected the instruction to be %lu bytes, instead it was %u bytes",
         code.len,
         args.result.machine_insn_len
     );
