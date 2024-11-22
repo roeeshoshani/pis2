@@ -2,6 +2,8 @@
 
 #include "pis.h"
 #include "types.h"
+#include "lifter.h"
+#include <limits.h>
 
 #define PIS_CFG_MAX_INSNS 8192
 #define PIS_CFG_MAX_UNITS 2048
@@ -11,10 +13,10 @@
 
 #define PIS_CFG_BLOCK_MAX_UNITS 512
 
-/// an insn identifier. this is basically an index into the insn storage of the cfg.
-typedef struct {
-    u16 index;
-} pis_cfg_insn_id_t;
+#define PIS_CFG_ITEM_ID_MAX (UINT16_MAX)
+#define PIS_CFG_ITEM_ID_INVALID (PIS_CFG_ITEM_ID_MAX)
+
+typedef u16 pis_cfg_item_id_t;
 
 /// represents a single CFG "unit". a unit corresponds to a single machine instruction in the
 /// original machine code.
@@ -23,22 +25,17 @@ typedef struct {
     u64 addr;
 
     /// the id of the first instruction of the sequence of pis instruction that belongs to this unit.
-    pis_cfg_insn_id_t first_insn_id;
+    pis_cfg_item_id_t first_insn_id;
 
     /// the amount of pis instructions in this unit.
     u8 insns_amount;
 } pis_cfg_unit_t;
 
-/// a unit identifier. this is basically an index into the unit storage of the cfg.
-typedef struct {
-    u16 index;
-} pis_cfg_unit_id_t;
-
 /// represents a single CFG "block". a block is a collection of units which ends with some control flow operation, and can be pointed
 /// to by other blocks.
 typedef struct {
     /// the id of the first unit of the sequence of units that belongs to this block.
-    pis_cfg_unit_id_t first_unit_id;
+    pis_cfg_item_id_t first_unit_id;
 
     /// the amount of units in this block.
     u16 units_amount;
@@ -51,8 +48,10 @@ typedef struct {
     pis_cfg_unit_t unit_storage[PIS_CFG_MAX_UNITS];
     size_t units_amount;
 
-    pis_cfg_block_t blocks[PIS_CFG_MAX_BLOCKS];
+    pis_cfg_block_t block_storage[PIS_CFG_MAX_BLOCKS];
     size_t blocks_amount;
 } pis_cfg_t;
 
 void pis_cfg_init(pis_cfg_t* cfg);
+
+err_t build_cfg_wip(pis_cfg_t* cfg, pis_lifter_t lifter, cursor_t code, u64 code_addr);

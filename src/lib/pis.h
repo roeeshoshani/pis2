@@ -188,7 +188,7 @@ typedef struct {
     pis_insn_t insns[PIS_LIFT_MAX_INSNS_AMOUNT];
     u8 insns_amount;
     u8 machine_insn_len;
-} __attribute__((packed)) pis_lift_res_t;
+} pis_lift_res_t;
 
 void pis_addr_dump(const pis_addr_t* addr);
 bool pis_addr_equals(const pis_addr_t* a, const pis_addr_t* b);
