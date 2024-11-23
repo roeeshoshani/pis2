@@ -40,6 +40,7 @@ typedef enum {
     CDFG_NODE_KIND_STORE,
     CDFG_NODE_KIND_LOAD,
     CDFG_NODE_KIND_ENTRY,
+    CDFG_NODE_KIND_IF,
 } __attribute__((packed)) cdfg_node_kind_t;
 
 /// a CDFG variable node. this is used to represent an access to a register without previous

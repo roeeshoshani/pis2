@@ -264,6 +264,35 @@ cleanup:
     return err;
 }
 
+static err_t make_if_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
+    err_t err = SUCCESS;
+
+    cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(next_node_id(cdfg, &node_id));
+
+    cdfg->node_storage[node_id] = (cdfg_node_t) {
+        .kind = CDFG_NODE_KIND_IF,
+        .content = {},
+    };
+
+    *out_node_id = node_id;
+cleanup:
+    return err;
+}
+
+static err_t do_if(cdfg_builder_t* builder, cdfg_item_id_t cond_node_id) {
+    err_t err = SUCCESS;
+
+    cdfg_item_id_t if_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(make_if_node(&builder->cdfg, &if_node_id));
+
+    CHECK_RETHROW(make_edge(&builder->cdfg, CDFG_EDGE_KIND_DATA_FLOW, cond_node_id, if_node_id, 0));
+
+    CHECK_RETHROW(link_cf_node(builder, if_node_id));
+cleanup:
+    return err;
+}
+
 static err_t
     do_store(cdfg_builder_t* builder, cdfg_item_id_t addr_node_id, cdfg_item_id_t val_node_id) {
     err_t err = SUCCESS;
@@ -1081,9 +1110,17 @@ cleanup:
 
 static err_t opcode_handler_jmp_cond(cdfg_builder_t* builder, const pis_insn_t* insn) {
     err_t err = SUCCESS;
-    // TODO: how tf do i do this...
-    UNUSED(builder);
-    UNUSED(insn);
+
+    CHECK_CODE(insn->operands_amount == 2, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+    // check operand sizes
+    CHECK_CODE(insn->operands[1].size == PIS_SIZE_1, PIS_ERR_OPERAND_SIZE_MISMATCH);
+
+    cdfg_item_id_t cond_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(read_operand(builder, &insn->operands[1], &cond_node_id));
+
+    CHECK_RETHROW(do_if(builder, cond_node_id));
+
     goto cleanup;
 cleanup:
     return err;
@@ -1176,16 +1213,16 @@ static void cdfg_dump_node_desc(const cdfg_node_t* node) {
             break;
         case CDFG_NODE_KIND_VAR:
             TRACE_NO_NEWLINE(
-                "var_off_0x%lx_sz_%u",
+                "var off 0x%lx sz %u",
                 node->content.var.reg_offset,
                 pis_size_to_bytes(node->content.var.reg_size)
             );
             break;
         case CDFG_NODE_KIND_IMM:
-            TRACE_NO_NEWLINE("0x%lx", node->content.imm.value);
+            TRACE_NO_NEWLINE("imm 0x%lx", node->content.imm.value);
             break;
         case CDFG_NODE_KIND_CALC:
-            TRACE_NO_NEWLINE("calc_%s", cdfg_calculation_to_str(node->content.calc.calculation));
+            TRACE_NO_NEWLINE("calc %s", cdfg_calculation_to_str(node->content.calc.calculation));
             break;
         case CDFG_NODE_KIND_STORE:
             TRACE_NO_NEWLINE("store");
@@ -1193,13 +1230,14 @@ static void cdfg_dump_node_desc(const cdfg_node_t* node) {
         case CDFG_NODE_KIND_LOAD:
             TRACE_NO_NEWLINE("load");
             break;
-        default:
+        case CDFG_NODE_KIND_IF:
+            TRACE_NO_NEWLINE("if");
             break;
     }
 }
 
 static void cdfg_dump_node(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
-    TRACE_NO_NEWLINE("id_%u_", node_id);
+    TRACE_NO_NEWLINE("id %u ", node_id);
     cdfg_dump_node_desc(&cdfg->node_storage[node_id]);
 }
 
