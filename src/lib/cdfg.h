@@ -27,6 +27,7 @@ typedef enum {
 /// the operation performed by a CDFG operation node.
 typedef enum {
     CDFG_CALCULATION_AND,
+    CDFG_CALCULATION_ADD,
     CDFG_CALCULATION_OR,
     CDFG_CALCULATION_SHIFT_RIGHT,
     CDFG_CALCULATION_SHIFT_LEFT,
@@ -100,6 +101,9 @@ typedef struct {
 typedef struct {
     /// the built CDFG.
     cdfg_t cdfg;
+
+    /// the current operands state.
+    cdfg_op_state_t op_state;
 
     /// the endianness of the lifted code.
     pis_endianness_t endianness;
