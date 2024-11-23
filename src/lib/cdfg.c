@@ -1097,6 +1097,21 @@ cleanup:
     return err;
 }
 
+/// invalidate all slots which represent tmp operands.
+static void invalidate_tmps(cdfg_op_state_t* op_state) {
+    for (size_t i = 0; i < op_state->used_slots_amount; i++) {
+        cdfg_op_state_slot_t* slot = &op_state->slots[i];
+        if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
+            // this slot is vacant.
+            continue;
+        }
+        if (slot->operand.addr.space == PIS_SPACE_TMP) {
+            // invalidate the slot
+            slot->value_node_id = CDFG_ITEM_ID_INVALID;
+        }
+    }
+}
+
 err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t endianness) {
     err_t err = SUCCESS;
 
@@ -1120,6 +1135,8 @@ err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t end
             const pis_insn_t* insn = &unit_insns[insn_idx];
             CHECK_RETHROW(process_insn(builder, insn));
         }
+        // invalidate all tmps. tmps are only valid for the unit in which they were defined.
+        invalidate_tmps(&builder->op_state);
     }
 
 cleanup:
