@@ -7,21 +7,21 @@
 
 #include <string.h>
 
-void pis_cfg_reset(pis_cfg_t* cfg) {
+void cfg_reset(cfg_t* cfg) {
     memset(cfg, 0, sizeof(*cfg));
 }
 
-static err_t next_id(size_t* items_amount, pis_cfg_item_id_t* id) {
+static err_t next_id(size_t* items_amount, cfg_item_id_t* id) {
     err_t err = SUCCESS;
 
     // make sure that we have more space in our storage.
-    CHECK(*items_amount < PIS_CFG_MAX_UNITS);
+    CHECK(*items_amount < CFG_MAX_UNITS);
 
     // allocate a new unit
     size_t index = (*items_amount)++;
 
     // check for overflow when casting to the item id type
-    CHECK(index <= PIS_CFG_ITEM_ID_MAX);
+    CHECK(index <= CFG_ITEM_ID_MAX);
 
     *id = index;
 
@@ -29,7 +29,7 @@ cleanup:
     return err;
 }
 
-static err_t next_insn_id(pis_cfg_t* cfg, pis_cfg_item_id_t* id) {
+static err_t next_insn_id(cfg_t* cfg, cfg_item_id_t* id) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(next_id(&cfg->insns_amount, id));
@@ -38,7 +38,7 @@ cleanup:
     return err;
 }
 
-static err_t next_unit_id(pis_cfg_t* cfg, pis_cfg_item_id_t* id) {
+static err_t next_unit_id(cfg_t* cfg, cfg_item_id_t* id) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(next_id(&cfg->units_amount, id));
@@ -47,7 +47,7 @@ cleanup:
     return err;
 }
 
-static err_t next_block_id(pis_cfg_t* cfg, pis_cfg_item_id_t* id) {
+static err_t next_block_id(cfg_t* cfg, cfg_item_id_t* id) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(next_id(&cfg->blocks_amount, id));
@@ -56,11 +56,11 @@ cleanup:
     return err;
 }
 
-static err_t make_insn(pis_cfg_t* cfg, const pis_insn_t* insn, pis_cfg_item_id_t* id_out) {
+static err_t make_insn(cfg_t* cfg, const pis_insn_t* insn, cfg_item_id_t* id_out) {
     err_t err = SUCCESS;
 
     // allocate an id
-    pis_cfg_item_id_t insn_id = PIS_CFG_ITEM_ID_INVALID;
+    cfg_item_id_t insn_id = CFG_ITEM_ID_INVALID;
     CHECK_RETHROW(next_insn_id(cfg, &insn_id));
 
     // store the actual pis instruction information
@@ -74,24 +74,24 @@ cleanup:
 }
 
 static err_t make_unit(
-    pis_cfg_t* cfg, const pis_lift_res_t* lift_res, u64 machine_insn_addr, pis_cfg_item_id_t* id_out
+    cfg_t* cfg, const pis_lift_res_t* lift_res, u64 machine_insn_addr, cfg_item_id_t* id_out
 ) {
     err_t err = SUCCESS;
 
     // store all of the pis instructions in the cfg and remember the id of the first one
-    pis_cfg_item_id_t first_insn_id = PIS_CFG_ITEM_ID_INVALID;
+    cfg_item_id_t first_insn_id = CFG_ITEM_ID_INVALID;
     for (size_t i = 0; i < lift_res->insns_amount; i++) {
-        pis_cfg_item_id_t insn_id = PIS_CFG_ITEM_ID_INVALID;
+        cfg_item_id_t insn_id = CFG_ITEM_ID_INVALID;
         CHECK_RETHROW(make_insn(cfg, &lift_res->insns[i], &insn_id));
 
         // if this is the first insn, remember its id.
-        if (first_insn_id == PIS_CFG_ITEM_ID_INVALID) {
+        if (first_insn_id == CFG_ITEM_ID_INVALID) {
             first_insn_id = insn_id;
         }
     }
 
     // allocate an id for the unit
-    pis_cfg_item_id_t unit_id = PIS_CFG_ITEM_ID_INVALID;
+    cfg_item_id_t unit_id = CFG_ITEM_ID_INVALID;
     CHECK_RETHROW(next_unit_id(cfg, &unit_id));
 
     // fill the information about the unit
@@ -107,11 +107,10 @@ cleanup:
     return err;
 }
 
-static err_t
-    block_append_unit(pis_cfg_t* cfg, pis_cfg_item_id_t block_id, pis_cfg_item_id_t unit_id) {
+static err_t block_append_unit(cfg_t* cfg, cfg_item_id_t block_id, cfg_item_id_t unit_id) {
     err_t err = SUCCESS;
 
-    pis_cfg_block_t* block = &cfg->block_storage[block_id];
+    cfg_block_t* block = &cfg->block_storage[block_id];
 
     if (block->units_amount == 0) {
         // no units currently in the block
@@ -123,7 +122,7 @@ static err_t
         // adjacently, due to how we are building the cfg.
 
         // first, make sure that the unit adjacency assumption holds.
-        pis_cfg_item_id_t last_unit_id = block->first_unit_id + block->units_amount - 1;
+        cfg_item_id_t last_unit_id = block->first_unit_id + block->units_amount - 1;
         CHECK(last_unit_id + 1 == unit_id);
 
         // add the unit to the block by just increasing the units amount
@@ -134,7 +133,7 @@ cleanup:
     return err;
 }
 
-static bool pis_opcode_is_cfg_jmp(pis_opcode_t opcode) {
+static bool opcode_is_cfg_jmp(pis_opcode_t opcode) {
     switch (opcode) {
         case PIS_OPCODE_JMP:
             // a regular jump is a CFG jump which is just treated as an inter-function jump.
@@ -164,7 +163,7 @@ static err_t find_cfg_jump(const pis_lift_res_t* lift_res, const pis_insn_t** jm
 
     for (size_t i = 0; i < lift_res->insns_amount; i++) {
         const pis_insn_t* cur_insn = &lift_res->insns[i];
-        if (pis_opcode_is_cfg_jmp(cur_insn->opcode)) {
+        if (opcode_is_cfg_jmp(cur_insn->opcode)) {
             // the machine instruction contains a pis jump instruction which looks like a CFG jump.
             //
             // this doesn't necessarily mean that this machine instruction is a CFG jump
@@ -193,11 +192,10 @@ cleanup:
 }
 
 /// appaneds the given unit to the current block.
-static err_t
-    cfg_builder_append_to_cur_block(pis_cfg_builder_t* builder, pis_cfg_item_id_t unit_id) {
+static err_t cfg_builder_append_to_cur_block(cfg_builder_t* builder, cfg_item_id_t unit_id) {
     err_t err = SUCCESS;
 
-    if (builder->cur_block_id == PIS_CFG_ITEM_ID_INVALID) {
+    if (builder->cur_block_id == CFG_ITEM_ID_INVALID) {
         // no current block, so create a new one.
         CHECK_RETHROW(next_block_id(&builder->cfg, &builder->cur_block_id));
     }
@@ -210,11 +208,11 @@ cleanup:
 }
 
 /// enqueue an unexplored path that should explored when building a CFG.
-static err_t enqueue_unexplored_path(pis_cfg_builder_t* builder, size_t path_start_offset) {
+static err_t enqueue_unexplored_path(cfg_builder_t* builder, size_t path_start_offset) {
     err_t err = SUCCESS;
 
     // make sure that we have more space in our queue.
-    CHECK(builder->unexplored_paths_amount < PIS_CFG_BUILDER_MAX_UNEXPLORED_PATHS);
+    CHECK(builder->unexplored_paths_amount < CFG_BUILDER_MAX_UNEXPLORED_PATHS);
 
     builder->unexplored_paths_queue[builder->unexplored_paths_amount].start_offset =
         path_start_offset;
@@ -226,7 +224,7 @@ cleanup:
 }
 
 /// enqueue an unexplored path that should explored when building a CFG.
-static err_t dequeue_unexplored_path(pis_cfg_builder_t* builder, size_t* path_start_offset) {
+static err_t dequeue_unexplored_path(cfg_builder_t* builder, size_t* path_start_offset) {
     err_t err = SUCCESS;
 
     // make sure that we have more space in our queue.
@@ -242,9 +240,8 @@ cleanup:
 }
 
 /// queue an unexplored path that should explored when building a CFG.
-static err_t enqueue_unexplored_path_by_jmp_target(
-    pis_cfg_builder_t* builder, const pis_operand_t* jmp_target
-) {
+static err_t
+    enqueue_unexplored_path_by_jmp_target(cfg_builder_t* builder, const pis_operand_t* jmp_target) {
     err_t err = SUCCESS;
 
     CHECK(jmp_target->addr.space == PIS_SPACE_RAM);
@@ -262,23 +259,21 @@ cleanup:
 }
 
 /// calculates the start and end machine code addresses of the given block.
-err_t pis_cfg_block_addr_range(
-    const pis_cfg_t* cfg, pis_cfg_item_id_t block_id, u64* start, u64* end
-) {
+err_t cfg_block_addr_range(const cfg_t* cfg, cfg_item_id_t block_id, u64* start, u64* end) {
     err_t err = SUCCESS;
 
     CHECK(block_id < cfg->blocks_amount);
 
-    const pis_cfg_block_t* block = &cfg->block_storage[block_id];
+    const cfg_block_t* block = &cfg->block_storage[block_id];
 
     // make sure that the block has any content
     CHECK(block->units_amount > 0);
 
-    const pis_cfg_unit_t* first_unit = &cfg->unit_storage[block->first_unit_id];
+    const cfg_unit_t* first_unit = &cfg->unit_storage[block->first_unit_id];
     *start = first_unit->addr;
 
-    pis_cfg_item_id_t last_unit_id = block->first_unit_id + block->units_amount - 1;
-    const pis_cfg_unit_t* last_unit = &cfg->unit_storage[last_unit_id];
+    cfg_item_id_t last_unit_id = block->first_unit_id + block->units_amount - 1;
+    const cfg_unit_t* last_unit = &cfg->unit_storage[last_unit_id];
     *end = last_unit->addr + last_unit->machine_insn_len;
 
 cleanup:
@@ -287,17 +282,16 @@ cleanup:
 
 /// tries to find a block in the CFG which contains the given machine code address.
 /// the id of the block that was found is returned in `found_block_id`.
-/// if no block was found, `found_block_id` is set to `PIS_CFG_ITEM_ID_INVALID`.
-static err_t
-    find_block_containing_addr(const pis_cfg_t* cfg, u64 addr, pis_cfg_item_id_t* found_block_id) {
+/// if no block was found, `found_block_id` is set to `CFG_ITEM_ID_INVALID`.
+static err_t find_block_containing_addr(const cfg_t* cfg, u64 addr, cfg_item_id_t* found_block_id) {
     err_t err = SUCCESS;
 
-    *found_block_id = PIS_CFG_ITEM_ID_INVALID;
+    *found_block_id = CFG_ITEM_ID_INVALID;
 
     for (size_t i = 0; i < cfg->blocks_amount; i++) {
         u64 block_start = 0;
         u64 block_end = 0;
-        CHECK_RETHROW(pis_cfg_block_addr_range(cfg, i, &block_start, &block_end));
+        CHECK_RETHROW(cfg_block_addr_range(cfg, i, &block_start, &block_end));
 
         if (addr >= block_start && addr < block_end) {
             *found_block_id = i;
@@ -309,12 +303,12 @@ cleanup:
     return err;
 }
 
-static pis_cfg_item_id_t
-    block_find_unit_containing_addr(const pis_cfg_t* cfg, const pis_cfg_block_t* block, u64 addr) {
-    pis_cfg_item_id_t end_id = block->first_unit_id + block->units_amount;
+static cfg_item_id_t
+    block_find_unit_containing_addr(const cfg_t* cfg, const cfg_block_t* block, u64 addr) {
+    cfg_item_id_t end_id = block->first_unit_id + block->units_amount;
 
-    for (pis_cfg_item_id_t i = block->first_unit_id; i < end_id; i++) {
-        const pis_cfg_unit_t* unit = &cfg->unit_storage[i];
+    for (cfg_item_id_t i = block->first_unit_id; i < end_id; i++) {
+        const cfg_unit_t* unit = &cfg->unit_storage[i];
 
         u64 unit_end_addr = unit->addr + unit->machine_insn_len;
 
@@ -325,24 +319,23 @@ static pis_cfg_item_id_t
     }
 
     // no unit was found.
-    return PIS_CFG_ITEM_ID_INVALID;
+    return CFG_ITEM_ID_INVALID;
 }
 
 /// explore a path of the code which was already explored previously, and is already contained in an
 /// existing block in the CFG.
-static err_t explore_seen_path(
-    pis_cfg_builder_t* builder, pis_cfg_item_id_t block_id, size_t path_start_offset
-) {
+static err_t
+    explore_seen_path(cfg_builder_t* builder, cfg_item_id_t block_id, size_t path_start_offset) {
     err_t err = SUCCESS;
 
     u64 path_start_addr = builder->machine_code_start_addr + path_start_offset;
 
-    pis_cfg_block_t* block = &builder->cfg.block_storage[block_id];
+    cfg_block_t* block = &builder->cfg.block_storage[block_id];
 
     // find the start address of the block
     u64 block_start = 0;
     u64 block_end = 0;
-    CHECK_RETHROW(pis_cfg_block_addr_range(&builder->cfg, block_id, &block_start, &block_end));
+    CHECK_RETHROW(cfg_block_addr_range(&builder->cfg, block_id, &block_start, &block_end));
 
     if (block_start == path_start_offset) {
         // if some flow in the code leads back to the start of this block, there is nothing for us
@@ -354,22 +347,21 @@ static err_t explore_seen_path(
     // split it.
 
     // find which unit inside of the block this new path points to.
-    pis_cfg_item_id_t unit_id =
-        block_find_unit_containing_addr(&builder->cfg, block, path_start_addr);
+    cfg_item_id_t unit_id = block_find_unit_containing_addr(&builder->cfg, block, path_start_addr);
 
     // this block should contain the path, so we expect to find a unit which contains it.
-    CHECK(unit_id != PIS_CFG_ITEM_ID_INVALID);
+    CHECK(unit_id != CFG_ITEM_ID_INVALID);
 
-    pis_cfg_unit_t* unit = &builder->cfg.unit_storage[unit_id];
+    cfg_unit_t* unit = &builder->cfg.unit_storage[unit_id];
 
     // the path is contained in this unit. make sure that it points to the start of the
     // unit, otherwise the machine code contains jumps to mid-instructions.
     CHECK(path_start_addr == unit->addr);
 
     // now lets start splitting. first create a new block.
-    pis_cfg_item_id_t new_block_id = PIS_CFG_ITEM_ID_INVALID;
+    cfg_item_id_t new_block_id = CFG_ITEM_ID_INVALID;
     CHECK_RETHROW(next_block_id(&builder->cfg, &new_block_id));
-    pis_cfg_block_t* new_block = &builder->cfg.block_storage[new_block_id];
+    cfg_block_t* new_block = &builder->cfg.block_storage[new_block_id];
 
     // the new block should start with the unit which this new path points to. for example if the
     // machine code contains a jump to some instruction in the middle of an existing block, we want
@@ -378,7 +370,7 @@ static err_t explore_seen_path(
 
     // the new block contains all instruction starting from the first one up to the end of the
     // original block.
-    pis_cfg_item_id_t unit_offset_in_block = unit_id - block->first_unit_id;
+    cfg_item_id_t unit_offset_in_block = unit_id - block->first_unit_id;
     new_block->units_amount = block->units_amount - unit_offset_in_block;
 
     // now truncate the original block to only contain unit up to the unit which contains the path.
@@ -388,9 +380,8 @@ cleanup:
     return err;
 }
 
-static err_t enqueue_cfg_jmp_paths(
-    pis_cfg_builder_t* builder, const pis_insn_t* insn, size_t next_insn_offset
-) {
+static err_t
+    enqueue_cfg_jmp_paths(cfg_builder_t* builder, const pis_insn_t* insn, size_t next_insn_offset) {
     err_t err = SUCCESS;
 
     // find the target of the jump
@@ -423,7 +414,7 @@ cleanup:
 }
 
 /// explore a previously unseen path of the code.
-static err_t explore_unseen_path(pis_cfg_builder_t* builder, size_t path_start_offset) {
+static err_t explore_unseen_path(cfg_builder_t* builder, size_t path_start_offset) {
     err_t err = SUCCESS;
 
     size_t cur_offset = path_start_offset;
@@ -433,9 +424,9 @@ static err_t explore_unseen_path(pis_cfg_builder_t* builder, size_t path_start_o
         // when exploring unseen path, we might reach a point where the next instruction that we are
         // about to explore was already previously explored because there was a branch to it in the
         // code.
-        pis_cfg_item_id_t existing_block_id = PIS_CFG_ITEM_ID_INVALID;
+        cfg_item_id_t existing_block_id = CFG_ITEM_ID_INVALID;
         CHECK_RETHROW(find_block_containing_addr(&builder->cfg, cur_offset, &existing_block_id));
-        if (existing_block_id != PIS_CFG_ITEM_ID_INVALID) {
+        if (existing_block_id != CFG_ITEM_ID_INVALID) {
             // the next instruction was already explored and exists in another block. so, the
             // current block is finished, and it just falls through to that block.
             break;
@@ -454,7 +445,7 @@ static err_t explore_unseen_path(pis_cfg_builder_t* builder, size_t path_start_o
         size_t next_offset = cur_offset + lift_args.result.machine_insn_len;
 
         // create a cfg unit for this machine instruction
-        pis_cfg_item_id_t unit_id = PIS_CFG_ITEM_ID_INVALID;
+        cfg_item_id_t unit_id = CFG_ITEM_ID_INVALID;
         CHECK_RETHROW(
             make_unit(&builder->cfg, &lift_args.result, lift_args.machine_code_addr, &unit_id)
         );
@@ -481,22 +472,22 @@ static err_t explore_unseen_path(pis_cfg_builder_t* builder, size_t path_start_o
     }
 
     // we finished building the current block, don't append any other units to it.
-    builder->cur_block_id = PIS_CFG_ITEM_ID_INVALID;
+    builder->cur_block_id = CFG_ITEM_ID_INVALID;
 
 cleanup:
     return err;
 }
 
 /// explore a single path of the code and build it into the CFG.
-static err_t explore_path(pis_cfg_builder_t* builder, size_t path_start_offset) {
+static err_t explore_path(cfg_builder_t* builder, size_t path_start_offset) {
     err_t err = SUCCESS;
 
     u64 path_start_addr = builder->machine_code_start_addr + path_start_offset;
 
     // first, check if we already have a block which contains this code.
-    pis_cfg_item_id_t existing_block_id = PIS_CFG_ITEM_ID_INVALID;
+    cfg_item_id_t existing_block_id = CFG_ITEM_ID_INVALID;
     CHECK_RETHROW(find_block_containing_addr(&builder->cfg, path_start_addr, &existing_block_id));
-    if (existing_block_id != PIS_CFG_ITEM_ID_INVALID) {
+    if (existing_block_id != CFG_ITEM_ID_INVALID) {
         // this path was already explored and is part of an existing block.
         CHECK_RETHROW(explore_seen_path(builder, existing_block_id, path_start_offset));
     } else {
@@ -509,7 +500,7 @@ cleanup:
 }
 
 static void builder_init(
-    pis_cfg_builder_t* builder,
+    cfg_builder_t* builder,
     pis_lifter_t lifter,
     const u8* machine_code,
     size_t machine_code_len,
@@ -520,13 +511,13 @@ static void builder_init(
     builder->machine_code_len = machine_code_len;
     builder->machine_code_start_addr = machine_code_start_addr;
 
-    pis_cfg_reset(&builder->cfg);
-    builder->cur_block_id = PIS_CFG_ITEM_ID_INVALID;
+    cfg_reset(&builder->cfg);
+    builder->cur_block_id = CFG_ITEM_ID_INVALID;
     builder->unexplored_paths_amount = 0;
 }
 
-err_t pis_cfg_build(
-    pis_cfg_builder_t* builder,
+err_t cfg_build(
+    cfg_builder_t* builder,
     pis_lifter_t lifter,
     const u8* machine_code,
     size_t machine_code_len,
