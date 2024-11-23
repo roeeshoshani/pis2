@@ -430,6 +430,17 @@ static err_t explore_unseen_path(pis_cfg_builder_t* builder, size_t path_start_o
     while (1) {
         CHECK(cur_offset < builder->machine_code_len);
 
+        // when exploring unseen path, we might reach a point where the next instruction that we are
+        // about to explore was already previously explored because there was a branch to it in the
+        // code.
+        pis_cfg_item_id_t existing_block_id = PIS_CFG_ITEM_ID_INVALID;
+        CHECK_RETHROW(find_block_containing_addr(&builder->cfg, cur_offset, &existing_block_id));
+        if (existing_block_id != PIS_CFG_ITEM_ID_INVALID) {
+            // the next instruction was already explored and exists in another block. so, the
+            // current block is finished, and it just falls through to that block.
+            break;
+        }
+
         pis_lift_args_t lift_args = {
             .machine_code = CURSOR_INIT(
                 builder->machine_code + cur_offset,
