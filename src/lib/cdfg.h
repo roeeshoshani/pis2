@@ -132,3 +132,5 @@ typedef struct {
 void cdfg_reset(cdfg_t* cdfg);
 
 err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t endianness);
+
+void cdfg_dump_dot(cdfg_t* cdfg);

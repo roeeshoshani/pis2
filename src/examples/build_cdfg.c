@@ -24,13 +24,13 @@ int main() {
         0x01, 0xd0, 0xeb, 0x08, 0x8b, 0x55, 0xfc, 0x8b, 0x45, 0xf8, 0x01, 0xd0, 0x5d, 0xc3,
     };
 
-    TRACE("cfg builder struct size: %lu", sizeof(cfg_builder_t));
-
     cfg_builder_t cfg_builder = {};
     CHECK_RETHROW(cfg_build(&cfg_builder, pis_lifter_x86_64, code, ARRAY_SIZE(code), 0));
 
     cdfg_builder_t cdfg_builder = {};
     CHECK_RETHROW(cdfg_build(&cdfg_builder, &cfg_builder.cfg, PIS_ENDIANNESS_LITTLE));
+
+    cdfg_dump_dot(&cdfg_builder.cdfg);
 
 cleanup:
     return err;

@@ -4,6 +4,7 @@
 #include "except.h"
 #include "operand_size.h"
 #include "pis.h"
+#include "trace.h"
 #include <string.h>
 
 typedef err_t (*opcode_handler_t)(cdfg_builder_t* builder, const pis_insn_t* insn);
@@ -896,6 +897,7 @@ static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
     [PIS_OPCODE_MOVE] = opcode_handler_move,
     [PIS_OPCODE_STORE] = opcode_handler_store,
     [PIS_OPCODE_LOAD] = opcode_handler_load,
+    [PIS_OPCODE_ZERO_EXTEND] = opcode_handler_move,
 };
 
 static err_t process_insn(cdfg_builder_t* builder, const pis_insn_t* insn) {
@@ -939,4 +941,14 @@ err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t end
 
 cleanup:
     return err;
+}
+
+/// dumps a DOT representation of the CDFG to stdout.
+void cdfg_dump_dot(cdfg_t* cdfg) {
+    TRACE("graph {");
+    for (size_t i = 0; i < cdfg->edges_amount; i++) {
+        cdfg_edge_t* edge = &cdfg->edge_storage[i];
+        TRACE("%u -> %u", edge->from_node, edge->to_node);
+    }
+    TRACE("}");
 }
