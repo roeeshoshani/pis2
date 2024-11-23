@@ -1,4 +1,5 @@
 #include "cdfg.h"
+#include "cfg.h"
 #include "endianness.h"
 #include "errors.h"
 #include "except.h"
@@ -1191,31 +1192,142 @@ static void invalidate_tmps(cdfg_op_state_t* op_state) {
     }
 }
 
-err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t endianness) {
+static err_t process_block(cdfg_builder_t* builder, cfg_item_id_t block_id) {
     err_t err = SUCCESS;
 
-    // initialize the builder
-    builder->endianness = endianness;
-    builder->op_state.used_slots_amount = 0;
-    cdfg_reset(&builder->cdfg);
-
-    // create the entry node
-    CHECK_RETHROW(make_entry_node(&builder->cdfg, &builder->op_state.last_cf_node_id));
-
-    // TODO: how do we handle the flow here? for now i just lift the first block...
-    const cfg_block_t* block = &cfg->block_storage[0];
+    const cfg_block_t* block = &builder->cfg->block_storage[block_id];
     CHECK(block->units_amount > 0);
 
-    const cfg_unit_t* block_units = &cfg->unit_storage[block->first_unit_id];
+    const cfg_unit_t* block_units = &builder->cfg->unit_storage[block->first_unit_id];
     for (size_t unit_idx = 0; unit_idx < block->units_amount; unit_idx++) {
         const cfg_unit_t* unit = &block_units[unit_idx];
-        const pis_insn_t* unit_insns = &cfg->insn_storage[unit->first_insn_id];
+        const pis_insn_t* unit_insns = &builder->cfg->insn_storage[unit->first_insn_id];
         for (size_t insn_idx = 0; insn_idx < unit->insns_amount; insn_idx++) {
             const pis_insn_t* insn = &unit_insns[insn_idx];
             CHECK_RETHROW(process_insn(builder, insn));
         }
         // invalidate all tmps. tmps are only valid for the unit in which they were defined.
         invalidate_tmps(&builder->op_state);
+    }
+
+    // finished processing the block.
+    builder->block_states[block_id] = (cdfg_block_state_t) {
+        .was_processed = true,
+        .final_state = builder->op_state,
+    };
+
+cleanup:
+    return err;
+}
+
+static err_t
+    combine_predecessor_op_state(cdfg_builder_t* builder, cfg_item_id_t predecessor_block_id) {
+    err_t err = SUCCESS;
+
+    TODO();
+
+cleanup:
+    return err;
+}
+
+static err_t prepare_non_first_block_initial_op_state(
+    cdfg_builder_t* builder, cfg_item_id_t prepared_block_id, bool* can_process_block
+) {
+    err_t err = SUCCESS;
+
+    builder->op_state.used_slots_amount = 0;
+    builder->op_state.last_cf_node_id = CDFG_ITEM_ID_INVALID;
+
+    // we want to combine the op states of all direct predecessors of this block
+    bool found_any_predecessors = false;
+    for (size_t i = 0; i < builder->cfg->blocks_amount; i++) {
+        if (i == prepared_block_id) {
+            // skip the block itself
+            continue;
+        }
+
+        bool is_direct_predecessor = false;
+        CHECK_RETHROW(cfg_block_is_direct_predecessor(
+            builder->cfg,
+            i,
+            prepared_block_id,
+            &is_direct_predecessor
+        ));
+        if (is_direct_predecessor) {
+            // the current block is a direct predecessor of the prepared block, so we should use all
+            // its op state.
+            if (!builder->block_states[i].was_processed) {
+                // this block wasn't yet processed, but is required to process the prepared block.
+                *can_process_block = false;
+                SUCCESS_CLEANUP();
+            }
+
+            // the prepared block may have multiple predecessors, and we want to combine all of
+            // their op states into one.
+            CHECK_RETHROW(combine_predecessor_op_state(builder, i));
+
+            found_any_predecessors = true;
+        }
+    }
+
+    // make sure that we found any predecessors. only the first block is allowed to have no
+    // predecessors.
+    CHECK(found_any_predecessors);
+
+cleanup:
+    return err;
+}
+
+static err_t prepare_block_initial_op_state(
+    cdfg_builder_t* builder, cfg_item_id_t block_id, bool* can_process_block
+) {
+    err_t err = SUCCESS;
+
+
+    if (block_id == 0) {
+        // for the first block, create an empty op state with a single initial entry node.
+        builder->op_state.used_slots_amount = 0;
+        builder->op_state.last_cf_node_id = CDFG_ITEM_ID_INVALID;
+        CHECK_RETHROW(make_entry_node(&builder->cdfg, &builder->op_state.last_cf_node_id));
+        *can_process_block = true;
+    } else {
+        // non-first blocks require some more complex logic
+        CHECK_RETHROW(prepare_non_first_block_initial_op_state(builder, block_id, can_process_block)
+        );
+    }
+cleanup:
+    return err;
+}
+
+err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t endianness) {
+    err_t err = SUCCESS;
+
+    // initialize the builder
+    builder->endianness = endianness;
+    builder->cfg = cfg;
+    cdfg_reset(&builder->cdfg);
+
+    while (1) {
+        bool processed_any_blocks = false;
+        for (size_t i = 0; i < cfg->blocks_amount; i++) {
+            // prepare the initial op state for the block
+            bool can_process_block = false;
+            CHECK_RETHROW(prepare_block_initial_op_state(builder, i, &can_process_block));
+
+            if (!can_process_block) {
+                // we can't yet process this block, since some of the blocks that are needed to
+                // process this one have not been processed yet, so skip it for now.
+                continue;
+            }
+
+            // process the block
+            CHECK_RETHROW(process_block(builder, i));
+            processed_any_blocks = true;
+        }
+
+        if (!processed_any_blocks) {
+            break;
+        }
     }
 
 cleanup:

@@ -10,25 +10,25 @@
 #define CDFG_MAX_NODES 1024
 #define CDFG_MAX_EDGES 1024
 
-#define CDFG_OP_STATE_MAX_SLOTS 1024
+#define CDFG_OP_STATE_MAX_SLOTS 256
 
 #define CDFG_ITEM_ID_MAX (UINT16_MAX)
-#define CDFG_ITEM_ID_INVALID (CFG_ITEM_ID_MAX)
+#define CDFG_ITEM_ID_INVALID (CDFG_ITEM_ID_MAX)
 
-#define CDFG_CALCULATION(_)                                                                              \
-    _(CDFG_CALCULATION_AND, ) \
-    _(CDFG_CALCULATION_ADD, ) \
-    _(CDFG_CALCULATION_SUB, ) \
-    _(CDFG_CALCULATION_OR, ) \
-    _(CDFG_CALCULATION_XOR, ) \
-    _(CDFG_CALCULATION_PARITY, ) \
-    _(CDFG_CALCULATION_SHIFT_RIGHT, ) \
-    _(CDFG_CALCULATION_SHIFT_RIGHT_SIGNED, ) \
-    _(CDFG_CALCULATION_SHIFT_LEFT, ) \
-    _(CDFG_CALCULATION_UNSIGNED_LESS_THAN, ) \
-    _(CDFG_CALCULATION_SIGNED_LESS_THAN, ) \
-    _(CDFG_CALCULATION_NEG, ) \
-    _(CDFG_CALCULATION_COND_NEGATE, ) \
+#define CDFG_CALCULATION(_)                                                                        \
+    _(CDFG_CALCULATION_AND, )                                                                      \
+    _(CDFG_CALCULATION_ADD, )                                                                      \
+    _(CDFG_CALCULATION_SUB, )                                                                      \
+    _(CDFG_CALCULATION_OR, )                                                                       \
+    _(CDFG_CALCULATION_XOR, )                                                                      \
+    _(CDFG_CALCULATION_PARITY, )                                                                   \
+    _(CDFG_CALCULATION_SHIFT_RIGHT, )                                                              \
+    _(CDFG_CALCULATION_SHIFT_RIGHT_SIGNED, )                                                       \
+    _(CDFG_CALCULATION_SHIFT_LEFT, )                                                               \
+    _(CDFG_CALCULATION_UNSIGNED_LESS_THAN, )                                                       \
+    _(CDFG_CALCULATION_SIGNED_LESS_THAN, )                                                         \
+    _(CDFG_CALCULATION_NEG, )                                                                      \
+    _(CDFG_CALCULATION_COND_NEGATE, )                                                              \
     _(CDFG_CALCULATION_EQUALS, )
 STR_ENUM(cdfg_calculation, CDFG_CALCULATION, __attribute__((packed)));
 
@@ -90,7 +90,7 @@ typedef struct {
     cdfg_edge_kind_t kind : 1;
 
     /// which of the inputs of the destination node does this edge represent?
-    u8 to_node_input_index: 7;
+    u8 to_node_input_index : 7;
 
     /// the source node.
     cdfg_item_id_t from_node;
@@ -115,7 +115,7 @@ typedef struct {
 
     /// the node which represents the current value of the operand.
     cdfg_item_id_t value_node_id;
-} cdfg_op_state_slot_t;
+} __attribute__((packed)) cdfg_op_state_slot_t;
 
 /// the state of all operands at a single point in time.
 typedef struct {
@@ -123,13 +123,28 @@ typedef struct {
     size_t used_slots_amount;
 
     /// the id of the last control flow node.
-    cfg_item_id_t last_cf_node_id;
+    cdfg_item_id_t last_cf_node_id;
 } cdfg_op_state_t;
+
+/// the state of a CFG block in the process of building the CDFG.
+typedef struct {
+    /// was this block already processed?
+    bool was_processed;
+
+    /// the op state at the end of this block.
+    cdfg_op_state_t final_state;
+} __attribute__((packed)) cdfg_block_state_t;
 
 /// a CDFG builder.
 typedef struct {
     /// the built CDFG.
     cdfg_t cdfg;
+
+    /// the CFG that is used to build the CDFG.
+    const cfg_t* cfg;
+
+    /// the state of each cfg block.
+    cdfg_block_state_t block_states[CFG_MAX_BLOCKS];
 
     /// the current operands state.
     cdfg_op_state_t op_state;

@@ -95,6 +95,10 @@ err_t cfg_block_successors(
     const cfg_t* cfg, cfg_item_id_t block_id, cfg_item_id_t successor_block_ids[CFG_BLOCK_MAX_SUCCESSORS]
 );
 
+err_t cfg_block_is_direct_predecessor(
+    const cfg_t* cfg, cfg_item_id_t block_id, cfg_item_id_t is_predecessor_of, bool* result
+);
+
 err_t cfg_build(
     cfg_builder_t* builder,
     pis_lifter_t lifter,

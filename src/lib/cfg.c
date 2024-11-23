@@ -660,6 +660,27 @@ cleanup:
     return err;
 }
 
+err_t cfg_block_is_direct_predecessor(
+    const cfg_t* cfg, cfg_item_id_t block_id, cfg_item_id_t is_predecessor_of, bool* result
+) {
+    err_t err = SUCCESS;
+
+    cfg_item_id_t successor_block_ids[CFG_BLOCK_MAX_SUCCESSORS] = {};
+    CHECK_RETHROW(cfg_block_successors(cfg, block_id, successor_block_ids));
+
+    *result = false;
+
+    for (size_t i = 0; i < CFG_BLOCK_MAX_SUCCESSORS; i++) {
+        if (successor_block_ids[i] == is_predecessor_of) {
+            *result = true;
+            break;
+        }
+    }
+
+cleanup:
+    return err;
+}
+
 err_t cfg_build(
     cfg_builder_t* builder,
     pis_lifter_t lifter,
