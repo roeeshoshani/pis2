@@ -361,8 +361,23 @@ static err_t explore_seen_path(
     // unit, otherwise the machine code contains jumps to mid-instructions.
     CHECK(path_start_addr == unit->addr);
 
-    // TODO: split the fockin block
-    TODO();
+    // now lets start splitting. first create a new block.
+    pis_cfg_item_id_t new_block_id = PIS_CFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(next_block_id(&builder->cfg, &new_block_id));
+    pis_cfg_block_t* new_block = &builder->cfg.block_storage[new_block_id];
+
+    // the new block should start with the unit which this new path points to. for example if the
+    // machine code contains a jump to some instruction in the middle of an existing block, we want
+    // the new block to start at that instruction.
+    new_block->first_unit_id = unit_id;
+
+    // the new block contains all instruction starting from the first one up to the end of the
+    // original block.
+    pis_cfg_item_id_t unit_offset_in_block = unit_id - block->first_unit_id;
+    new_block->units_amount = block->units_amount - unit_offset_in_block;
+
+    // now truncate the original block to only contain unit up to the unit which contains the path.
+    block->units_amount = unit_offset_in_block;
 
 cleanup:
     return err;
