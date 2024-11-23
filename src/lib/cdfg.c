@@ -1108,6 +1108,13 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_neg(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW(opcode_handler_unary_op(builder, insn, CDFG_CALCULATION_NEG));
+cleanup:
+    return err;
+}
+
 static err_t opcode_handler_jmp_cond(cdfg_builder_t* builder, const pis_insn_t* insn) {
     err_t err = SUCCESS;
 
@@ -1144,6 +1151,7 @@ static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
     [PIS_OPCODE_PARITY] = opcode_handler_parity,
     [PIS_OPCODE_EQUALS] = opcode_handler_equals,
     [PIS_OPCODE_JMP_COND] = opcode_handler_jmp_cond,
+    [PIS_OPCODE_NEG] = opcode_handler_neg,
 };
 
 static err_t process_insn(cdfg_builder_t* builder, const pis_insn_t* insn) {
