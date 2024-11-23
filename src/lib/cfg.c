@@ -216,9 +216,10 @@ static err_t enqueue_unexplored_path(pis_cfg_builder_t* builder, size_t path_sta
     // make sure that we have more space in our queue.
     CHECK(builder->unexplored_paths_amount < PIS_CFG_BUILDER_MAX_UNEXPLORED_PATHS);
 
-    // store the unexplored path
-    builder->unexplored_paths_queue[builder->unexplored_paths_amount++].start_offset =
+    builder->unexplored_paths_queue[builder->unexplored_paths_amount].start_offset =
         path_start_offset;
+
+    builder->unexplored_paths_amount++;
 
 cleanup:
     return err;
@@ -231,9 +232,10 @@ static err_t dequeue_unexplored_path(pis_cfg_builder_t* builder, size_t* path_st
     // make sure that we have more space in our queue.
     CHECK(builder->unexplored_paths_amount > 0);
 
-    // store the unexplored path
+    builder->unexplored_paths_amount--;
+
     *path_start_offset =
-        builder->unexplored_paths_queue[builder->unexplored_paths_amount--].start_offset;
+        builder->unexplored_paths_queue[builder->unexplored_paths_amount].start_offset;
 
 cleanup:
     return err;
