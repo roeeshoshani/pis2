@@ -5,7 +5,7 @@
 #include "operand_size.h"
 #include "pis.h"
 
-typedef err_t (*opcode_handler_t)();
+typedef err_t (*opcode_handler_t)(cdfg_builder_t* builder, const pis_insn_t* insn);
 
 static err_t next_id(size_t* items_amount, size_t max, cdfg_item_id_t* id) {
     err_t err = SUCCESS;
@@ -52,10 +52,24 @@ cleanup:
     return err;
 }
 
+static err_t make_op_state_slot(
+    cdfg_op_state_t* op_state, const pis_operand_t* operand, cdfg_item_id_t value_node_id
+) {
+    err_t err = SUCCESS;
+    cdfg_item_id_t slot_id = CDFG_ITEM_ID_INVALID;
+    CHECK(next_op_state_slot_id(op_state, &slot_id));
+    op_state->slots[slot_id] = (cdfg_op_state_slot_t) {
+        .operand = *operand,
+        .value_node_id = value_node_id,
+    };
+cleanup:
+    return err;
+}
+
 /// tries to find an exact match for the given operand in the operand state. if an exact match was
-/// found, returns the id of the node which represents the value of the given operand.
+/// found, returns the id of the slot which matched the operand.
 static cdfg_item_id_t
-    op_state_read_exact(const cdfg_op_state_t* op_state, const pis_operand_t* operand) {
+    find_slot_exact(const cdfg_op_state_t* op_state, const pis_operand_t* operand) {
     for (size_t i = 0; i < op_state->used_slots_amount; i++) {
         const cdfg_op_state_slot_t* slot = &op_state->slots[i];
         if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
@@ -72,11 +86,21 @@ static cdfg_item_id_t
     return CDFG_ITEM_ID_INVALID;
 }
 
+/// tries to find an exact match for the given operand in the operand state. if an exact match was
+/// found, returns the id of the node which represents the value of the given operand.
+static cdfg_item_id_t
+    read_operand_exact(const cdfg_op_state_t* op_state, const pis_operand_t* operand) {
+    cdfg_item_id_t slot_id = find_slot_exact(op_state, operand);
+    if (slot_id == CDFG_ITEM_ID_INVALID) {
+        return CDFG_ITEM_ID_INVALID;
+    }
+    return op_state->slots[slot_id].value_node_id;
+}
+
 /// checks if the given operand is fully uninitialized. that is, none of its bytes are
 /// initialized. if at least one of its bytes is initialized, then it is not considered fully
 /// uninitialized.
-static bool
-    op_state_is_fully_uninit(const cdfg_op_state_t* op_state, const pis_operand_t* operand) {
+static bool is_operand_fully_uninit(const cdfg_op_state_t* op_state, const pis_operand_t* operand) {
     for (size_t i = 0; i < op_state->used_slots_amount; i++) {
         const cdfg_op_state_slot_t* slot = &op_state->slots[i];
         if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
@@ -112,16 +136,16 @@ static cdfg_item_id_t find_imm_node(const cdfg_t* cdfg, u64 value) {
 
 /// returns an immediate node with the given immediate value, either by creating one or by reusing
 /// an existing one.
-static err_t make_imm_node(cdfg_builder_t* builder, u64 value, cdfg_item_id_t* out_node_id) {
+static err_t make_imm_node(cdfg_t* cdfg, u64 value, cdfg_item_id_t* out_node_id) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t node_id = find_imm_node(&builder->cdfg, value);
+    cdfg_item_id_t node_id = find_imm_node(cdfg, value);
 
     if (node_id == CDFG_ITEM_ID_INVALID) {
         // no existing node, create a new one.
-        CHECK_RETHROW(next_node_id(&builder->cdfg, &node_id));
+        CHECK_RETHROW(next_node_id(cdfg, &node_id));
 
-        cdfg_node_t* node = &builder->cdfg.node_storage[node_id];
+        cdfg_node_t* node = &cdfg->node_storage[node_id];
         node->content.imm.value = value;
     }
 
@@ -189,6 +213,17 @@ cleanup:
     return err;
 }
 
+static err_t calc_extracted_byte_operand(
+    const pis_operand_t* operand, size_t byte_index, pis_operand_t* out_byte_operand
+) {
+    err_t err = SUCCESS;
+    pis_addr_t cur_byte_addr = {};
+    CHECK_RETHROW(pis_addr_add(&operand->addr, byte_index, &cur_byte_addr));
+    *out_byte_operand = PIS_OPERAND(cur_byte_addr, PIS_SIZE_1);
+cleanup:
+    return err;
+}
+
 /// calculates the shift amount by which a value needs to be shifted to extract the byte at the
 /// given index from it.
 static err_t extract_byte_shift_amount(
@@ -234,7 +269,7 @@ static err_t extract_byte(
     ));
 
     cdfg_item_id_t shift_amount_node_id = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(make_imm_node(builder, shift_amount, &shift_amount_node_id));
+    CHECK_RETHROW(make_imm_node(&builder->cdfg, shift_amount, &shift_amount_node_id));
 
     cdfg_item_id_t shifted_val_node_id = CDFG_ITEM_ID_INVALID;
     CHECK_RETHROW(make_binop_node(
@@ -246,7 +281,7 @@ static err_t extract_byte(
     ));
 
     cdfg_item_id_t mask_node_id = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(make_imm_node(builder, 0xff, &mask_node_id));
+    CHECK_RETHROW(make_imm_node(&builder->cdfg, 0xff, &mask_node_id));
 
     cdfg_item_id_t masked_val_node_id = CDFG_ITEM_ID_INVALID;
     CHECK_RETHROW(make_binop_node(
@@ -283,7 +318,7 @@ static err_t reconstruct_byte(
     ));
 
     cdfg_item_id_t shift_amount_node_id = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(make_imm_node(builder, shift_amount, &shift_amount_node_id));
+    CHECK_RETHROW(make_imm_node(&builder->cdfg, shift_amount, &shift_amount_node_id));
 
     cdfg_item_id_t shifted_val_node_id = CDFG_ITEM_ID_INVALID;
     CHECK_RETHROW(make_binop_node(
@@ -332,9 +367,8 @@ static err_t break_op_state_slot_to_bytes(cdfg_builder_t* builder, cdfg_item_id_
         );
 
         // calculate the operand that represents the byte value
-        pis_addr_t cur_byte_addr = {};
-        CHECK_RETHROW(pis_addr_add(&orig_slot.operand.addr, i, &cur_byte_addr));
-        pis_operand_t cur_byte_operand = PIS_OPERAND(cur_byte_addr, PIS_SIZE_1);
+        pis_operand_t cur_byte_operand = {};
+        CHECK_RETHROW(calc_extracted_byte_operand(&orig_slot.operand, i, &cur_byte_operand));
 
         // store it in the slot
         builder->op_state.slots[cur_byte_slot_id] = (cdfg_op_state_slot_t) {
@@ -408,13 +442,12 @@ static err_t read_reg_operand_byte_by_byte(
     u32 bytes = pis_size_to_bytes(operand->size);
     for (size_t i = 0; i < bytes; i++) {
         // calculate the operand that represents the byte value
-        pis_addr_t cur_byte_addr = {};
-        CHECK_RETHROW(pis_addr_add(&operand->addr, i, &cur_byte_addr));
-        pis_operand_t cur_byte_operand = PIS_OPERAND(cur_byte_addr, PIS_SIZE_1);
+        pis_operand_t cur_byte_operand = {};
+        CHECK_RETHROW(calc_extracted_byte_operand(operand, i, &cur_byte_operand));
 
         // calculate the byte value of the current byte
         cdfg_item_id_t cur_byte_val_node_id =
-            op_state_read_exact(&builder->op_state, &cur_byte_operand);
+            read_operand_exact(&builder->op_state, &cur_byte_operand);
         if (cur_byte_val_node_id == CDFG_ITEM_ID_INVALID) {
             // this byte is uninitialized, create a variable for it.
             CHECK_RETHROW(make_var_node(builder, &cur_byte_operand, &cur_byte_val_node_id));
@@ -459,7 +492,7 @@ static err_t read_reg_operand(
 ) {
     err_t err = SUCCESS;
 
-    if (op_state_is_fully_uninit(&builder->op_state, operand)) {
+    if (is_operand_fully_uninit(&builder->op_state, operand)) {
         // the reg operand is fully uninitialized. initialize it to a new variable node.
 
         // first, create the variable node
@@ -467,15 +500,10 @@ static err_t read_reg_operand(
         CHECK_RETHROW(make_var_node(builder, operand, &node_id));
 
         // now add a slot in the op state to point to it
-        cdfg_item_id_t op_state_slot_id = CDFG_ITEM_ID_INVALID;
-        CHECK_RETHROW(next_op_state_slot_id(&builder->op_state, &op_state_slot_id));
-        builder->op_state.slots[op_state_slot_id] = (cdfg_op_state_slot_t) {
-            .operand = *operand,
-            .value_node_id = node_id,
-        };
+        CHECK_RETHROW(make_op_state_slot(&builder->op_state, operand, node_id));
     } else {
         // node is either fully initialized or partially initialized.
-        cdfg_item_id_t exact_match_node_id = op_state_read_exact(&builder->op_state, operand);
+        cdfg_item_id_t exact_match_node_id = read_operand_exact(&builder->op_state, operand);
         if (exact_match_node_id != CDFG_ITEM_ID_INVALID) {
             // found an exact match for the node, use it.
             *out_node_id = exact_match_node_id;
@@ -503,7 +531,7 @@ static err_t read_tmp_operand(
     // tmp operands don't allow the shitty combinatorics that are allowed for reg operands. they
     // must always be initialized when read, and they only allow exact matches in the op state, no
     // partial reads/writes.
-    cdfg_item_id_t node_id = op_state_read_exact(&builder->op_state, operand);
+    cdfg_item_id_t node_id = read_operand_exact(&builder->op_state, operand);
     CHECK(node_id != CDFG_ITEM_ID_INVALID);
 
     *out_node_id = node_id;
@@ -511,7 +539,7 @@ cleanup:
     return err;
 }
 
-/// reads the given operand according to the given op state and returns the id of a node which
+/// reads the given operand according to the current op state and returns the id of a node which
 /// represents the value of the operand.
 static err_t read_operand(
     cdfg_builder_t* builder, const pis_operand_t* operand, cdfg_item_id_t* out_node_id
@@ -519,13 +547,127 @@ static err_t read_operand(
     err_t err = SUCCESS;
     switch (operand->addr.space) {
         case PIS_SPACE_CONST:
-            CHECK_RETHROW(make_imm_node(builder, operand->addr.offset, out_node_id));
+            CHECK_RETHROW(make_imm_node(&builder->cdfg, operand->addr.offset, out_node_id));
             break;
         case PIS_SPACE_REG:
             CHECK_RETHROW(read_reg_operand(builder, operand, out_node_id));
             break;
         case PIS_SPACE_TMP:
             CHECK_RETHROW(read_tmp_operand(builder, operand, out_node_id));
+            break;
+        case PIS_SPACE_RAM:
+            // ram operands are only used in jump instructions, and can't be read directly. reading
+            // from ram is done using the load instruction.
+            UNREACHABLE();
+        default:
+            UNREACHABLE();
+    }
+cleanup:
+    return err;
+}
+
+static err_t write_tmp_operand(
+    cdfg_builder_t* builder, const pis_operand_t* operand, cdfg_item_id_t value_node_id
+) {
+    err_t err = SUCCESS;
+
+    cdfg_item_id_t exact_slot_id = find_slot_exact(&builder->op_state, operand);
+    if (exact_slot_id != CDFG_ITEM_ID_INVALID) {
+        // found an exactly matching slot. overwrite its value with the new value.
+        builder->op_state.slots[exact_slot_id].value_node_id = value_node_id;
+    } else {
+        // no exactly matching slot.
+
+        // make sure that we don't have any intersecting slots, as tmp operands are not allowed to
+        // use partial read/writes.
+        CHECK(is_operand_fully_uninit(&builder->op_state, operand));
+
+        // add a new slot which contains the new value for this tmp operand
+        CHECK_RETHROW(make_op_state_slot(&builder->op_state, operand, value_node_id));
+    }
+
+cleanup:
+    return err;
+}
+
+/// write to a partially initialized register operand.
+static err_t write_reg_operand_partially_init(
+    cdfg_builder_t* builder, const pis_operand_t* operand, cdfg_item_id_t value_node_id
+) {
+    err_t err = SUCCESS;
+
+    // first, break all existing slots that intersect with this operand to bytes.
+    CHECK_RETHROW(break_intersecting_slots_to_bytes(builder, operand));
+
+    // now write the operand byte-by-byte
+    u32 bytes = pis_size_to_bytes(operand->size);
+    for (size_t i = 0; i < bytes; i++) {
+        // calculate the value of the current byte
+        cdfg_item_id_t cur_byte_val_node_id = CDFG_ITEM_ID_INVALID;
+        CHECK_RETHROW(extract_byte(builder, value_node_id, bytes, i, &cur_byte_val_node_id));
+
+        // calculate the operand of the current byte
+        pis_operand_t cur_byte_operand = {};
+        CHECK_RETHROW(calc_extracted_byte_operand(operand, i, &cur_byte_operand));
+
+        cdfg_item_id_t cur_byte_slot_id = find_slot_exact(&builder->op_state, &cur_byte_operand);
+        if (cur_byte_slot_id != CDFG_ITEM_ID_INVALID) {
+            // found an existing slot. overwrite its value with the new value.
+            builder->op_state.slots[cur_byte_slot_id].value_node_id = cur_byte_val_node_id;
+        } else {
+            // no existing slot. just add a new slot which contains the new value for this operand.
+            CHECK_RETHROW(
+                make_op_state_slot(&builder->op_state, &cur_byte_operand, cur_byte_val_node_id)
+            );
+        }
+    }
+
+cleanup:
+    return err;
+}
+
+/// write to a register operand.
+static err_t write_reg_operand(
+    cdfg_builder_t* builder, const pis_operand_t* operand, cdfg_item_id_t value_node_id
+) {
+    err_t err = SUCCESS;
+
+    cdfg_item_id_t exact_slot_id = find_slot_exact(&builder->op_state, operand);
+    if (exact_slot_id != CDFG_ITEM_ID_INVALID) {
+        // found an exactly matching slot. overwrite its value with the new value.
+        builder->op_state.slots[exact_slot_id].value_node_id = value_node_id;
+    } else {
+        // no exact match. either the operand is partially initialized, or it is completely
+        // uninitialized.
+        if (is_operand_fully_uninit(&builder->op_state, operand)) {
+            // operand is completely uninitialized. just add a new slot which contains the new value
+            // for this operand.
+            CHECK_RETHROW(make_op_state_slot(&builder->op_state, operand, value_node_id));
+        } else {
+            // operand is partially initialized.
+            CHECK_RETHROW(write_reg_operand_partially_init(builder, operand, value_node_id));
+        }
+    }
+
+cleanup:
+    return err;
+}
+
+/// writes the given operand to the current op state.
+static err_t write_operand(
+    cdfg_builder_t* builder, const pis_operand_t* operand, cdfg_item_id_t value_node_id
+) {
+    err_t err = SUCCESS;
+    switch (operand->addr.space) {
+        case PIS_SPACE_REG:
+            CHECK_RETHROW(write_reg_operand(builder, operand, value_node_id));
+            break;
+        case PIS_SPACE_TMP:
+            CHECK_RETHROW(write_tmp_operand(builder, operand, value_node_id));
+            break;
+        case PIS_SPACE_CONST:
+            // can't write to const operands.
+            UNREACHABLE();
             break;
         case PIS_SPACE_RAM:
             // ram operands are only used in jump instructions, and can't be read directly. reading
