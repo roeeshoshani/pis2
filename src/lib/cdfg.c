@@ -1200,7 +1200,7 @@ static void cdfg_dump_node(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
 
 /// dumps a DOT representation of the CDFG to stdout.
 void cdfg_dump_dot(const cdfg_t* cdfg) {
-    TRACE("graph {");
+    TRACE("digraph {");
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* edge = &cdfg->edge_storage[i];
         cdfg_dump_node(cdfg, edge->from_node);
