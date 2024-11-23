@@ -26,7 +26,7 @@ int main() {
     TRACE("cfg builder struct size: %lu", sizeof(pis_cfg_builder_t));
 
     pis_cfg_builder_t builder = {};
-    CHECK_RETHROW(pis_cfg_builder_build(&builder, pis_lifter_x86_64, code, ARRAY_SIZE(code), 0));
+    CHECK_RETHROW(pis_cfg_build(&builder, pis_lifter_x86_64, code, ARRAY_SIZE(code), 0));
 
     for (size_t i = 0; i < builder.cfg.blocks_amount; i++) {
         u64 start = 0;

@@ -89,7 +89,7 @@ err_t pis_cfg_block_addr_range(
     const pis_cfg_t* cfg, pis_cfg_item_id_t block_id, u64* start, u64* end
 );
 
-err_t pis_cfg_builder_build(
+err_t pis_cfg_build(
     pis_cfg_builder_t* builder,
     pis_lifter_t lifter,
     const u8* machine_code,

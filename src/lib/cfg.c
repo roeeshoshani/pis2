@@ -525,7 +525,7 @@ static void builder_init(
     builder->unexplored_paths_amount = 0;
 }
 
-err_t pis_cfg_builder_build(
+err_t pis_cfg_build(
     pis_cfg_builder_t* builder,
     pis_lifter_t lifter,
     const u8* machine_code,
