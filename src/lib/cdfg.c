@@ -1044,6 +1044,13 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_equals(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW(opcode_handler_comparison(builder, insn, CDFG_CALCULATION_EQUALS));
+cleanup:
+    return err;
+}
+
 static err_t opcode_handler_signed_less_than(cdfg_builder_t* builder, const pis_insn_t* insn) {
     err_t err = SUCCESS;
     CHECK_RETHROW(opcode_handler_comparison(builder, insn, CDFG_CALCULATION_SIGNED_LESS_THAN));
@@ -1073,6 +1080,7 @@ static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
     [PIS_OPCODE_UNSIGNED_LESS_THAN] = opcode_handler_unsigned_less_than,
     [PIS_OPCODE_SIGNED_LESS_THAN] = opcode_handler_signed_less_than,
     [PIS_OPCODE_PARITY] = opcode_handler_parity,
+    [PIS_OPCODE_EQUALS] = opcode_handler_equals,
 };
 
 static err_t process_insn(cdfg_builder_t* builder, const pis_insn_t* insn) {
