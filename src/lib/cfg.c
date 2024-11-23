@@ -388,6 +388,40 @@ cleanup:
     return err;
 }
 
+static err_t enqueue_cfg_jmp_paths(
+    pis_cfg_builder_t* builder, const pis_insn_t* insn, size_t next_insn_offset
+) {
+    err_t err = SUCCESS;
+
+    // find the target of the jump
+    CHECK(insn->operands_amount >= 1);
+    const pis_operand_t* jmp_target = &insn->operands[0];
+
+    switch (insn->opcode) {
+        case PIS_OPCODE_JMP:
+            // regular jump. this is assumed to be a jump into somewhere inside the current
+            // function. enqueue exploration of the branch target.
+            CHECK_RETHROW(enqueue_unexplored_path_by_jmp_target(builder, jmp_target));
+            break;
+        case PIS_OPCODE_JMP_RET:
+            // ret. this marks the end of a path, and doesn't require any further
+            // exploration.
+            break;
+        case PIS_OPCODE_JMP_COND:
+            // conditional jump. this is assumed to be a jump into somewhere inside the
+            // current function. enqueue exploration of the branch target, and of the
+            // instruction following the branch.
+            CHECK_RETHROW(enqueue_unexplored_path_by_jmp_target(builder, jmp_target));
+            CHECK_RETHROW(enqueue_unexplored_path(builder, next_insn_offset));
+            break;
+        default:
+            UNREACHABLE();
+            break;
+    }
+cleanup:
+    return err;
+}
+
 /// explore a previously unseen path of the code.
 static err_t explore_unseen_path(pis_cfg_builder_t* builder, size_t path_start_offset) {
     err_t err = SUCCESS;
@@ -406,6 +440,8 @@ static err_t explore_unseen_path(pis_cfg_builder_t* builder, size_t path_start_o
 
         CHECK_RETHROW(builder->lifter(&lift_args));
 
+        size_t next_offset = cur_offset + lift_args.result.machine_insn_len;
+
         // create a cfg unit for this machine instruction
         pis_cfg_item_id_t unit_id = PIS_CFG_ITEM_ID_INVALID;
         CHECK_RETHROW(
@@ -422,52 +458,15 @@ static err_t explore_unseen_path(pis_cfg_builder_t* builder, size_t path_start_o
         if (cfg_jmp_insn != NULL) {
             // this is a cfg jump instruction. handle it accordingly.
 
-            // find the target of the jump
-            CHECK(cfg_jmp_insn->operands_amount >= 1);
-            const pis_operand_t* jmp_target = &cfg_jmp_insn->operands[0];
+            // enqueue the paths that need to be further explored according to the jump.
+            CHECK_RETHROW(enqueue_cfg_jmp_paths(builder, cfg_jmp_insn, next_offset));
 
-            bool continue_exploring_current_path;
-            switch (cfg_jmp_insn->opcode) {
-                case PIS_OPCODE_JMP:
-                    // regular jump. this is assumed to be a jump into somewhere inside the current
-                    // function. queue exploration of the branch target.
-                    CHECK_RETHROW(enqueue_unexplored_path_by_jmp_target(builder, jmp_target));
-
-                    // we finished exploring the current path.
-                    continue_exploring_current_path = false;
-
-                    break;
-                case PIS_OPCODE_JMP_RET:
-                    // ret. this marks the end of a path, and doesn't require any further
-                    // exploration.
-
-                    // we finished exploring the current path.
-                    continue_exploring_current_path = false;
-
-                    break;
-                case PIS_OPCODE_JMP_COND:
-                    // conditional jump. this is assumed to be a jump into somewhere inside the
-                    // current function. queue exploration of the branch target.
-                    CHECK_RETHROW(enqueue_unexplored_path_by_jmp_target(builder, jmp_target));
-
-                    // the jump is conditional, so also continue exploration of the current path, in
-                    // case the branch is not taken.
-                    continue_exploring_current_path = true;
-
-                    break;
-                default:
-                    UNREACHABLE();
-                    break;
-            }
-
-            if (!continue_exploring_current_path) {
-                // stop exploring.
-                break;
-            }
+            // a CFG jump always marks the end of a block. so, stop building the current block.
+            break;
+        } else {
+            // regular, non cfg jump instruction. just advance to the next instruction.
+            cur_offset = next_offset;
         }
-
-        // advance to the next instruction
-        cur_offset += lift_args.result.machine_insn_len;
     }
 
     // we finished building the current block, don't append any other units to it.
