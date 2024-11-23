@@ -1194,7 +1194,7 @@ static void cdfg_dump_node_desc(const cdfg_node_t* node) {
 }
 
 static void cdfg_dump_node(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
-    TRACE_NO_NEWLINE("%u_", node_id);
+    TRACE_NO_NEWLINE("id_%u_", node_id);
     cdfg_dump_node_desc(&cdfg->node_storage[node_id]);
 }
 
