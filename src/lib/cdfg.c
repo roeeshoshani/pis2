@@ -1072,6 +1072,16 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_jmp_cond(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    err_t err = SUCCESS;
+    // TODO: how tf do i do this...
+    UNUSED(builder);
+    UNUSED(insn);
+    goto cleanup;
+cleanup:
+    return err;
+}
+
 static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
     [PIS_OPCODE_ADD] = opcode_handler_add,
     [PIS_OPCODE_SUB] = opcode_handler_sub,
@@ -1089,6 +1099,7 @@ static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
     [PIS_OPCODE_SIGNED_LESS_THAN] = opcode_handler_signed_less_than,
     [PIS_OPCODE_PARITY] = opcode_handler_parity,
     [PIS_OPCODE_EQUALS] = opcode_handler_equals,
+    [PIS_OPCODE_JMP_COND] = opcode_handler_jmp_cond,
 };
 
 static err_t process_insn(cdfg_builder_t* builder, const pis_insn_t* insn) {
