@@ -63,7 +63,7 @@ static err_t make_op_state_slot(
 ) {
     err_t err = SUCCESS;
     cdfg_item_id_t slot_id = CDFG_ITEM_ID_INVALID;
-    CHECK(next_op_state_slot_id(op_state, &slot_id));
+    CHECK_RETHROW(next_op_state_slot_id(op_state, &slot_id));
     op_state->slots[slot_id] = (cdfg_op_state_slot_t) {
         .operand = *operand,
         .value_node_id = value_node_id,
