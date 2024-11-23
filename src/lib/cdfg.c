@@ -199,6 +199,25 @@ cleanup:
     return err;
 }
 
+static err_t make_entry_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
+    err_t err = SUCCESS;
+
+    cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(next_node_id(cdfg, &node_id));
+
+    cdfg->node_storage[node_id] = (cdfg_node_t) {
+        .kind = CDFG_NODE_KIND_ENTRY,
+        .content =
+            {
+                .entry = {},
+            },
+    };
+
+    *out_node_id = node_id;
+cleanup:
+    return err;
+}
+
 static err_t make_binop_node(
     cdfg_t* cdfg,
     cdfg_calculation_t calculation,
@@ -770,6 +789,9 @@ err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t end
     builder->endianness = endianness;
     builder->op_state.used_slots_amount = 0;
     cdfg_reset(&builder->cdfg);
+
+    // create the entry node
+    CHECK_RETHROW(make_entry_node(&builder->cdfg, &builder->op_state.last_cf_node_id));
 
     // TODO: how do we handle the flow here? for now i just lift the first block...
     const cfg_block_t* block = &cfg->block_storage[0];

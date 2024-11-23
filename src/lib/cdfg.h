@@ -22,6 +22,7 @@ typedef enum {
     CDFG_NODE_KIND_VAR,
     CDFG_NODE_KIND_IMM,
     CDFG_NODE_KIND_CALC,
+    CDFG_NODE_KIND_ENTRY,
 } __attribute__((packed)) cdfg_node_kind_t;
 
 /// the operation performed by a CDFG operation node.
@@ -54,11 +55,16 @@ typedef struct {
     cdfg_calculation_t calculation;
 } __attribute__((packed)) cdfg_calc_node_t;
 
+/// a CDFG entry node. this represents the entrypoint of the function.
+typedef struct {
+} __attribute__((packed)) cdfg_entry_node_t;
+
 /// the content of a CDFG node.
 typedef union {
     cdfg_var_node_t var;
     cdfg_imm_node_t imm;
     cdfg_calc_node_t calc;
+    cdfg_entry_node_t entry;
 } __attribute__((packed)) cdfg_node_content_t;
 
 /// represents a single node in the CDFG
@@ -95,6 +101,9 @@ typedef struct {
 typedef struct {
     cdfg_op_state_slot_t slots[CDFG_OP_STATE_MAX_SLOTS];
     size_t used_slots_amount;
+
+    /// the id of the last control flow node.
+    cfg_item_id_t last_cf_node_id;
 } cdfg_op_state_t;
 
 /// a CDFG builder.
