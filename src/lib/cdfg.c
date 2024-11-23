@@ -331,6 +331,24 @@ cleanup:
     return err;
 }
 
+static err_t make_unary_op_node(
+    cdfg_t* cdfg,
+    cdfg_calculation_t calculation,
+    cdfg_item_id_t input_node_id,
+    cdfg_item_id_t* out_binop_node_id
+) {
+    err_t err = SUCCESS;
+
+    cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(make_calc_node(cdfg, calculation, &node_id));
+
+    CHECK_RETHROW(make_edge(cdfg, CDFG_EDGE_KIND_DATA_FLOW, input_node_id, node_id, 0));
+
+    *out_binop_node_id = node_id;
+cleanup:
+    return err;
+}
+
 static err_t calc_extracted_byte_operand(
     const pis_operand_t* operand, size_t byte_index, pis_operand_t* out_byte_operand
 ) {
@@ -838,6 +856,33 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_unary_op(
+    cdfg_builder_t* builder, const pis_insn_t* insn, cdfg_calculation_t calculation
+) {
+    err_t err = SUCCESS;
+    CHECK_CODE(insn->operands_amount == 2, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+    // make sure that all operands are of the same size
+    CHECK_TRACE_CODE(
+        insn->operands[0].size == insn->operands[1].size,
+        PIS_ERR_OPERAND_SIZE_MISMATCH,
+        "operand size mismatch in opcode %s, operand sizes: %u %u",
+        pis_opcode_to_str(insn->opcode),
+        insn->operands[0].size,
+        insn->operands[1].size
+    );
+
+    cdfg_item_id_t input_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(read_operand(builder, &insn->operands[1], &input_node_id));
+
+    cdfg_item_id_t result_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(make_unary_op_node(&builder->cdfg, calculation, input_node_id, &result_node_id));
+
+    CHECK_RETHROW(write_operand(builder, &insn->operands[0], result_node_id));
+cleanup:
+    return err;
+}
+
 static err_t opcode_handler_comparison(
     cdfg_builder_t* builder, const pis_insn_t* insn, cdfg_calculation_t calculation
 ) {
@@ -1006,6 +1051,13 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_parity(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW(opcode_handler_unary_op(builder, insn, CDFG_CALCULATION_PARITY));
+cleanup:
+    return err;
+}
+
 static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
     [PIS_OPCODE_ADD] = opcode_handler_add,
     [PIS_OPCODE_SUB] = opcode_handler_sub,
@@ -1020,6 +1072,7 @@ static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
     [PIS_OPCODE_GET_LOW_BITS] = opcode_handler_get_low_bits,
     [PIS_OPCODE_UNSIGNED_LESS_THAN] = opcode_handler_unsigned_less_than,
     [PIS_OPCODE_SIGNED_LESS_THAN] = opcode_handler_signed_less_than,
+    [PIS_OPCODE_PARITY] = opcode_handler_parity,
 };
 
 static err_t process_insn(cdfg_builder_t* builder, const pis_insn_t* insn) {
