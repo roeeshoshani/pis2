@@ -1,6 +1,7 @@
 #include "pis.h"
 #include "errors.h"
 #include "except.h"
+#include "operand_size.h"
 #include "trace.h"
 #include <limits.h>
 
@@ -150,4 +151,37 @@ bool pis_opcode_is_jmp(pis_opcode_t opcode) {
         default:
             return false;
     }
+}
+
+/// checks if the given operand fully contains the given sub-operand.
+bool pis_operand_contains(const pis_operand_t* operand, const pis_operand_t* sub_operand) {
+    if (operand->addr.space != sub_operand->addr.space) {
+        // the operands are not even in the same space.
+        return false;
+    }
+
+    u64 operand_start = operand->addr.offset;
+    u64 operand_end = operand_start + pis_size_to_bytes(operand->size);
+
+    u64 sub_operand_start = sub_operand->addr.offset;
+    u64 sub_operand_end = sub_operand_start + pis_size_to_bytes(sub_operand->size);
+
+    return sub_operand_start >= operand_start && sub_operand_end <= operand_end;
+}
+
+/// checks if the given 2 operands intersect. that is, there is at least one byte of operand space
+/// which is included in both operands.
+bool pis_operands_intersect(const pis_operand_t* operand_a, const pis_operand_t* operand_b) {
+    if (operand_a->addr.space != operand_b->addr.space) {
+        // the operands are not even in the same space.
+        return false;
+    }
+
+    u64 operand_a_start = operand_a->addr.offset;
+    u64 operand_a_end = operand_a_start + pis_size_to_bytes(operand_a->size);
+
+    u64 operand_b_start = operand_a->addr.offset;
+    u64 operand_b_end = operand_b_start + pis_size_to_bytes(operand_a->size);
+
+    return operand_a_start < operand_b_end && operand_b_start < operand_a_end;
 }

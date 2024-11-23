@@ -223,3 +223,7 @@ bool pis_addr_is_writable(const pis_addr_t* addr);
 bool pis_operand_is_writable(const pis_operand_t* operand);
 
 bool pis_opcode_is_jmp(pis_opcode_t opcode);
+
+bool pis_operand_contains(const pis_operand_t* operand, const pis_operand_t* sub_operand);
+
+bool pis_operands_intersect(const pis_operand_t* operand_a, const pis_operand_t* operand_b);
