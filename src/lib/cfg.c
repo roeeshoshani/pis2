@@ -17,7 +17,7 @@ static err_t next_id(size_t* items_amount, size_t max, cfg_item_id_t* id) {
     // make sure that we have more space in our storage.
     CHECK(*items_amount < max);
 
-    // allocate a new unit
+    // allocate a new item
     size_t index = (*items_amount)++;
 
     // check for overflow when casting to the item id type
