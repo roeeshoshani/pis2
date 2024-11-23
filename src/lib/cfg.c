@@ -11,11 +11,11 @@ void cfg_reset(cfg_t* cfg) {
     memset(cfg, 0, sizeof(*cfg));
 }
 
-static err_t next_id(size_t* items_amount, cfg_item_id_t* id) {
+static err_t next_id(size_t* items_amount, size_t max, cfg_item_id_t* id) {
     err_t err = SUCCESS;
 
     // make sure that we have more space in our storage.
-    CHECK(*items_amount < CFG_MAX_UNITS);
+    CHECK(*items_amount < max);
 
     // allocate a new unit
     size_t index = (*items_amount)++;
@@ -32,7 +32,7 @@ cleanup:
 static err_t next_insn_id(cfg_t* cfg, cfg_item_id_t* id) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(next_id(&cfg->insns_amount, id));
+    CHECK_RETHROW(next_id(&cfg->insns_amount, CFG_MAX_INSNS, id));
 
 cleanup:
     return err;
@@ -41,7 +41,7 @@ cleanup:
 static err_t next_unit_id(cfg_t* cfg, cfg_item_id_t* id) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(next_id(&cfg->units_amount, id));
+    CHECK_RETHROW(next_id(&cfg->units_amount, CFG_MAX_UNITS, id));
 
 cleanup:
     return err;
@@ -50,7 +50,7 @@ cleanup:
 static err_t next_block_id(cfg_t* cfg, cfg_item_id_t* id) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(next_id(&cfg->blocks_amount, id));
+    CHECK_RETHROW(next_id(&cfg->blocks_amount, CFG_MAX_BLOCKS, id));
 
 cleanup:
     return err;
