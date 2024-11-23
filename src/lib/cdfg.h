@@ -27,7 +27,9 @@ typedef enum {
 /// the operation performed by a CDFG operation node.
 typedef enum {
     CDFG_CALCULATION_AND,
+    CDFG_CALCULATION_OR,
     CDFG_CALCULATION_SHIFT_RIGHT,
+    CDFG_CALCULATION_SHIFT_LEFT,
 } __attribute__((packed)) cdfg_calculation_t;
 
 /// a CDFG variable node. this is used to represent an access to a register without previous

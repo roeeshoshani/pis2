@@ -5,6 +5,8 @@
 #include "operand_size.h"
 #include "pis.h"
 
+typedef err_t (*opcode_handler_t)();
+
 static err_t next_id(size_t* items_amount, size_t max, cdfg_item_id_t* id) {
     err_t err = SUCCESS;
 
@@ -187,9 +189,34 @@ cleanup:
     return err;
 }
 
+/// calculates the shift amount by which a value needs to be shifted to extract the byte at the
+/// given index from it.
+static err_t extract_byte_shift_amount(
+    size_t byte_index, size_t value_size_in_bytes, pis_endianness_t endianness, size_t* shift_amount
+) {
+    err_t err = SUCCESS;
+
+    size_t value_size_in_bits = value_size_in_bytes * 8;
+    size_t bit_index = byte_index * 8;
+
+    switch (endianness) {
+        case PIS_ENDIANNESS_LITTLE:
+            *shift_amount = bit_index;
+            break;
+        case PIS_ENDIANNESS_BIG:
+            *shift_amount = value_size_in_bits - 8 - bit_index;
+            break;
+        default:
+            UNREACHABLE();
+    }
+
+cleanup:
+    return err;
+}
+
 /// builds a node which represents the extraction of the byte at the given index from the value
 /// represented by the given node id.
-static err_t build_byte_extraction_node(
+static err_t extract_byte(
     cdfg_builder_t* builder,
     cdfg_item_id_t value_node_id,
     size_t value_size_in_bytes,
@@ -198,21 +225,13 @@ static err_t build_byte_extraction_node(
 ) {
     err_t err = SUCCESS;
 
-    size_t value_size_in_bits = value_size_in_bytes * 8;
-    size_t bit_index = byte_index * 8;
-
-    size_t shift_amount;
-    switch (builder->endianness) {
-        case PIS_ENDIANNESS_LITTLE:
-            shift_amount = bit_index;
-            break;
-        case PIS_ENDIANNESS_BIG:
-            shift_amount = value_size_in_bits - 8 - bit_index;
-            break;
-        default:
-            UNREACHABLE();
-    }
-
+    size_t shift_amount = 0;
+    CHECK_RETHROW(extract_byte_shift_amount(
+        byte_index,
+        value_size_in_bytes,
+        builder->endianness,
+        &shift_amount
+    ));
 
     cdfg_item_id_t shift_amount_node_id = CDFG_ITEM_ID_INVALID;
     CHECK_RETHROW(make_imm_node(builder, shift_amount, &shift_amount_node_id));
@@ -244,8 +263,45 @@ cleanup:
     return err;
 }
 
+/// left-shifts the given byte value node id such that it is placed at the requested byte index in
+/// the reconstructed value.
+static err_t reconstruct_byte(
+    cdfg_builder_t* builder,
+    cdfg_item_id_t byte_value_node_id,
+    size_t value_size_in_bytes,
+    size_t byte_index,
+    cdfg_item_id_t* out_node_id
+) {
+    err_t err = SUCCESS;
+
+    size_t shift_amount = 0;
+    CHECK_RETHROW(extract_byte_shift_amount(
+        byte_index,
+        value_size_in_bytes,
+        builder->endianness,
+        &shift_amount
+    ));
+
+    cdfg_item_id_t shift_amount_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(make_imm_node(builder, shift_amount, &shift_amount_node_id));
+
+    cdfg_item_id_t shifted_val_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(make_binop_node(
+        &builder->cdfg,
+        CDFG_CALCULATION_SHIFT_LEFT,
+        byte_value_node_id,
+        shift_amount_node_id,
+        &shifted_val_node_id
+    ));
+
+    *out_node_id = shifted_val_node_id;
+
+cleanup:
+    return err;
+}
+
 /// breaks the specified op state slot to byte-by-byte slots.
-static err_t op_state_break_to_bytes(
+static err_t break_op_state_slot_to_bytes(
     cdfg_builder_t* builder, cdfg_op_state_t* op_state, cdfg_item_id_t slot_id
 ) {
     err_t err = SUCCESS;
@@ -273,18 +329,13 @@ static err_t op_state_break_to_bytes(
 
         // calculate the byte value
         cdfg_item_id_t cur_byte_value_node_id = CDFG_ITEM_ID_INVALID;
-        CHECK_RETHROW(build_byte_extraction_node(
-            builder,
-            orig_slot.value_node_id,
-            bytes,
-            i,
-            &cur_byte_value_node_id
-        ));
+        CHECK_RETHROW(
+            extract_byte(builder, orig_slot.value_node_id, bytes, i, &cur_byte_value_node_id)
+        );
 
         // calculate the operand that represents the byte value
         pis_addr_t cur_byte_addr = {};
         CHECK_RETHROW(pis_addr_add(&orig_slot.operand.addr, i, &cur_byte_addr));
-
         pis_operand_t cur_byte_operand = PIS_OPERAND(cur_byte_addr, PIS_SIZE_1);
 
         // store it in the slot
@@ -293,6 +344,53 @@ static err_t op_state_break_to_bytes(
             .value_node_id = cur_byte_value_node_id,
         };
     }
+cleanup:
+    return err;
+}
+
+/// break all op state slots that intersect with the given operand to individual bytes.
+static err_t break_intersecting_slots_to_bytes(
+    const pis_operand_t* operand, cdfg_builder_t* builder, cdfg_op_state_t* op_state
+) {
+    err_t err = SUCCESS;
+
+    for (size_t i = 0; i < op_state->used_slots_amount; i++) {
+        const cdfg_op_state_slot_t* slot = &op_state->slots[i];
+        if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
+            // this slot is vacant.
+            continue;
+        }
+        if (pis_operands_intersect(operand, &slot->operand)) {
+            CHECK_RETHROW(break_op_state_slot_to_bytes(builder, op_state, i));
+        }
+    }
+
+cleanup:
+    return err;
+}
+
+static err_t make_var_node(
+    cdfg_builder_t* builder, const pis_operand_t* reg_operand, cdfg_item_id_t* out_node_id
+) {
+    err_t err = SUCCESS;
+
+    CHECK(reg_operand->addr.space == PIS_SPACE_REG);
+
+    cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(next_node_id(&builder->cdfg, &node_id));
+    builder->cdfg.node_storage[node_id] = (cdfg_node_t) {
+        .kind = CDFG_NODE_KIND_VAR,
+        .content =
+            {
+                .var =
+                    {
+                        .reg_offset = reg_operand->addr.offset,
+                        .reg_size = reg_operand->size,
+                    },
+            },
+    };
+
+    *out_node_id = node_id;
 cleanup:
     return err;
 }
@@ -309,20 +407,54 @@ static err_t read_reg_operand_byte_by_byte(
 
     // first, break apart all existing operands that intersect with this operand to byte-by-byte
     // operands.
-    for (size_t i = 0; i < op_state->used_slots_amount; i++) {
-        const cdfg_op_state_slot_t* slot = &op_state->slots[i];
-        if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
-            // this slot is vacant.
-            continue;
+    CHECK_RETHROW(break_intersecting_slots_to_bytes(operand, builder, op_state));
+
+    cdfg_item_id_t reconstructed_val_node_id = CDFG_ITEM_ID_INVALID;
+
+    u32 bytes = pis_size_to_bytes(operand->size);
+    for (size_t i = 0; i < bytes; i++) {
+        // calculate the operand that represents the byte value
+        pis_addr_t cur_byte_addr = {};
+        CHECK_RETHROW(pis_addr_add(&operand->addr, i, &cur_byte_addr));
+        pis_operand_t cur_byte_operand = PIS_OPERAND(cur_byte_addr, PIS_SIZE_1);
+
+        // calculate the byte value of the current byte
+        cdfg_item_id_t cur_byte_val_node_id = op_state_read_exact(op_state, &cur_byte_operand);
+        if (cur_byte_val_node_id == CDFG_ITEM_ID_INVALID) {
+            // this byte is uninitialized, create a variable for it.
+            CHECK_RETHROW(make_var_node(builder, &cur_byte_operand, &cur_byte_val_node_id));
         }
-        if (pis_operands_intersect(operand, &slot->operand)) {
-            // if this slot intersects with the examined operand, break it to byte-by-byte
-            // representation.
-            CHECK_RETHROW(op_state_break_to_bytes(builder, op_state, i));
+
+        cdfg_item_id_t cur_byte_reconstructed_node_id = CDFG_ITEM_ID_INVALID;
+        CHECK_RETHROW(reconstruct_byte(
+            builder,
+            cur_byte_val_node_id,
+            bytes,
+            i,
+            &cur_byte_reconstructed_node_id
+        ));
+
+        // append the current reconstructed byte to the full reconstructed value.
+        if (reconstructed_val_node_id == CDFG_ITEM_ID_INVALID) {
+            reconstructed_val_node_id = cur_byte_reconstructed_node_id;
+        } else {
+            // bitwise or the currnet byte into the full reconstructed value
+            cdfg_item_id_t ored_values_node_id = CDFG_ITEM_ID_INVALID;
+            CHECK_RETHROW(make_binop_node(
+                &builder->cdfg,
+                CDFG_CALCULATION_OR,
+                reconstructed_val_node_id,
+                cur_byte_reconstructed_node_id,
+                &ored_values_node_id
+            ));
+
+            reconstructed_val_node_id = ored_values_node_id;
         }
     }
-    // TODO: now read it byte-by-byte
-    TODO();
+
+    CHECK(reconstructed_val_node_id != CDFG_ITEM_ID_INVALID);
+    *out_node_id = reconstructed_val_node_id;
+
 cleanup:
     return err;
 }
@@ -340,18 +472,7 @@ static err_t read_reg_operand(
 
         // first, create the variable node
         cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
-        CHECK_RETHROW(next_node_id(&builder->cdfg, &node_id));
-        builder->cdfg.node_storage[node_id] = (cdfg_node_t) {
-            .kind = CDFG_NODE_KIND_VAR,
-            .content =
-                {
-                    .var =
-                        {
-                            .reg_offset = operand->addr.offset,
-                            .reg_size = operand->size,
-                        },
-                },
-        };
+        CHECK_RETHROW(make_var_node(builder, operand, &node_id));
 
         // now add a slot in the op state to point to it
         cdfg_item_id_t op_state_slot_id = CDFG_ITEM_ID_INVALID;
