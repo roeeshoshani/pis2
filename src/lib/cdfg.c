@@ -1213,16 +1213,16 @@ static void cdfg_dump_node_desc(const cdfg_node_t* node) {
             break;
         case CDFG_NODE_KIND_VAR:
             TRACE_NO_NEWLINE(
-                "var off 0x%lx sz %u",
+                "var_off_0x%lx_sz_%u",
                 node->content.var.reg_offset,
                 pis_size_to_bytes(node->content.var.reg_size)
             );
             break;
         case CDFG_NODE_KIND_IMM:
-            TRACE_NO_NEWLINE("imm 0x%lx", node->content.imm.value);
+            TRACE_NO_NEWLINE("imm_0x%lx", node->content.imm.value);
             break;
         case CDFG_NODE_KIND_CALC:
-            TRACE_NO_NEWLINE("calc %s", cdfg_calculation_to_str(node->content.calc.calculation));
+            TRACE_NO_NEWLINE("calc_%s", cdfg_calculation_to_str(node->content.calc.calculation));
             break;
         case CDFG_NODE_KIND_STORE:
             TRACE_NO_NEWLINE("store");
@@ -1237,7 +1237,7 @@ static void cdfg_dump_node_desc(const cdfg_node_t* node) {
 }
 
 static void cdfg_dump_node(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
-    TRACE_NO_NEWLINE("id %u ", node_id);
+    TRACE_NO_NEWLINE("id_%u_", node_id);
     cdfg_dump_node_desc(&cdfg->node_storage[node_id]);
 }
 
