@@ -260,8 +260,9 @@ cleanup:
 }
 
 /// calculates the start and end machine code addresses of the given block.
-static err_t
-    block_get_addr_range(const pis_cfg_t* cfg, const pis_cfg_block_t* block, u64* start, u64* end) {
+err_t pis_cfg_block_addr_range(
+    const pis_cfg_t* cfg, const pis_cfg_block_t* block, u64* start, u64* end
+) {
     err_t err = SUCCESS;
 
     // make sure that the block has any content
@@ -292,7 +293,7 @@ static err_t
 
         u64 block_start = 0;
         u64 block_end = 0;
-        CHECK_RETHROW(block_get_addr_range(cfg, block, &block_start, &block_end));
+        CHECK_RETHROW(pis_cfg_block_addr_range(cfg, block, &block_start, &block_end));
 
         if (addr >= block_start && addr < block_end) {
             *found_block_id = i;
@@ -337,7 +338,7 @@ static err_t explore_seen_path(
     // find the start address of the block
     u64 block_start = 0;
     u64 block_end = 0;
-    CHECK_RETHROW(block_get_addr_range(&builder->cfg, block, &block_start, &block_end));
+    CHECK_RETHROW(pis_cfg_block_addr_range(&builder->cfg, block, &block_start, &block_end));
 
     if (block_start == path_start_offset) {
         // if some flow in the code leads back to the start of this block, there is nothing for us

@@ -89,6 +89,10 @@ typedef struct {
 
 void pis_cfg_reset(pis_cfg_t* cfg);
 
+err_t pis_cfg_block_addr_range(
+    const pis_cfg_t* cfg, const pis_cfg_block_t* block, u64* start, u64* end
+);
+
 err_t pis_cfg_builder_build(
     pis_cfg_builder_t* builder,
     pis_lifter_t lifter,
