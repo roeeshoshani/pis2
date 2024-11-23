@@ -181,7 +181,7 @@ bool pis_operands_intersect(const pis_operand_t* operand_a, const pis_operand_t*
     u64 operand_a_end = operand_a_start + pis_size_to_bytes(operand_a->size);
 
     u64 operand_b_start = operand_a->addr.offset;
-    u64 operand_b_end = operand_b_start + pis_size_to_bytes(operand_a->size);
+    u64 operand_b_end = operand_b_start + pis_size_to_bytes(operand_b->size);
 
     return operand_a_start < operand_b_end && operand_b_start < operand_a_end;
 }
