@@ -75,7 +75,7 @@ typedef struct {
     pis_lifter_t lifter;
 
     /// the machine code to use when building the CFG.
-    const u8* machine_code_start;
+    const u8* machine_code;
     size_t machine_code_len;
     u64 machine_code_start_addr;
 
@@ -89,12 +89,10 @@ typedef struct {
 
 void pis_cfg_reset(pis_cfg_t* cfg);
 
-void pis_cfg_builder_init(
+err_t pis_cfg_builder_build(
     pis_cfg_builder_t* builder,
     pis_lifter_t lifter,
-    const u8* machine_code_start,
+    const u8* machine_code,
     size_t machine_code_len,
     u64 machine_code_start_addr
 );
-
-err_t build_cfg_wip(pis_cfg_builder_t* builder);

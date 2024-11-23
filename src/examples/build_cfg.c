@@ -24,9 +24,7 @@ int main() {
     };
 
     pis_cfg_builder_t builder = {};
-    pis_cfg_builder_init(&builder, pis_lifter_x86_64, code, ARRAY_SIZE(code), 0);
-
-    CHECK_RETHROW(build_cfg_wip(&builder));
+    CHECK_RETHROW(pis_cfg_builder_build(&builder, pis_lifter_x86_64, code, ARRAY_SIZE(code), 0));
 
 cleanup:
     return err;

@@ -393,7 +393,7 @@ static err_t explore_unseen_path(pis_cfg_builder_t* builder, size_t path_start_o
 
         pis_lift_args_t lift_args = {
             .machine_code = CURSOR_INIT(
-                builder->machine_code_start + cur_offset,
+                builder->machine_code + cur_offset,
                 builder->machine_code_len - cur_offset
             ),
             .machine_code_addr = builder->machine_code_start_addr + cur_offset,
@@ -490,15 +490,15 @@ cleanup:
     return err;
 }
 
-void pis_cfg_builder_init(
+static void builder_init(
     pis_cfg_builder_t* builder,
     pis_lifter_t lifter,
-    const u8* machine_code_start,
+    const u8* machine_code,
     size_t machine_code_len,
     u64 machine_code_start_addr
 ) {
     builder->lifter = lifter;
-    builder->machine_code_start = machine_code_start;
+    builder->machine_code = machine_code;
     builder->machine_code_len = machine_code_len;
     builder->machine_code_start_addr = machine_code_start_addr;
 
@@ -507,12 +507,16 @@ void pis_cfg_builder_init(
     builder->unexplored_paths_amount = 0;
 }
 
-err_t build_cfg_wip(pis_cfg_builder_t* builder) {
+err_t pis_cfg_builder_build(
+    pis_cfg_builder_t* builder,
+    pis_lifter_t lifter,
+    const u8* machine_code,
+    size_t machine_code_len,
+    u64 machine_code_start_addr
+) {
     err_t err = SUCCESS;
 
-    // reset the fields of the CFG builder.
-    pis_cfg_reset(&builder->cfg);
-    builder->cur_block_id = PIS_CFG_ITEM_ID_INVALID;
+    builder_init(builder, lifter, machine_code, machine_code_len, machine_code_start_addr);
 
     CHECK_RETHROW(enqueue_unexplored_path(builder, 0));
 
