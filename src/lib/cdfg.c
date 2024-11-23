@@ -722,6 +722,21 @@ cleanup:
     return err;
 }
 
+static err_t move_opcode_handler(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    err_t err = SUCCESS;
+    CHECK_CODE(insn->operands_amount == 2, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+    // check operand sizes
+    CHECK_CODE(insn->operands[0].size == insn->operands[1].size, PIS_ERR_OPERAND_SIZE_MISMATCH);
+
+    cdfg_item_id_t src = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(read_operand(builder, &insn->operands[1], &src));
+
+    CHECK_RETHROW(write_operand(builder, &insn->operands[0], src));
+cleanup:
+    return err;
+}
+
 static err_t add_opcode_handler(cdfg_builder_t* builder, const pis_insn_t* insn) {
     err_t err = SUCCESS;
     CHECK_RETHROW(binop_opcode_handler(builder, insn, CDFG_CALCULATION_ADD));
@@ -731,6 +746,7 @@ cleanup:
 
 static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
     [PIS_OPCODE_ADD] = add_opcode_handler,
+    [PIS_OPCODE_MOVE] = move_opcode_handler,
 };
 
 static err_t process_insn(cdfg_builder_t* builder, const pis_insn_t* insn) {
