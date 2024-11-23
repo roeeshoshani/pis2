@@ -470,6 +470,9 @@ static err_t explore_unseen_path(pis_cfg_builder_t* builder, size_t path_start_o
         cur_offset += lift_args.result.machine_insn_len;
     }
 
+    // we finished building the current block, don't append any other units to it.
+    builder->cur_block_id = PIS_CFG_ITEM_ID_INVALID;
+
 cleanup:
     return err;
 }
