@@ -1016,6 +1016,13 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_or(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW(opcode_handler_binop(builder, insn, CDFG_CALCULATION_OR));
+cleanup:
+    return err;
+}
+
 static err_t opcode_handler_shift_right(cdfg_builder_t* builder, const pis_insn_t* insn) {
     err_t err = SUCCESS;
     CHECK_RETHROW(opcode_handler_binop(builder, insn, CDFG_CALCULATION_SHIFT_RIGHT));
@@ -1069,6 +1076,7 @@ static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
     [PIS_OPCODE_ADD] = opcode_handler_add,
     [PIS_OPCODE_SUB] = opcode_handler_sub,
     [PIS_OPCODE_XOR] = opcode_handler_xor,
+    [PIS_OPCODE_OR] = opcode_handler_or,
     [PIS_OPCODE_SHIFT_RIGHT] = opcode_handler_shift_right,
     [PIS_OPCODE_SHIFT_RIGHT_SIGNED] = opcode_handler_shift_right_signed,
     [PIS_OPCODE_SHIFT_LEFT] = opcode_handler_shift_left,
