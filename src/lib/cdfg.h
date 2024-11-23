@@ -37,6 +37,7 @@ typedef enum {
     CDFG_CALCULATION_SHIFT_RIGHT_SIGNED,
     CDFG_CALCULATION_SHIFT_LEFT,
     CDFG_CALCULATION_UNSIGNED_LESS_THAN,
+    CDFG_CALCULATION_SIGNED_LESS_THAN,
 } __attribute__((packed)) cdfg_calculation_t;
 
 /// a CDFG variable node. this is used to represent an access to a register without previous
