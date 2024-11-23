@@ -22,6 +22,8 @@ typedef enum {
     CDFG_NODE_KIND_VAR,
     CDFG_NODE_KIND_IMM,
     CDFG_NODE_KIND_CALC,
+    CDFG_NODE_KIND_STORE,
+    CDFG_NODE_KIND_LOAD,
     CDFG_NODE_KIND_ENTRY,
 } __attribute__((packed)) cdfg_node_kind_t;
 
@@ -55,16 +57,11 @@ typedef struct {
     cdfg_calculation_t calculation;
 } __attribute__((packed)) cdfg_calc_node_t;
 
-/// a CDFG entry node. this represents the entrypoint of the function.
-typedef struct {
-} __attribute__((packed)) cdfg_entry_node_t;
-
 /// the content of a CDFG node.
 typedef union {
     cdfg_var_node_t var;
     cdfg_imm_node_t imm;
     cdfg_calc_node_t calc;
-    cdfg_entry_node_t entry;
 } __attribute__((packed)) cdfg_node_content_t;
 
 /// represents a single node in the CDFG
@@ -73,11 +70,25 @@ typedef struct {
     cdfg_node_content_t content;
 } __attribute__((packed)) cdfg_node_t;
 
+typedef enum {
+    CDFG_EDGE_KIND_DATA_FLOW,
+    CDFG_EDGE_KIND_CONTROL_FLOW,
+} __attribute__((packed)) cdfg_edge_kind_t;
+
 /// represents a single edge in the CDFG
 typedef struct {
+    /// the kind of node.
+    cdfg_edge_kind_t kind : 1;
+
+    /// which of the inputs of the destination node does this edge represent?
+    u8 to_node_input_index: 7;
+
+    /// the source node.
     cdfg_item_id_t from_node;
+
+    /// the destination node.
     cdfg_item_id_t to_node;
-} cdfg_edge_t;
+} __attribute__((packed)) cdfg_edge_t;
 
 /// a control data flow graph.
 typedef struct {

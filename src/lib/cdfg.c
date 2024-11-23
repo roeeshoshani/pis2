@@ -1,5 +1,4 @@
 #include "cdfg.h"
-#include "cfg.h"
 #include "endianness.h"
 #include "errors.h"
 #include "except.h"
@@ -31,7 +30,7 @@ cleanup:
     return err;
 }
 
-static err_t next_node_id(cdfg_t* cdfg, cfg_item_id_t* id) {
+static err_t next_node_id(cdfg_t* cdfg, cdfg_item_id_t* id) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(next_id(&cdfg->nodes_amount, CDFG_MAX_NODES, id));
@@ -40,7 +39,7 @@ cleanup:
     return err;
 }
 
-static err_t next_edge_id(cdfg_t* cdfg, cfg_item_id_t* id) {
+static err_t next_edge_id(cdfg_t* cdfg, cdfg_item_id_t* id) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(next_id(&cdfg->edges_amount, CDFG_MAX_EDGES, id));
@@ -49,7 +48,7 @@ cleanup:
     return err;
 }
 
-static err_t next_op_state_slot_id(cdfg_op_state_t* op_state, cfg_item_id_t* id) {
+static err_t next_op_state_slot_id(cdfg_op_state_t* op_state, cdfg_item_id_t* id) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(next_id(&op_state->used_slots_amount, CDFG_OP_STATE_MAX_SLOTS, id));
@@ -161,13 +160,21 @@ cleanup:
     return err;
 }
 
-static err_t make_edge(cdfg_t* cdfg, cdfg_item_id_t from_node, cdfg_item_id_t to_node) {
+static err_t make_edge(
+    cdfg_t* cdfg,
+    cdfg_edge_kind_t kind,
+    cdfg_item_id_t from_node,
+    cdfg_item_id_t to_node,
+    u8 to_node_input_index
+) {
     err_t err = SUCCESS;
 
     cdfg_item_id_t edge_id = CDFG_ITEM_ID_INVALID;
     CHECK_RETHROW(next_edge_id(cdfg, &edge_id));
 
     cdfg->edge_storage[edge_id] = (cdfg_edge_t) {
+        .kind = kind,
+        .to_node_input_index = to_node_input_index,
         .from_node = from_node,
         .to_node = to_node,
     };
@@ -199,6 +206,59 @@ cleanup:
     return err;
 }
 
+/// link a node which requires control flow into the control flow chain.
+static err_t link_cf_node(cdfg_builder_t* builder, cdfg_item_id_t node_id) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW(make_edge(
+        &builder->cdfg,
+        CDFG_EDGE_KIND_CONTROL_FLOW,
+        builder->op_state.last_cf_node_id,
+        node_id,
+        0
+    ));
+
+    builder->op_state.last_cf_node_id = node_id;
+
+cleanup:
+    return err;
+}
+
+static err_t make_store_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
+    err_t err = SUCCESS;
+
+    cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(next_node_id(cdfg, &node_id));
+
+    cdfg->node_storage[node_id] = (cdfg_node_t) {
+        .kind = CDFG_NODE_KIND_STORE,
+        .content = {},
+    };
+
+    *out_node_id = node_id;
+cleanup:
+    return err;
+}
+
+static err_t
+    do_store(cdfg_builder_t* builder, cdfg_item_id_t addr_node_id, cdfg_item_id_t val_node_id) {
+    err_t err = SUCCESS;
+
+    cdfg_item_id_t store_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(make_store_node(&builder->cdfg, &store_node_id));
+
+    CHECK_RETHROW(
+        make_edge(&builder->cdfg, CDFG_EDGE_KIND_DATA_FLOW, addr_node_id, store_node_id, 0)
+    );
+    CHECK_RETHROW(make_edge(&builder->cdfg, CDFG_EDGE_KIND_DATA_FLOW, val_node_id, store_node_id, 1)
+    );
+
+    CHECK_RETHROW(link_cf_node(builder, store_node_id));
+
+cleanup:
+    return err;
+}
+
 static err_t make_entry_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
     err_t err = SUCCESS;
 
@@ -207,10 +267,7 @@ static err_t make_entry_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
 
     cdfg->node_storage[node_id] = (cdfg_node_t) {
         .kind = CDFG_NODE_KIND_ENTRY,
-        .content =
-            {
-                .entry = {},
-            },
+        .content = {},
     };
 
     *out_node_id = node_id;
@@ -230,8 +287,8 @@ static err_t make_binop_node(
     cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
     CHECK_RETHROW(make_calc_node(cdfg, calculation, &node_id));
 
-    CHECK_RETHROW(make_edge(cdfg, lhs_node_id, node_id));
-    CHECK_RETHROW(make_edge(cdfg, rhs_node_id, node_id));
+    CHECK_RETHROW(make_edge(cdfg, CDFG_EDGE_KIND_DATA_FLOW, lhs_node_id, node_id, 0));
+    CHECK_RETHROW(make_edge(cdfg, CDFG_EDGE_KIND_DATA_FLOW, rhs_node_id, node_id, 1));
 
     *out_binop_node_id = node_id;
 cleanup:
@@ -709,7 +766,7 @@ cleanup:
     return err;
 }
 
-static err_t binop_opcode_handler(
+static err_t opcode_handler_binop(
     cdfg_builder_t* builder, const pis_insn_t* insn, cdfg_calculation_t calculation
 ) {
     err_t err = SUCCESS;
@@ -741,7 +798,7 @@ cleanup:
     return err;
 }
 
-static err_t move_opcode_handler(cdfg_builder_t* builder, const pis_insn_t* insn) {
+static err_t opcode_handler_move(cdfg_builder_t* builder, const pis_insn_t* insn) {
     err_t err = SUCCESS;
     CHECK_CODE(insn->operands_amount == 2, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
 
@@ -756,16 +813,33 @@ cleanup:
     return err;
 }
 
-static err_t add_opcode_handler(cdfg_builder_t* builder, const pis_insn_t* insn) {
+static err_t opcode_handler_store(cdfg_builder_t* builder, const pis_insn_t* insn) {
     err_t err = SUCCESS;
-    CHECK_RETHROW(binop_opcode_handler(builder, insn, CDFG_CALCULATION_ADD));
+    CHECK_CODE(insn->operands_amount == 2, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+    cdfg_item_id_t addr = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(read_operand(builder, &insn->operands[0], &addr));
+
+    cdfg_item_id_t value = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(read_operand(builder, &insn->operands[1], &value));
+
+    CHECK_RETHROW(do_store(builder, addr, value));
+
+cleanup:
+    return err;
+}
+
+static err_t opcode_handler_add(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW(opcode_handler_binop(builder, insn, CDFG_CALCULATION_ADD));
 cleanup:
     return err;
 }
 
 static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
-    [PIS_OPCODE_ADD] = add_opcode_handler,
-    [PIS_OPCODE_MOVE] = move_opcode_handler,
+    [PIS_OPCODE_ADD] = opcode_handler_add,
+    [PIS_OPCODE_MOVE] = opcode_handler_move,
+    [PIS_OPCODE_STORE] = opcode_handler_store,
 };
 
 static err_t process_insn(cdfg_builder_t* builder, const pis_insn_t* insn) {
