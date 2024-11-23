@@ -2,6 +2,7 @@
 
 #include "cfg.h"
 #include "except.h"
+#include "operand_size.h"
 #include "pis.h"
 #include "types.h"
 
@@ -18,25 +19,33 @@ typedef u16 cdfg_item_id_t;
 typedef enum {
     CDFG_NODE_KIND_VAR,
     CDFG_NODE_KIND_IMM,
-} cdfg_node_kind_t;
+} __attribute__((packed)) cdfg_node_kind_t;
 
+/// a CDFG variable node. this is used to represent an access to a register without previous
+/// initialization of it. used for example to represent arguments to functions.
 typedef struct {
-} cdfg_node_var_t;
+    /// the offset in the register space of the register access that this variable represents.
+    u64 reg_offset;
 
+    /// the size of the register access that this variable represents.
+    pis_size_t reg_size;
+} __attribute__((packed)) cdfg_node_var_t;
+
+/// a CDFG immediate value.
 typedef struct {
     u64 value;
-} cdfg_node_imm_t;
+} __attribute__((packed)) cdfg_node_imm_t;
 
 typedef union {
     cdfg_node_var_t var;
     cdfg_node_imm_t imm;
-} cdfg_node_content_t;
+} __attribute__((packed)) cdfg_node_content_t;
 
 /// represents a single node in the CDFG
 typedef struct {
     cdfg_node_kind_t kind;
     cdfg_node_content_t content;
-} cdfg_node_t;
+} __attribute__((packed)) cdfg_node_t;
 
 /// represents a single edge in the CDFG
 typedef struct {

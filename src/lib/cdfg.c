@@ -1,6 +1,7 @@
 #include "cdfg.h"
 #include "cfg.h"
 #include "except.h"
+#include "operand_size.h"
 #include "pis.h"
 
 static err_t next_id(size_t* items_amount, size_t max, cdfg_item_id_t* id) {
@@ -30,11 +31,19 @@ cleanup:
     return err;
 }
 
-/// fetch the value of the given operand according to the given operand state.
-/// returns the id of the node which represents the value of the operand, or `CDFG_ITEM_ID_INVALID`
-/// if the operand is currently uninitialized.
+static err_t next_op_state_slot_id(cdfg_op_state_t* op_state, cfg_item_id_t* id) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW(next_id(&op_state->used_slots_amount, CDFG_OP_STATE_MAX_SLOTS, id));
+
+cleanup:
+    return err;
+}
+
+/// tries to find an exact match for the given operand in the operand state. if an exact match was
+/// found, returns the id of the node which represents the value of the given operand.
 static cdfg_item_id_t
-    op_state_read_operand(const cdfg_op_state_t* op_state, const pis_operand_t* operand) {
+    op_state_read_exact(const cdfg_op_state_t* op_state, const pis_operand_t* operand) {
     for (size_t i = 0; i < op_state->used_slots_amount; i++) {
         const cdfg_op_state_slot_t* slot = &op_state->slots[i];
         if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
@@ -42,10 +51,36 @@ static cdfg_item_id_t
             continue;
         }
         if (pis_operand_equals(operand, &slot->operand)) {
-            return slot->value_node_id;
+            // exact match
+            return i;
         }
     }
+
+    // no exact match was found
     return CDFG_ITEM_ID_INVALID;
+}
+
+/// checks if the given operand is fully uninitialized. that is, none of its bytes are
+/// initialized. if at least one of its bytes is initialized, then it is not considered fully
+/// uninitialized.
+static bool
+    op_state_is_fully_uninit(const cdfg_op_state_t* op_state, const pis_operand_t* operand) {
+    for (size_t i = 0; i < op_state->used_slots_amount; i++) {
+        const cdfg_op_state_slot_t* slot = &op_state->slots[i];
+        if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
+            // this slot is vacant.
+            continue;
+        }
+        if (pis_operands_intersect(operand, &slot->operand)) {
+            // found a slot which intersects with the examined operand. this means that at least one
+            // of its bytes is initialized, so it is not fully uninitialized.
+            return false;
+        }
+    }
+
+    // none of the slots in the operand state intersect with the operand, so it is fully
+    // uninitialized.
+    return true;
 }
 
 /// tries to find an existing immediate node with the given value in the cdfg.
@@ -84,14 +119,101 @@ cleanup:
     return err;
 }
 
-static err_t read_reg_operand(
+/// breaks the specified op state slot to byte-by-byte slots.
+static err_t op_state_break_to_bytes(cdfg_op_state_t* op_state, cdfg_item_id_t slot_id) {
+    err_t err = SUCCESS;
+    cdfg_op_state_slot_t* slot = &op_state->slots[slot_id];
+    if (slot->operand.size == PIS_SIZE_1) {
+        // the operand is already a single byte, so we don't need to do anything.
+        SUCCESS_CLEANUP();
+    }
+    // TODO: split it
+    TODO();
+cleanup:
+    return err;
+}
+
+/// read a register operand byte by byte. this is used when no exact match operand it found for the
+/// register operand, and it requires partial reads.
+static err_t read_reg_operand_byte_by_byte(
     const pis_operand_t* operand,
     cdfg_builder_t* builder,
-    const cdfg_op_state_t* op_state,
+    cdfg_op_state_t* op_state,
     cdfg_item_id_t* out_node_id
 ) {
     err_t err = SUCCESS;
+
+    // first, break apart all existing operands that intersect with this operand to byte-by-byte
+    // operands.
+    for (size_t i = 0; i < op_state->used_slots_amount; i++) {
+        const cdfg_op_state_slot_t* slot = &op_state->slots[i];
+        if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
+            // this slot is vacant.
+            continue;
+        }
+        if (pis_operands_intersect(operand, &slot->operand)) {
+            // if this slot intersects with the examined operand, break it to byte-by-byte
+            // representation.
+            CHECK_RETHROW(op_state_break_to_bytes(op_state, i));
+        }
+    }
+    // TODO: now read it byte-by-byte
     TODO();
+cleanup:
+    return err;
+}
+
+static err_t read_reg_operand(
+    const pis_operand_t* operand,
+    cdfg_builder_t* builder,
+    cdfg_op_state_t* op_state,
+    cdfg_item_id_t* out_node_id
+) {
+    err_t err = SUCCESS;
+
+    if (op_state_is_fully_uninit(op_state, operand)) {
+        // the reg operand is fully uninitialized. initialize it to a new variable node.
+
+        // first, create the variable node
+        cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
+        CHECK_RETHROW(next_node_id(&builder->cdfg, &node_id));
+        builder->cdfg.node_storage[node_id] = (cdfg_node_t) {
+            .kind = CDFG_NODE_KIND_VAR,
+            .content =
+                {
+                    .var =
+                        {
+                            .reg_offset = operand->addr.offset,
+                            .reg_size = operand->size,
+                        },
+                },
+        };
+
+        // now add a slot in the op state to point to it
+        cdfg_item_id_t op_state_slot_id = CDFG_ITEM_ID_INVALID;
+        CHECK_RETHROW(next_op_state_slot_id(op_state, &op_state_slot_id));
+        op_state->slots[op_state_slot_id] = (cdfg_op_state_slot_t) {
+            .operand = *operand,
+            .value_node_id = node_id,
+        };
+    } else {
+        // node is either fully initialized or partially initialized.
+        cdfg_item_id_t exact_match_node_id = op_state_read_exact(op_state, operand);
+        if (exact_match_node_id != CDFG_ITEM_ID_INVALID) {
+            // found an exact match for the node, use it.
+            *out_node_id = exact_match_node_id;
+        } else {
+            // no exact match for the node. this means that the node requires partial reading.
+            // implementing this is really complicated as it must be able to combine multiple
+            // relevant op state slots, and it must be able to represent partially uninitialized
+            // regions in the resulting value, since it might be partially initialized.
+            //
+            // instead of doing this, we are breaking all slots related to this operand to
+            // byte-by-byte slots and then read it byte-by-byte, which is much simpler than handling
+            // all edge cases of partial reads.
+            CHECK_RETHROW(read_reg_operand_byte_by_byte(operand, builder, op_state, out_node_id));
+        }
+    }
 cleanup:
     return err;
 }
@@ -101,8 +223,10 @@ static err_t read_tmp_operand(
 ) {
     err_t err = SUCCESS;
 
-    // tmp operands can't be uninitialized when read, so just read it from the op state.
-    cdfg_item_id_t node_id = op_state_read_operand(op_state, operand);
+    // tmp operands don't allow the shitty combinatorics that are allowed for reg operands. they
+    // must always be initialized when read, and they only allow exact matches in the op state, no
+    // partial reads/writes.
+    cdfg_item_id_t node_id = op_state_read_exact(op_state, operand);
     CHECK(node_id != CDFG_ITEM_ID_INVALID);
 
     *out_node_id = node_id;
@@ -115,7 +239,7 @@ cleanup:
 static err_t read_operand(
     const pis_operand_t* operand,
     cdfg_builder_t* builder,
-    const cdfg_op_state_t* op_state,
+    cdfg_op_state_t* op_state,
     cdfg_item_id_t* out_node_id
 ) {
     err_t err = SUCCESS;
