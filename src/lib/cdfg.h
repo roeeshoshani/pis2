@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cfg.h"
+#include "endianness.h"
 #include "except.h"
 #include "operand_size.h"
 #include "pis.h"
@@ -16,10 +17,17 @@
 
 typedef u16 cdfg_item_id_t;
 
+/// the kind of a CDFG node.
 typedef enum {
     CDFG_NODE_KIND_VAR,
     CDFG_NODE_KIND_IMM,
+    CDFG_NODE_KIND_CALC,
 } __attribute__((packed)) cdfg_node_kind_t;
+
+/// the operation performed by a CDFG operation node.
+typedef enum {
+    CDFG_OPERATION_AND,
+} __attribute__((packed)) cdfg_operation_t;
 
 /// a CDFG variable node. this is used to represent an access to a register without previous
 /// initialization of it. used for example to represent arguments to functions.
@@ -29,16 +37,24 @@ typedef struct {
 
     /// the size of the register access that this variable represents.
     pis_size_t reg_size;
-} __attribute__((packed)) cdfg_node_var_t;
+} __attribute__((packed)) cdfg_var_node_t;
 
 /// a CDFG immediate value.
 typedef struct {
     u64 value;
-} __attribute__((packed)) cdfg_node_imm_t;
+} __attribute__((packed)) cdfg_imm_node_t;
 
+/// a CDFG calculation node.
+typedef struct {
+    /// the calculation that is performed by this node.
+    cdfg_operation_t calculation;
+} __attribute__((packed)) cdfg_calc_node_t;
+
+/// the content of a CDFG node.
 typedef union {
-    cdfg_node_var_t var;
-    cdfg_node_imm_t imm;
+    cdfg_var_node_t var;
+    cdfg_imm_node_t imm;
+    cdfg_calc_node_t calc;
 } __attribute__((packed)) cdfg_node_content_t;
 
 /// represents a single node in the CDFG
@@ -81,6 +97,9 @@ typedef struct {
 typedef struct {
     /// the built CDFG.
     cdfg_t cdfg;
+
+    /// the endianness of the lifted code.
+    pis_endianness_t endianness;
 } cdfg_builder_t;
 
-err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg);
+err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t endianness);

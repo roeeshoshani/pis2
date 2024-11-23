@@ -119,16 +119,66 @@ cleanup:
     return err;
 }
 
+/// builds a node which represents the extraction of the byte at the given index from the value
+/// represented by the given node id.
+static err_t build_byte_extraction_node(
+    cdfg_builder_t* builder,
+    cdfg_item_id_t value_node_id,
+    size_t byte_index,
+    cdfg_item_id_t* out_node_id
+) {
+    err_t err = SUCCESS;
+    // TODO: implement this.
+    TODO();
+cleanup:
+    return err;
+}
+
 /// breaks the specified op state slot to byte-by-byte slots.
-static err_t op_state_break_to_bytes(cdfg_op_state_t* op_state, cdfg_item_id_t slot_id) {
+static err_t op_state_break_to_bytes(
+    cdfg_builder_t* builder, cdfg_op_state_t* op_state, cdfg_item_id_t slot_id
+) {
     err_t err = SUCCESS;
     cdfg_op_state_slot_t* slot = &op_state->slots[slot_id];
     if (slot->operand.size == PIS_SIZE_1) {
         // the operand is already a single byte, so we don't need to do anything.
         SUCCESS_CLEANUP();
     }
-    // TODO: split it
-    TODO();
+
+    // copy out the content of the slot as we are about to overwrite it.
+    cdfg_op_state_slot_t orig_slot = *slot;
+
+    // extract each of the bytes of the operand into its own slot.
+    u32 bytes = pis_size_to_bytes(orig_slot.operand.size);
+    for (size_t i = 0; i < bytes; i++) {
+        // first, choose the slot in which we will store this byte
+        cdfg_item_id_t cur_byte_slot_id;
+        if (i == 0) {
+            // the first byte is stored in the original slot
+            cur_byte_slot_id = slot_id;
+        } else {
+            // we allocate a new slots for the rest of the bytes
+            CHECK_RETHROW(next_op_state_slot_id(op_state, &cur_byte_slot_id));
+        }
+
+        // calculate the byte value
+        cdfg_item_id_t cur_byte_value_node_id = CDFG_ITEM_ID_INVALID;
+        CHECK_RETHROW(
+            build_byte_extraction_node(builder, orig_slot.value_node_id, i, &cur_byte_value_node_id)
+        );
+
+        // calculate the operand that represents the byte value
+        pis_addr_t cur_byte_addr = {};
+        CHECK_RETHROW(pis_addr_add(&orig_slot.operand.addr, i, &cur_byte_addr));
+
+        pis_operand_t cur_byte_operand = PIS_OPERAND(cur_byte_addr, PIS_SIZE_1);
+
+        // store it in the slot
+        op_state->slots[cur_byte_slot_id] = (cdfg_op_state_slot_t) {
+            .operand = cur_byte_operand,
+            .value_node_id = cur_byte_value_node_id,
+        };
+    }
 cleanup:
     return err;
 }
@@ -154,7 +204,7 @@ static err_t read_reg_operand_byte_by_byte(
         if (pis_operands_intersect(operand, &slot->operand)) {
             // if this slot intersects with the examined operand, break it to byte-by-byte
             // representation.
-            CHECK_RETHROW(op_state_break_to_bytes(op_state, i));
+            CHECK_RETHROW(op_state_break_to_bytes(builder, op_state, i));
         }
     }
     // TODO: now read it byte-by-byte
@@ -264,8 +314,10 @@ cleanup:
     return err;
 }
 
-err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg) {
+err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t endianness) {
     err_t err = SUCCESS;
+
+    builder->endianness = endianness;
 
     const cfg_block_t* block = &cfg->block_storage[0];
     CHECK(block->units_amount > 0);
