@@ -240,6 +240,22 @@ cleanup:
     return err;
 }
 
+static err_t make_load_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
+    err_t err = SUCCESS;
+
+    cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(next_node_id(cdfg, &node_id));
+
+    cdfg->node_storage[node_id] = (cdfg_node_t) {
+        .kind = CDFG_NODE_KIND_LOAD,
+        .content = {},
+    };
+
+    *out_node_id = node_id;
+cleanup:
+    return err;
+}
+
 static err_t
     do_store(cdfg_builder_t* builder, cdfg_item_id_t addr_node_id, cdfg_item_id_t val_node_id) {
     err_t err = SUCCESS;
@@ -254,6 +270,25 @@ static err_t
     );
 
     CHECK_RETHROW(link_cf_node(builder, store_node_id));
+
+cleanup:
+    return err;
+}
+
+static err_t do_load(
+    cdfg_builder_t* builder, cdfg_item_id_t addr_node_id, cdfg_item_id_t* out_loaded_val_node_id
+) {
+    err_t err = SUCCESS;
+
+    cdfg_item_id_t load_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(make_load_node(&builder->cdfg, &load_node_id));
+
+    CHECK_RETHROW(make_edge(&builder->cdfg, CDFG_EDGE_KIND_DATA_FLOW, addr_node_id, load_node_id, 0)
+    );
+
+    CHECK_RETHROW(link_cf_node(builder, load_node_id));
+
+    *out_loaded_val_node_id = load_node_id;
 
 cleanup:
     return err;
@@ -786,16 +821,18 @@ static err_t opcode_handler_binop(
         insn->operands[2].size
     );
 
-    cdfg_item_id_t lhs = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(read_operand(builder, &insn->operands[1], &lhs));
+    cdfg_item_id_t lhs_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(read_operand(builder, &insn->operands[1], &lhs_node_id));
 
-    cdfg_item_id_t rhs = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(read_operand(builder, &insn->operands[2], &rhs));
+    cdfg_item_id_t rhs_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(read_operand(builder, &insn->operands[2], &rhs_node_id));
 
-    cdfg_item_id_t result = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(make_binop_node(&builder->cdfg, calculation, lhs, rhs, &result));
+    cdfg_item_id_t result_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(
+        make_binop_node(&builder->cdfg, calculation, lhs_node_id, rhs_node_id, &result_node_id)
+    );
 
-    CHECK_RETHROW(write_operand(builder, &insn->operands[0], result));
+    CHECK_RETHROW(write_operand(builder, &insn->operands[0], result_node_id));
 cleanup:
     return err;
 }
@@ -807,10 +844,10 @@ static err_t opcode_handler_move(cdfg_builder_t* builder, const pis_insn_t* insn
     // check operand sizes
     CHECK_CODE(insn->operands[0].size == insn->operands[1].size, PIS_ERR_OPERAND_SIZE_MISMATCH);
 
-    cdfg_item_id_t src = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(read_operand(builder, &insn->operands[1], &src));
+    cdfg_item_id_t src_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(read_operand(builder, &insn->operands[1], &src_node_id));
 
-    CHECK_RETHROW(write_operand(builder, &insn->operands[0], src));
+    CHECK_RETHROW(write_operand(builder, &insn->operands[0], src_node_id));
 cleanup:
     return err;
 }
@@ -819,13 +856,29 @@ static err_t opcode_handler_store(cdfg_builder_t* builder, const pis_insn_t* ins
     err_t err = SUCCESS;
     CHECK_CODE(insn->operands_amount == 2, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
 
-    cdfg_item_id_t addr = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(read_operand(builder, &insn->operands[0], &addr));
+    cdfg_item_id_t addr_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(read_operand(builder, &insn->operands[0], &addr_node_id));
 
-    cdfg_item_id_t value = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(read_operand(builder, &insn->operands[1], &value));
+    cdfg_item_id_t val_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(read_operand(builder, &insn->operands[1], &val_node_id));
 
-    CHECK_RETHROW(do_store(builder, addr, value));
+    CHECK_RETHROW(do_store(builder, addr_node_id, val_node_id));
+
+cleanup:
+    return err;
+}
+
+static err_t opcode_handler_load(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    err_t err = SUCCESS;
+    CHECK_CODE(insn->operands_amount == 2, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+    cdfg_item_id_t addr_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(read_operand(builder, &insn->operands[1], &addr_node_id));
+
+    cdfg_item_id_t loaded_val_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(do_load(builder, addr_node_id, &loaded_val_node_id));
+
+    CHECK_RETHROW(write_operand(builder, &insn->operands[0], loaded_val_node_id));
 
 cleanup:
     return err;
@@ -842,6 +895,7 @@ static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
     [PIS_OPCODE_ADD] = opcode_handler_add,
     [PIS_OPCODE_MOVE] = opcode_handler_move,
     [PIS_OPCODE_STORE] = opcode_handler_store,
+    [PIS_OPCODE_LOAD] = opcode_handler_load,
 };
 
 static err_t process_insn(cdfg_builder_t* builder, const pis_insn_t* insn) {
