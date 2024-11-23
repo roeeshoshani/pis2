@@ -32,6 +32,9 @@ typedef struct {
 
     /// the amount of pis instructions in this unit.
     u8 insns_amount;
+
+    /// the length in bytes of the machine instruction that this unit represents.
+    u8 machine_insn_len;
 } pis_cfg_unit_t;
 
 /// represents a single CFG "block". a block is a collection of units which ends with some control

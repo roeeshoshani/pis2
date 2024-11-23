@@ -1,5 +1,6 @@
 #include "cfg.h"
 #include "cursor.h"
+#include "errors.h"
 #include "except.h"
 #include "lifter.h"
 #include "pis.h"
@@ -97,6 +98,7 @@ static err_t make_unit(
     cfg->unit_storage[unit_id].addr = machine_insn_addr;
     cfg->unit_storage[unit_id].first_insn_id = first_insn_id;
     cfg->unit_storage[unit_id].insns_amount = lift_res->insns_amount;
+    cfg->unit_storage[unit_id].machine_insn_len = lift_res->machine_insn_len;
 
     // return the id to the caller
     *id_out = unit_id;
@@ -257,16 +259,118 @@ cleanup:
     return err;
 }
 
-/// explore a single path of the CFG.
-static err_t explore_path(pis_cfg_builder_t* builder, size_t path_start_offset) {
+/// calculates the start and end machine code addresses of the given block.
+static err_t
+    block_get_addr_range(const pis_cfg_t* cfg, const pis_cfg_block_t* block, u64* start, u64* end) {
     err_t err = SUCCESS;
 
-    // first, check if we already have a block which contains this code.
-    for (size_t i = 0; i < builder->cfg.blocks_amount; i++) {
-        pis_cfg_block_t* block = &builder->cfg.block_storage[i];
-        // TODO: continue implementing this
-        TODO();
+    // make sure that the block has any content
+    CHECK(block->units_amount > 0);
+
+    const pis_cfg_unit_t* first_unit = &cfg->unit_storage[block->first_unit_id];
+    *start = first_unit->addr;
+
+    pis_cfg_item_id_t last_unit_id = block->first_unit_id + block->units_amount - 1;
+    const pis_cfg_unit_t* last_unit = &cfg->unit_storage[last_unit_id];
+    *end = last_unit->addr + last_unit->machine_insn_len;
+
+cleanup:
+    return err;
+}
+
+/// tries to find a block in the CFG which contains the given machine code address.
+/// the id of the block that was found is returned in `found_block_id`.
+/// if no block was found, `found_block_id` is set to `PIS_CFG_ITEM_ID_INVALID`.
+static err_t
+    find_block_containing_addr(const pis_cfg_t* cfg, u64 addr, pis_cfg_item_id_t* found_block_id) {
+    err_t err = SUCCESS;
+
+    *found_block_id = PIS_CFG_ITEM_ID_INVALID;
+
+    for (size_t i = 0; i < cfg->blocks_amount; i++) {
+        const pis_cfg_block_t* block = &cfg->block_storage[i];
+
+        u64 block_start = 0;
+        u64 block_end = 0;
+        CHECK_RETHROW(block_get_addr_range(cfg, block, &block_start, &block_end));
+
+        if (addr >= block_start && addr < block_end) {
+            *found_block_id = i;
+            break;
+        }
     }
+
+cleanup:
+    return err;
+}
+
+static pis_cfg_item_id_t
+    block_find_unit_containing_addr(const pis_cfg_t* cfg, const pis_cfg_block_t* block, u64 addr) {
+    pis_cfg_item_id_t end_id = block->first_unit_id + block->units_amount;
+
+    for (pis_cfg_item_id_t i = block->first_unit_id; i < end_id; i++) {
+        const pis_cfg_unit_t* unit = &cfg->unit_storage[i];
+
+        u64 unit_end_addr = unit->addr + unit->machine_insn_len;
+
+        if (addr >= unit->addr && addr < unit_end_addr) {
+            // this unit contains the given addr.
+            return i;
+        }
+    }
+
+    // no unit was found.
+    return PIS_CFG_ITEM_ID_INVALID;
+}
+
+/// explore a path of the code which was already explored previously, and is already contained in an
+/// existing block in the CFG.
+static err_t explore_seen_path(
+    pis_cfg_builder_t* builder, pis_cfg_item_id_t block_id, size_t path_start_offset
+) {
+    err_t err = SUCCESS;
+
+    u64 path_start_addr = builder->machine_code_start_addr + path_start_offset;
+
+    pis_cfg_block_t* block = &builder->cfg.block_storage[block_id];
+
+    // find the start address of the block
+    u64 block_start = 0;
+    u64 block_end = 0;
+    CHECK_RETHROW(block_get_addr_range(&builder->cfg, block, &block_start, &block_end));
+
+    if (block_start == path_start_offset) {
+        // if some flow in the code leads back to the start of this block, there is nothing for us
+        // to do, since we have already explored this block.
+        SUCCESS_CLEANUP();
+    }
+
+    // in this case, some flow in the machine code leads to the middle of this block, so we need to
+    // split it.
+
+    // find which unit inside of the block this new path points to.
+    pis_cfg_item_id_t unit_id =
+        block_find_unit_containing_addr(&builder->cfg, block, path_start_addr);
+
+    // this block should contain the path, so we expect to find a unit which contains it.
+    CHECK(unit_id != PIS_CFG_ITEM_ID_INVALID);
+
+    pis_cfg_unit_t* unit = &builder->cfg.unit_storage[unit_id];
+
+    // the path is contained in this unit. make sure that it points to the start of the
+    // unit, otherwise the machine code contains jumps to mid-instructions.
+    CHECK(path_start_addr == unit->addr);
+
+    // TODO: split the fockin block
+    TODO();
+
+cleanup:
+    return err;
+}
+
+/// explore a previously unseen path of the code.
+static err_t explore_unseen_path(pis_cfg_builder_t* builder, size_t path_start_offset) {
+    err_t err = SUCCESS;
 
     size_t cur_offset = path_start_offset;
     while (1) {
@@ -345,6 +449,28 @@ static err_t explore_path(pis_cfg_builder_t* builder, size_t path_start_offset) 
         // advance to the next instruction
         cur_offset += lift_args.result.machine_insn_len;
     }
+
+cleanup:
+    return err;
+}
+
+/// explore a single path of the code and build it into the CFG.
+static err_t explore_path(pis_cfg_builder_t* builder, size_t path_start_offset) {
+    err_t err = SUCCESS;
+
+    u64 path_start_addr = builder->machine_code_start_addr + path_start_offset;
+
+    // first, check if we already have a block which contains this code.
+    pis_cfg_item_id_t existing_block_id = PIS_CFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(find_block_containing_addr(&builder->cfg, path_start_addr, &existing_block_id));
+    if (existing_block_id != PIS_CFG_ITEM_ID_INVALID) {
+        // this path was already explored and is part of an existing block.
+        CHECK_RETHROW(explore_seen_path(builder, existing_block_id, path_start_offset));
+    } else {
+        // this path is unseen.
+        CHECK_RETHROW(explore_unseen_path(builder, path_start_offset));
+    }
+
 cleanup:
     return err;
 }
