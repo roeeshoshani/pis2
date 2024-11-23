@@ -239,7 +239,7 @@ cleanup:
     return err;
 }
 
-/// queue an unexplored path that should be explored when building a CFG.
+/// enqueue an unexplored path that should be explored when building a CFG.
 static err_t
     enqueue_unexplored_path_by_jmp_target(cfg_builder_t* builder, const pis_operand_t* jmp_target) {
     err_t err = SUCCESS;
