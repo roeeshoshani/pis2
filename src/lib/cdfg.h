@@ -109,4 +109,6 @@ typedef struct {
     pis_endianness_t endianness;
 } cdfg_builder_t;
 
+void cdfg_reset(cdfg_t* cdfg);
+
 err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t endianness);

@@ -161,7 +161,8 @@
     _(PIS_OPCODE_SIGNED_REM, )                                                                     \
     _(PIS_OPCODE_SIGNED_DIV, )                                                                     \
     _(PIS_OPCODE_UNSIGNED_REM, )                                                                   \
-    _(PIS_OPCODE_UNSIGNED_DIV, )
+    _(PIS_OPCODE_UNSIGNED_DIV, )                                                                   \
+    _(PIS_OPCODES_AMOUNT, )
 STR_ENUM(pis_opcode, PIS_OPCODE, __attribute__((packed)));
 
 #define PIS_SPACE(_)                                                                               \

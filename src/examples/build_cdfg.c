@@ -1,4 +1,5 @@
 #include "../lib/arch/x86/lift.h"
+#include "../lib/cdfg.h"
 #include "../lib/cfg.h"
 #include "../lib/except.h"
 #include "../lib/pis.h"
@@ -25,16 +26,11 @@ int main() {
 
     TRACE("cfg builder struct size: %lu", sizeof(cfg_builder_t));
 
-    cfg_builder_t builder = {};
-    CHECK_RETHROW(cfg_build(&builder, pis_lifter_x86_64, code, ARRAY_SIZE(code), 0));
+    cfg_builder_t cfg_builder = {};
+    CHECK_RETHROW(cfg_build(&cfg_builder, pis_lifter_x86_64, code, ARRAY_SIZE(code), 0));
 
-    for (size_t i = 0; i < builder.cfg.blocks_amount; i++) {
-        u64 start = 0;
-        u64 end = 0;
-        CHECK_RETHROW(cfg_block_addr_range(&builder.cfg, i, &start, &end));
-
-        TRACE("0x%lx - 0x%lx", start, end);
-    }
+    cdfg_builder_t cdfg_builder = {};
+    CHECK_RETHROW(cdfg_build(&cdfg_builder, &cfg_builder.cfg, PIS_ENDIANNESS_LITTLE));
 
 cleanup:
     return err;

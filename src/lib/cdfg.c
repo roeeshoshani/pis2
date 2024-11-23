@@ -1,11 +1,17 @@
 #include "cdfg.h"
 #include "cfg.h"
 #include "endianness.h"
+#include "errors.h"
 #include "except.h"
 #include "operand_size.h"
 #include "pis.h"
+#include <string.h>
 
 typedef err_t (*opcode_handler_t)(cdfg_builder_t* builder, const pis_insn_t* insn);
+
+void cdfg_reset(cdfg_t* cdfg) {
+    memset(cdfg, 0, sizeof(*cdfg));
+}
 
 static err_t next_id(size_t* items_amount, size_t max, cdfg_item_id_t* id) {
     err_t err = SUCCESS;
@@ -559,8 +565,10 @@ static err_t read_operand(
             // ram operands are only used in jump instructions, and can't be read directly. reading
             // from ram is done using the load instruction.
             UNREACHABLE();
+            break;
         default:
             UNREACHABLE();
+            break;
     }
 cleanup:
     return err;
@@ -673,14 +681,18 @@ static err_t write_operand(
             // ram operands are only used in jump instructions, and can't be read directly. reading
             // from ram is done using the load instruction.
             UNREACHABLE();
+            break;
         default:
             UNREACHABLE();
+            break;
     }
 cleanup:
     return err;
 }
 
-static err_t add_opcode_handler(cdfg_builder_t* builder, const pis_insn_t* insn) {
+static err_t binop_opcode_handler(
+    cdfg_builder_t* builder, const pis_insn_t* insn, cdfg_calculation_t calculation
+) {
     err_t err = SUCCESS;
     CHECK_CODE(insn->operands_amount == 3, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
 
@@ -703,10 +715,34 @@ static err_t add_opcode_handler(cdfg_builder_t* builder, const pis_insn_t* insn)
     CHECK_RETHROW(read_operand(builder, &insn->operands[2], &rhs));
 
     cdfg_item_id_t result = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(make_binop_node(&builder->cdfg, CDFG_CALCULATION_ADD, lhs, rhs, &result));
+    CHECK_RETHROW(make_binop_node(&builder->cdfg, calculation, lhs, rhs, &result));
 
-    // TODO: write the result to the op state.
-    TODO();
+    CHECK_RETHROW(write_operand(builder, &insn->operands[0], result));
+cleanup:
+    return err;
+}
+
+static err_t add_opcode_handler(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW(binop_opcode_handler(builder, insn, CDFG_CALCULATION_ADD));
+cleanup:
+    return err;
+}
+
+static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
+    [PIS_OPCODE_ADD] = add_opcode_handler,
+};
+
+static err_t process_insn(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    err_t err = SUCCESS;
+    opcode_handler_t handler = g_opcode_handlers_table[insn->opcode];
+    CHECK_TRACE_CODE(
+        handler != NULL,
+        PIS_ERR_UNSUPPORTED_INSN,
+        "CDFG does not support pis opcode %s",
+        pis_opcode_to_str(insn->opcode)
+    );
+    CHECK_RETHROW(handler(builder, insn));
 cleanup:
     return err;
 }
@@ -714,12 +750,14 @@ cleanup:
 err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t endianness) {
     err_t err = SUCCESS;
 
+    // initialize the builder
     builder->endianness = endianness;
+    builder->op_state.used_slots_amount = 0;
+    cdfg_reset(&builder->cdfg);
 
+    // TODO: how do we handle the flow here? for now i just lift the first block...
     const cfg_block_t* block = &cfg->block_storage[0];
     CHECK(block->units_amount > 0);
-
-    cdfg_op_state_t op_state = {};
 
     const cfg_unit_t* block_units = &cfg->unit_storage[block->first_unit_id];
     for (size_t unit_idx = 0; unit_idx < block->units_amount; unit_idx++) {
@@ -727,6 +765,7 @@ err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t end
         const pis_insn_t* unit_insns = &cfg->insn_storage[unit->first_insn_id];
         for (size_t insn_idx = 0; insn_idx < unit->insns_amount; insn_idx++) {
             const pis_insn_t* insn = &unit_insns[insn_idx];
+            CHECK_RETHROW(process_insn(builder, insn));
         }
     }
 

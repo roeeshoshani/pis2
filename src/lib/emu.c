@@ -957,6 +957,9 @@ err_t pis_emu_run_one(pis_emu_t* emu, exec_ctx_t* exec_ctx, const pis_insn_t* in
         case PIS_OPCODE_HALT:
             CHECK_FAIL();
             break;
+        default:
+            UNREACHABLE();
+            break;
     }
 cleanup:
     return err;
