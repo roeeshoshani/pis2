@@ -583,6 +583,8 @@ static err_t read_reg_operand(
 
         // now add a slot in the op state to point to it
         CHECK_RETHROW(make_op_state_slot(&builder->op_state, operand, node_id));
+
+        *out_node_id = node_id;
     } else {
         // node is either fully initialized or partially initialized.
         cdfg_item_id_t exact_match_node_id = read_operand_exact(&builder->op_state, operand);
