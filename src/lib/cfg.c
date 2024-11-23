@@ -261,6 +261,13 @@ cleanup:
 static err_t explore_path(pis_cfg_builder_t* builder, size_t path_start_offset) {
     err_t err = SUCCESS;
 
+    // first, check if we already have a block which contains this code.
+    for (size_t i = 0; i < builder->cfg.blocks_amount; i++) {
+        pis_cfg_block_t* block = &builder->cfg.block_storage[i];
+        // TODO: continue implementing this
+        TODO();
+    }
+
     size_t cur_offset = path_start_offset;
     while (1) {
         CHECK(cur_offset < builder->machine_code_len);
