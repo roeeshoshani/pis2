@@ -26,8 +26,9 @@ typedef enum {
 
 /// the operation performed by a CDFG operation node.
 typedef enum {
-    CDFG_OPERATION_AND,
-} __attribute__((packed)) cdfg_operation_t;
+    CDFG_CALCULATION_AND,
+    CDFG_CALCULATION_SHIFT_RIGHT,
+} __attribute__((packed)) cdfg_calculation_t;
 
 /// a CDFG variable node. this is used to represent an access to a register without previous
 /// initialization of it. used for example to represent arguments to functions.
@@ -47,7 +48,7 @@ typedef struct {
 /// a CDFG calculation node.
 typedef struct {
     /// the calculation that is performed by this node.
-    cdfg_operation_t calculation;
+    cdfg_calculation_t calculation;
 } __attribute__((packed)) cdfg_calc_node_t;
 
 /// the content of a CDFG node.

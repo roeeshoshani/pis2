@@ -1,5 +1,6 @@
 #include "cdfg.h"
 #include "cfg.h"
+#include "endianness.h"
 #include "except.h"
 #include "operand_size.h"
 #include "pis.h"
@@ -26,6 +27,15 @@ static err_t next_node_id(cdfg_t* cdfg, cfg_item_id_t* id) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(next_id(&cdfg->nodes_amount, CDFG_MAX_NODES, id));
+
+cleanup:
+    return err;
+}
+
+static err_t next_edge_id(cdfg_t* cdfg, cfg_item_id_t* id) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW(next_id(&cdfg->edges_amount, CDFG_MAX_EDGES, id));
 
 cleanup:
     return err;
@@ -98,9 +108,9 @@ static cdfg_item_id_t find_imm_node(const cdfg_t* cdfg, u64 value) {
     return CDFG_ITEM_ID_INVALID;
 }
 
-/// reads an immediate operand with the given value. returns the node id of a node which represents
-/// that immediate value.
-static err_t read_imm_operand(cdfg_builder_t* builder, u64 value, cdfg_item_id_t* out_node_id) {
+/// returns an immediate node with the given immediate value, either by creating one or by reusing
+/// an existing one.
+static err_t make_imm_node(cdfg_builder_t* builder, u64 value, cdfg_item_id_t* out_node_id) {
     err_t err = SUCCESS;
 
     cdfg_item_id_t node_id = find_imm_node(&builder->cdfg, value);
@@ -119,17 +129,117 @@ cleanup:
     return err;
 }
 
+static err_t make_edge(cdfg_t* cdfg, cdfg_item_id_t from_node, cdfg_item_id_t to_node) {
+    err_t err = SUCCESS;
+
+    cdfg_item_id_t edge_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(next_edge_id(cdfg, &edge_id));
+
+    cdfg->edge_storage[edge_id] = (cdfg_edge_t) {
+        .from_node = from_node,
+        .to_node = to_node,
+    };
+
+cleanup:
+    return err;
+}
+
+static err_t
+    make_calc_node(cdfg_t* cdfg, cdfg_calculation_t calculation, cdfg_item_id_t* out_node_id) {
+    err_t err = SUCCESS;
+
+    cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(next_node_id(cdfg, &node_id));
+
+    cdfg->node_storage[node_id] = (cdfg_node_t) {
+        .kind = CDFG_NODE_KIND_CALC,
+        .content =
+            {
+                .calc =
+                    {
+                        .calculation = calculation,
+                    },
+            },
+    };
+
+    *out_node_id = node_id;
+cleanup:
+    return err;
+}
+
+static err_t make_binop_node(
+    cdfg_t* cdfg,
+    cdfg_calculation_t calculation,
+    cdfg_item_id_t lhs_node_id,
+    cdfg_item_id_t rhs_node_id,
+    cdfg_item_id_t* out_binop_node_id
+) {
+    err_t err = SUCCESS;
+
+    cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(make_calc_node(cdfg, calculation, &node_id));
+
+    CHECK_RETHROW(make_edge(cdfg, lhs_node_id, node_id));
+    CHECK_RETHROW(make_edge(cdfg, rhs_node_id, node_id));
+
+    *out_binop_node_id = node_id;
+cleanup:
+    return err;
+}
+
 /// builds a node which represents the extraction of the byte at the given index from the value
 /// represented by the given node id.
 static err_t build_byte_extraction_node(
     cdfg_builder_t* builder,
     cdfg_item_id_t value_node_id,
+    size_t value_size_in_bytes,
     size_t byte_index,
     cdfg_item_id_t* out_node_id
 ) {
     err_t err = SUCCESS;
-    // TODO: implement this.
-    TODO();
+
+    size_t value_size_in_bits = value_size_in_bytes * 8;
+    size_t bit_index = byte_index * 8;
+
+    size_t shift_amount;
+    switch (builder->endianness) {
+        case PIS_ENDIANNESS_LITTLE:
+            shift_amount = bit_index;
+            break;
+        case PIS_ENDIANNESS_BIG:
+            shift_amount = value_size_in_bits - 8 - bit_index;
+            break;
+        default:
+            UNREACHABLE();
+    }
+
+
+    cdfg_item_id_t shift_amount_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(make_imm_node(builder, shift_amount, &shift_amount_node_id));
+
+    cdfg_item_id_t shifted_val_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(make_binop_node(
+        &builder->cdfg,
+        CDFG_CALCULATION_SHIFT_RIGHT,
+        value_node_id,
+        shift_amount_node_id,
+        &shifted_val_node_id
+    ));
+
+    cdfg_item_id_t mask_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(make_imm_node(builder, 0xff, &mask_node_id));
+
+    cdfg_item_id_t masked_val_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(make_binop_node(
+        &builder->cdfg,
+        CDFG_CALCULATION_AND,
+        shifted_val_node_id,
+        mask_node_id,
+        &masked_val_node_id
+    ));
+
+    *out_node_id = masked_val_node_id;
+
 cleanup:
     return err;
 }
@@ -163,9 +273,13 @@ static err_t op_state_break_to_bytes(
 
         // calculate the byte value
         cdfg_item_id_t cur_byte_value_node_id = CDFG_ITEM_ID_INVALID;
-        CHECK_RETHROW(
-            build_byte_extraction_node(builder, orig_slot.value_node_id, i, &cur_byte_value_node_id)
-        );
+        CHECK_RETHROW(build_byte_extraction_node(
+            builder,
+            orig_slot.value_node_id,
+            bytes,
+            i,
+            &cur_byte_value_node_id
+        ));
 
         // calculate the operand that represents the byte value
         pis_addr_t cur_byte_addr = {};
@@ -295,7 +409,7 @@ static err_t read_operand(
     err_t err = SUCCESS;
     switch (operand->addr.space) {
         case PIS_SPACE_CONST:
-            CHECK_RETHROW(read_imm_operand(builder, operand->addr.offset, out_node_id));
+            CHECK_RETHROW(make_imm_node(builder, operand->addr.offset, out_node_id));
             break;
         case PIS_SPACE_REG:
             CHECK_RETHROW(read_reg_operand(operand, builder, op_state, out_node_id));
