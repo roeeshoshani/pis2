@@ -153,8 +153,13 @@ static err_t make_imm_node(cdfg_t* cdfg, u64 value, cdfg_item_id_t* out_node_id)
         // no existing node, create a new one.
         CHECK_RETHROW(next_node_id(cdfg, &node_id));
 
-        cdfg_node_t* node = &cdfg->node_storage[node_id];
-        node->content.imm.value = value;
+        cdfg->node_storage[node_id] = (cdfg_node_t) {
+            .kind = CDFG_NODE_KIND_IMM,
+            .content =
+                {
+                    .imm = {.value = value},
+                },
+        };
     }
 
     *out_node_id = node_id;
