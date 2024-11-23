@@ -838,6 +838,38 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_comparison(
+    cdfg_builder_t* builder, const pis_insn_t* insn, cdfg_calculation_t calculation
+) {
+    err_t err = SUCCESS;
+    CHECK_CODE(insn->operands_amount == 3, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+    CHECK_TRACE_CODE(
+        insn->operands[0].size == PIS_SIZE_1 && insn->operands[1].size == insn->operands[2].size,
+        PIS_ERR_OPERAND_SIZE_MISMATCH,
+        "operand size mismatch in opcode %s, operand sizes: %u %u %u",
+        pis_opcode_to_str(insn->opcode),
+        insn->operands[0].size,
+        insn->operands[1].size,
+        insn->operands[2].size
+    );
+
+    cdfg_item_id_t lhs_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(read_operand(builder, &insn->operands[1], &lhs_node_id));
+
+    cdfg_item_id_t rhs_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(read_operand(builder, &insn->operands[2], &rhs_node_id));
+
+    cdfg_item_id_t result_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(
+        make_binop_node(&builder->cdfg, calculation, lhs_node_id, rhs_node_id, &result_node_id)
+    );
+
+    CHECK_RETHROW(write_operand(builder, &insn->operands[0], result_node_id));
+cleanup:
+    return err;
+}
+
 static err_t opcode_handler_move(cdfg_builder_t* builder, const pis_insn_t* insn) {
     err_t err = SUCCESS;
     CHECK_CODE(insn->operands_amount == 2, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
@@ -907,12 +939,20 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_unsigned_less_than(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW(opcode_handler_comparison(builder, insn, CDFG_CALCULATION_UNSIGNED_LESS_THAN));
+cleanup:
+    return err;
+}
+
 static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
     [PIS_OPCODE_ADD] = opcode_handler_add,
     [PIS_OPCODE_MOVE] = opcode_handler_move,
     [PIS_OPCODE_STORE] = opcode_handler_store,
     [PIS_OPCODE_LOAD] = opcode_handler_load,
     [PIS_OPCODE_ZERO_EXTEND] = opcode_handler_zero_extend,
+    [PIS_OPCODE_UNSIGNED_LESS_THAN] = opcode_handler_unsigned_less_than,
 };
 
 static err_t process_insn(cdfg_builder_t* builder, const pis_insn_t* insn) {
