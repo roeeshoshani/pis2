@@ -26,6 +26,14 @@ int main() {
     pis_cfg_builder_t builder = {};
     CHECK_RETHROW(pis_cfg_builder_build(&builder, pis_lifter_x86_64, code, ARRAY_SIZE(code), 0));
 
+    for (size_t i = 0; i < builder.cfg.blocks_amount; i++) {
+        u64 start = 0;
+        u64 end = 0;
+        CHECK_RETHROW(pis_cfg_block_addr_range(&builder.cfg, i, &start, &end));
+
+        TRACE("0x%lx - 0x%lx", start, end);
+    }
+
 cleanup:
     return err;
 }
