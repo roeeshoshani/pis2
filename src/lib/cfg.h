@@ -7,12 +7,14 @@
 
 #define CFG_MAX_INSNS 4096
 #define CFG_MAX_UNITS 1024
-#define CFG_MAX_BLOCKS 512
+#define CFG_MAX_BLOCKS 256
 
 #define CFG_ITEM_ID_MAX (UINT16_MAX)
 #define CFG_ITEM_ID_INVALID (CFG_ITEM_ID_MAX)
 
 #define CFG_BUILDER_MAX_UNEXPLORED_PATHS (64)
+
+#define CFG_BLOCK_MAX_SUCCESSORS (2)
 
 typedef u16 cfg_item_id_t;
 
@@ -87,6 +89,10 @@ void cfg_reset(cfg_t* cfg);
 
 err_t cfg_block_addr_range(
     const cfg_t* cfg, cfg_item_id_t block_id, u64* start, u64* end
+);
+
+err_t cfg_block_successors(
+    const cfg_t* cfg, cfg_item_id_t block_id, cfg_item_id_t successor_block_ids[CFG_BLOCK_MAX_SUCCESSORS]
 );
 
 err_t cfg_build(

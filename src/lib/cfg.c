@@ -154,37 +154,54 @@ static bool opcode_is_cfg_jmp(pis_opcode_t opcode) {
     }
 }
 
+static err_t insn_is_cfg_jump(const pis_insn_t* insn, bool* is_cfg_jump) {
+    err_t err = SUCCESS;
+    if (opcode_is_cfg_jmp(insn->opcode)) {
+        // the machine instruction contains a pis jump instruction which looks like a CFG jump.
+        //
+        // this doesn't necessarily mean that this machine instruction is a CFG jump
+        // instruction, since it might also be an inter-instruction jump.
+
+        CHECK(insn->operands_amount >= 1);
+        const pis_operand_t* jmp_target = &insn->operands[0];
+
+        if (jmp_target->addr.space == PIS_SPACE_CONST) {
+            // this jump is an inter-instruction jump. this is used for example to implement the
+            // x86 `REP` prefix, and does not represent an actual CFG jump instruction.
+            *is_cfg_jump = false;
+        } else {
+            // this jump is an actual CFG jump.
+            *is_cfg_jump = true;
+        }
+    } else {
+        // not a cfg jump
+        *is_cfg_jump = false;
+    }
+cleanup:
+    return err;
+}
+
 /// checks if the given lift result represent a CFG jump machine instruction, and if so, returns
 /// the pis opcode inside of it that is responsible for performing the jump.
-static err_t find_cfg_jump(const pis_lift_res_t* lift_res, const pis_insn_t** jmp_insn) {
+static err_t
+    find_cfg_jump(const pis_insn_t* insns, size_t insns_amount, const pis_insn_t** jmp_insn) {
     err_t err = SUCCESS;
 
     *jmp_insn = NULL;
 
-    for (size_t i = 0; i < lift_res->insns_amount; i++) {
-        const pis_insn_t* cur_insn = &lift_res->insns[i];
-        if (opcode_is_cfg_jmp(cur_insn->opcode)) {
-            // the machine instruction contains a pis jump instruction which looks like a CFG jump.
+    for (size_t i = 0; i < insns_amount; i++) {
+        const pis_insn_t* cur_insn = &insns[i];
+        bool is_cfg_jump = false;
+        CHECK_RETHROW(insn_is_cfg_jump(cur_insn, &is_cfg_jump));
+        if (is_cfg_jump) {
+            // this instruction is a CFG jump instruction.
             //
-            // this doesn't necessarily mean that this machine instruction is a CFG jump
-            // instruction, since it might also be an inter-instruction jump.
+            // such a jump must be the last pis instruction in the lifted representation of the
+            // machine instruction, because otherwise it is unclear how we should handle the pis
+            // instructions following it when building the cfg.
+            CHECK(i + 1 == insns_amount);
 
-            CHECK(cur_insn->operands_amount >= 1);
-            const pis_operand_t* jmp_target = &cur_insn->operands[0];
-
-            if (jmp_target->addr.space == PIS_SPACE_CONST) {
-                // this jump is an inter-instruction jump. this is used for example to implement the
-                // x86 `REP` prefix, and does not represent an actual CFG jump instruction.
-            } else {
-                // this jump is an actual CFG jump.
-
-                // such a jump must be the last pis instruction in the lifted representation of the
-                // machine instruction, because otherwise it is unclear how we should handle the pis
-                // instructions following it when building the cfg.
-                CHECK(i + 1 == lift_res->insns_amount);
-
-                *jmp_insn = cur_insn;
-            }
+            *jmp_insn = cur_insn;
         }
     }
 cleanup:
@@ -298,6 +315,34 @@ static err_t find_block_containing_addr(const cfg_t* cfg, u64 addr, cfg_item_id_
             break;
         }
     }
+
+cleanup:
+    return err;
+}
+
+/// finds a block which starts at the given address. this functions fails if no such block was
+/// found.
+static err_t
+    find_block_starting_at_addr(const cfg_t* cfg, u64 addr, cfg_item_id_t* found_block_id) {
+    err_t err = SUCCESS;
+
+    cfg_item_id_t block_id = CFG_ITEM_ID_INVALID;
+
+    for (size_t i = 0; i < cfg->blocks_amount; i++) {
+        u64 block_start = 0;
+        u64 block_end = 0;
+        CHECK_RETHROW(cfg_block_addr_range(cfg, i, &block_start, &block_end));
+
+        if (addr == block_start) {
+            block_id = i;
+            break;
+        }
+    }
+
+    // make sure that we found a matching block
+    CHECK(block_id != CFG_ITEM_ID_INVALID);
+
+    *found_block_id = block_id;
 
 cleanup:
     return err;
@@ -453,7 +498,9 @@ static err_t explore_unseen_path(cfg_builder_t* builder, size_t path_start_offse
         // check if this machine instruction is a CFG jump instruction, and if so, find the relevant
         // pis instruction.
         const pis_insn_t* cfg_jmp_insn = NULL;
-        CHECK_RETHROW(find_cfg_jump(&lift_args.result, &cfg_jmp_insn));
+        CHECK_RETHROW(
+            find_cfg_jump(lift_args.result.insns, lift_args.result.insns_amount, &cfg_jmp_insn)
+        );
 
         CHECK_RETHROW(cfg_builder_append_to_cur_block(builder, unit_id));
 
@@ -514,6 +561,103 @@ static void builder_init(
     cfg_reset(&builder->cfg);
     builder->cur_block_id = CFG_ITEM_ID_INVALID;
     builder->unexplored_paths_amount = 0;
+}
+
+/// assuming that the given block falls through, find the block into which it falls through
+static err_t find_block_fallthrough_block(
+    const cfg_t* cfg, cfg_item_id_t block_id, cfg_item_id_t* fallthrough_block_it
+) {
+    err_t err = SUCCESS;
+
+    // find the fallthrough successor of this block
+    u64 block_start = 0;
+    u64 block_end = 0;
+    CHECK_RETHROW(cfg_block_addr_range(cfg, block_id, &block_start, &block_end));
+
+    // the successor starts right at the end address of this block
+    CHECK_RETHROW(find_block_starting_at_addr(cfg, block_end, fallthrough_block_it));
+cleanup:
+    return err;
+}
+
+static err_t cfg_block_successors_cfg_jump(
+    const cfg_t* cfg,
+    cfg_item_id_t block_id,
+    const pis_insn_t* last_insn,
+    cfg_item_id_t successor_block_ids[CFG_BLOCK_MAX_SUCCESSORS]
+) {
+    err_t err = SUCCESS;
+
+    CHECK(last_insn->operands_amount >= 1);
+    const pis_operand_t* jmp_target = &last_insn->operands[0];
+
+    switch (last_insn->opcode) {
+        case PIS_OPCODE_JMP: {
+            // regular jump. the only successor is the target of the jump.
+            CHECK(jmp_target->addr.space == PIS_SPACE_RAM);
+            u64 ram_addr = jmp_target->addr.offset;
+            CHECK_RETHROW(find_block_starting_at_addr(cfg, ram_addr, &successor_block_ids[0]));
+            break;
+        }
+        case PIS_OPCODE_JMP_RET:
+            // ret. no successors
+            break;
+        case PIS_OPCODE_JMP_COND:
+            // conditional jump. there are 2 successors, one is the jump target, and one is the
+            // fallthrough.
+
+            // jump target successor
+            CHECK(jmp_target->addr.space == PIS_SPACE_RAM);
+            u64 ram_addr = jmp_target->addr.offset;
+            CHECK_RETHROW(find_block_starting_at_addr(cfg, ram_addr, &successor_block_ids[0]));
+
+            // fallthrough successor
+            CHECK_RETHROW(find_block_fallthrough_block(cfg, block_id, &successor_block_ids[1]));
+            break;
+        default:
+            UNREACHABLE();
+            break;
+    }
+cleanup:
+    return err;
+}
+
+err_t cfg_block_successors(
+    const cfg_t* cfg,
+    cfg_item_id_t block_id,
+    cfg_item_id_t successor_block_ids[CFG_BLOCK_MAX_SUCCESSORS]
+) {
+    err_t err = SUCCESS;
+
+    for (size_t i = 0; i < CFG_BLOCK_MAX_SUCCESSORS; i++) {
+        successor_block_ids[i] = CFG_ITEM_ID_INVALID;
+    }
+
+    const cfg_block_t* block = &cfg->block_storage[block_id];
+
+    CHECK(block->units_amount > 0);
+
+    cfg_item_id_t last_unit_id = block->first_unit_id + block->units_amount - 1;
+    const cfg_unit_t* last_unit = &cfg->unit_storage[last_unit_id];
+
+    CHECK(last_unit->insns_amount > 0);
+    cfg_item_id_t last_insn_id = last_unit->first_insn_id + last_unit->insns_amount - 1;
+    const pis_insn_t* last_insn = &cfg->insn_storage[last_insn_id];
+
+    bool is_cfg_jump = false;
+    CHECK_RETHROW(insn_is_cfg_jump(last_insn, &is_cfg_jump));
+    if (is_cfg_jump) {
+        // the block ends with a cfg jump. calculate its successors according to the type of cfg
+        // jump.
+        CHECK_RETHROW(cfg_block_successors_cfg_jump(cfg, block_id, last_insn, successor_block_ids));
+    } else {
+        // the last instruction in the block is not a CFG jump, so the block just falls through to
+        // the next instruction.
+        CHECK_RETHROW(find_block_fallthrough_block(cfg, block_id, &successor_block_ids[0]));
+    }
+
+cleanup:
+    return err;
 }
 
 err_t cfg_build(
