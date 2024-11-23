@@ -23,6 +23,8 @@ int main() {
         0x01, 0xd0, 0xeb, 0x08, 0x8b, 0x55, 0xfc, 0x8b, 0x45, 0xf8, 0x01, 0xd0, 0x5d, 0xc3,
     };
 
+    TRACE("cfg builder struct size: %lu", sizeof(pis_cfg_builder_t));
+
     pis_cfg_builder_t builder = {};
     CHECK_RETHROW(pis_cfg_builder_build(&builder, pis_lifter_x86_64, code, ARRAY_SIZE(code), 0));
 

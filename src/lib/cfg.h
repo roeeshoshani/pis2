@@ -5,13 +5,9 @@
 #include "types.h"
 #include <limits.h>
 
-#define PIS_CFG_MAX_INSNS 8192
-#define PIS_CFG_MAX_UNITS 2048
+#define PIS_CFG_MAX_INSNS 4096
+#define PIS_CFG_MAX_UNITS 1024
 #define PIS_CFG_MAX_BLOCKS 512
-
-#define PIS_CFG_UNIT_MAX_INSNS PIS_LIFT_MAX_INSNS_AMOUNT
-
-#define PIS_CFG_BLOCK_MAX_UNITS 512
 
 #define PIS_CFG_ITEM_ID_MAX (UINT16_MAX)
 #define PIS_CFG_ITEM_ID_INVALID (PIS_CFG_ITEM_ID_MAX)
@@ -35,7 +31,7 @@ typedef struct {
 
     /// the length in bytes of the machine instruction that this unit represents.
     u8 machine_insn_len;
-} pis_cfg_unit_t;
+} __attribute__((packed)) pis_cfg_unit_t;
 
 /// represents a single CFG "block". a block is a collection of units which ends with some control
 /// flow operation, and can be pointed to by other blocks.
