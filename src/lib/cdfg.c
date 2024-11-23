@@ -9,6 +9,8 @@
 
 typedef err_t (*opcode_handler_t)(cdfg_builder_t* builder, const pis_insn_t* insn);
 
+STR_ENUM_IMPL(cdfg_calculation, CDFG_CALCULATION);
+
 void cdfg_reset(cdfg_t* cdfg) {
     memset(cdfg, 0, sizeof(*cdfg));
 }
@@ -1162,12 +1164,49 @@ cleanup:
     return err;
 }
 
+static void cdfg_dump_node_desc(const cdfg_node_t* node) {
+    switch (node->kind) {
+        case CDFG_NODE_KIND_ENTRY:
+            TRACE_NO_NEWLINE("entry");
+            break;
+        case CDFG_NODE_KIND_VAR:
+            TRACE_NO_NEWLINE(
+                "var_off_0x%lx_sz_%u",
+                node->content.var.reg_offset,
+                pis_size_to_bytes(node->content.var.reg_size)
+            );
+            break;
+        case CDFG_NODE_KIND_IMM:
+            TRACE_NO_NEWLINE("0x%lx", node->content.imm.value);
+            break;
+        case CDFG_NODE_KIND_CALC:
+            TRACE_NO_NEWLINE("calc_%s", cdfg_calculation_to_str(node->content.calc.calculation));
+            break;
+        case CDFG_NODE_KIND_STORE:
+            TRACE_NO_NEWLINE("store");
+            break;
+        case CDFG_NODE_KIND_LOAD:
+            TRACE_NO_NEWLINE("load");
+            break;
+        default:
+            break;
+    }
+}
+
+static void cdfg_dump_node(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
+    TRACE_NO_NEWLINE("%u_", node_id);
+    cdfg_dump_node_desc(&cdfg->node_storage[node_id]);
+}
+
 /// dumps a DOT representation of the CDFG to stdout.
-void cdfg_dump_dot(cdfg_t* cdfg) {
+void cdfg_dump_dot(const cdfg_t* cdfg) {
     TRACE("graph {");
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
-        cdfg_edge_t* edge = &cdfg->edge_storage[i];
-        TRACE("%u -> %u", edge->from_node, edge->to_node);
+        const cdfg_edge_t* edge = &cdfg->edge_storage[i];
+        cdfg_dump_node(cdfg, edge->from_node);
+        TRACE_NO_NEWLINE(" -> ");
+        cdfg_dump_node(cdfg, edge->to_node);
+        TRACE();
     }
     TRACE("}");
 }

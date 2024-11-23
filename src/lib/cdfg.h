@@ -15,6 +15,21 @@
 #define CDFG_ITEM_ID_MAX (UINT16_MAX)
 #define CDFG_ITEM_ID_INVALID (CFG_ITEM_ID_MAX)
 
+#define CDFG_CALCULATION(_)                                                                              \
+    _(CDFG_CALCULATION_AND, ) \
+    _(CDFG_CALCULATION_ADD, ) \
+    _(CDFG_CALCULATION_SUB, ) \
+    _(CDFG_CALCULATION_OR, ) \
+    _(CDFG_CALCULATION_XOR, ) \
+    _(CDFG_CALCULATION_PARITY, ) \
+    _(CDFG_CALCULATION_SHIFT_RIGHT, ) \
+    _(CDFG_CALCULATION_SHIFT_RIGHT_SIGNED, ) \
+    _(CDFG_CALCULATION_SHIFT_LEFT, ) \
+    _(CDFG_CALCULATION_UNSIGNED_LESS_THAN, ) \
+    _(CDFG_CALCULATION_SIGNED_LESS_THAN, ) \
+    _(CDFG_CALCULATION_EQUALS, )
+STR_ENUM(cdfg_calculation, CDFG_CALCULATION, __attribute__((packed)));
+
 typedef u16 cdfg_item_id_t;
 
 /// the kind of a CDFG node.
@@ -26,22 +41,6 @@ typedef enum {
     CDFG_NODE_KIND_LOAD,
     CDFG_NODE_KIND_ENTRY,
 } __attribute__((packed)) cdfg_node_kind_t;
-
-/// the operation performed by a CDFG operation node.
-typedef enum {
-    CDFG_CALCULATION_AND,
-    CDFG_CALCULATION_ADD,
-    CDFG_CALCULATION_SUB,
-    CDFG_CALCULATION_OR,
-    CDFG_CALCULATION_XOR,
-    CDFG_CALCULATION_PARITY,
-    CDFG_CALCULATION_SHIFT_RIGHT,
-    CDFG_CALCULATION_SHIFT_RIGHT_SIGNED,
-    CDFG_CALCULATION_SHIFT_LEFT,
-    CDFG_CALCULATION_UNSIGNED_LESS_THAN,
-    CDFG_CALCULATION_SIGNED_LESS_THAN,
-    CDFG_CALCULATION_EQUALS,
-} __attribute__((packed)) cdfg_calculation_t;
 
 /// a CDFG variable node. this is used to represent an access to a register without previous
 /// initialization of it. used for example to represent arguments to functions.
@@ -140,4 +139,4 @@ void cdfg_reset(cdfg_t* cdfg);
 
 err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t endianness);
 
-void cdfg_dump_dot(cdfg_t* cdfg);
+void cdfg_dump_dot(const cdfg_t* cdfg);
