@@ -1627,7 +1627,12 @@ static err_t node_find_inputs(
         cur_inputs_amount++;
     }
 
-    CHECK(cur_inputs_amount == inputs_amount);
+    CHECK_TRACE(
+        cur_inputs_amount == inputs_amount,
+        "expected inputs amount %lu, instead got %lu",
+        inputs_amount,
+        cur_inputs_amount
+    );
 
 cleanup:
     return err;
@@ -1676,7 +1681,7 @@ static err_t node_find_input_by_predicate(
         // make sure that we only found one such item.
         CHECK(found_node_id == CDFG_ITEM_ID_INVALID);
 
-        found_node_id = i;
+        found_node_id = edge->from_node;
     }
 
     *out_found_node_id = found_node_id;
@@ -1767,8 +1772,13 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
         did_anything = false;
         did_anything |= remove_unused_nodes_and_edges(cdfg);
         CHECK_RETHROW(remove_single_input_region_phi_nodes(cdfg, &did_anything));
+    }
+
+    did_anything = true;
+    while (did_anything) {
         CHECK_RETHROW(optimize_sub_equals_zero(cdfg, &did_anything));
     }
+
 cleanup:
     return err;
 }
