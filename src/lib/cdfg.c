@@ -1514,14 +1514,32 @@ static bool remove_unused_nodes_and_edges(cdfg_t* cdfg) {
     return removed_anything;
 }
 
-/// returns the edge id of one of the input edges of the given node, if any.
-static cdfg_item_id_t node_find_any_input_edge(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
+/// finds the single input edge of the given kind to the given node. makes sure that only one such
+/// edge exists, and that it does exist.
+static err_t node_find_single_input_edge(
+    const cdfg_t* cdfg,
+    cdfg_edge_kind_t kind,
+    cdfg_item_id_t node_id,
+    cdfg_item_id_t* out_found_item_id
+) {
+    err_t err = SUCCESS;
+    cdfg_item_id_t found_id = CDFG_ITEM_ID_INVALID;
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
-        if (cdfg->edge_storage[i].to_node == node_id) {
-            return i;
+        const cdfg_edge_t* edge = &cdfg->edge_storage[i];
+        if (edge->to_node == node_id && edge->kind == kind) {
+            // make sure that we don't find multiple matchine edges.
+            CHECK(found_id == CDFG_ITEM_ID_INVALID);
+
+            found_id = i;
         }
     }
-    return CDFG_ITEM_ID_INVALID;
+
+    // make sure that we found any matching edge.
+    CHECK(found_id != CDFG_ITEM_ID_INVALID);
+
+    *out_found_item_id = found_id;
+cleanup:
+    return err;
 }
 
 /// replaces all uses of the given node as a the "from" node of an edge with the given other node.
@@ -1558,8 +1576,15 @@ static err_t remove_single_input_region_phi_nodes(cdfg_t* cdfg, bool* did_anythi
             continue;
         }
 
-        cdfg_item_id_t input_edge_id = node_find_any_input_edge(cdfg, i);
-        CHECK(input_edge_id != CDFG_ITEM_ID_INVALID);
+        cdfg_edge_kind_t desired_edge_kind;
+        if (node->kind == CDFG_NODE_KIND_PHI) {
+            desired_edge_kind = CDFG_EDGE_KIND_DATA_FLOW;
+        } else {
+            desired_edge_kind = CDFG_EDGE_KIND_CONTROL_FLOW;
+        }
+
+        cdfg_item_id_t input_edge_id = CDFG_ITEM_ID_INVALID;
+        CHECK_RETHROW(node_find_single_input_edge(cdfg, desired_edge_kind, i, &input_edge_id));
 
         cdfg_edge_t* edge = &cdfg->edge_storage[input_edge_id];
 
