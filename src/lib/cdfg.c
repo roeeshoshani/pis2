@@ -1170,7 +1170,7 @@ cleanup:
 static err_t opcode_handler_ret(cdfg_builder_t* builder, const pis_insn_t* insn) {
     err_t err = SUCCESS;
 
-    CHECK_CODE(insn->operands_amount == 0, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
+    UNUSED(insn);
 
     cdfg_item_id_t finish_node_id = CDFG_ITEM_ID_INVALID;
     CHECK_RETHROW(make_finish_node(&builder->cdfg, &finish_node_id));
