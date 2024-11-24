@@ -1447,6 +1447,10 @@ err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t end
     while (1) {
         bool processed_any_blocks = false;
         for (size_t i = 0; i < cfg->blocks_amount; i++) {
+            if (builder->block_states[i].was_processed) {
+                // this block was already processed.
+                continue;
+            }
             // prepare the initial op state for the block
             bool can_process_block = false;
             CHECK_RETHROW(prepare_block_initial_op_state(builder, i, &can_process_block));
