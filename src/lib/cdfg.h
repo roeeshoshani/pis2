@@ -7,8 +7,8 @@
 #include "pis.h"
 #include "types.h"
 
-#define CDFG_MAX_NODES 1024
-#define CDFG_MAX_EDGES 1024
+#define CDFG_MAX_NODES 8192
+#define CDFG_MAX_EDGES 16384
 
 #define CDFG_OP_STATE_MAX_SLOTS 256
 
