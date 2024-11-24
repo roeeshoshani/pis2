@@ -694,7 +694,7 @@ static err_t read_reg_operand(
             *out_node_id = exact_match_node_id;
         } else {
             // no exact match for the node. this means that the node requires partial reading.
-            // implementing this is really complicated as it must be able to combine multiple
+            // implementing this is really complicated as it must be able to merge multiple
             // relevant op state slots, and it must be able to represent partially uninitialized
             // regions in the resulting value, since it might be partially initialized.
             //
@@ -1230,7 +1230,7 @@ cleanup:
     return err;
 }
 
-static err_t combine_predecessor_operand_value(
+static err_t merge_predecessor_operand_value(
     cdfg_builder_t* builder,
     const pis_operand_t* operand,
     cdfg_item_id_t value_node_id,
@@ -1282,8 +1282,8 @@ cleanup:
     return err;
 }
 
-/// combines the op state of the given predecessor block into the current op state.
-static err_t combine_predecessor_op_state(
+/// mergess the op state of the given predecessor block into the current op state.
+static err_t merge_predecessor_op_state(
     cdfg_builder_t* builder, cfg_item_id_t predecessor_block_id, size_t predecessor_index
 ) {
     err_t err = SUCCESS;
@@ -1291,7 +1291,7 @@ static err_t combine_predecessor_op_state(
     const cdfg_op_state_t* predecessor_block_final_state =
         &builder->block_states[predecessor_block_id].final_state;
 
-    // first, combine the control flow into a region node
+    // first, merge the control flow into a region node
 
     if (builder->op_state.last_cf_node_id == CDFG_ITEM_ID_INVALID) {
         // no node yet, create a new empty region node.
@@ -1314,22 +1314,22 @@ static err_t combine_predecessor_op_state(
     // increase the region inputs counter
     region_node->content.region.inputs_amount++;
 
-    // now combine each of the operand values.
+    // now merge each of the operand values.
     for (size_t i = 0; i < predecessor_block_final_state->used_slots_amount; i++) {
         const cdfg_op_state_slot_t* slot = &predecessor_block_final_state->slots[i];
         if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
             // this slot is vacant.
         }
         if (slot->operand.addr.space == PIS_SPACE_TMP) {
-            // tmp operands don't need to be combined.
+            // tmp operands don't need to be merged.
             continue;
         }
 
-        // sanity. only registers should be combined.
+        // sanity. only registers should be merged.
         CHECK(slot->operand.addr.space == PIS_SPACE_REG);
 
-        // combine the value
-        CHECK_RETHROW(combine_predecessor_operand_value(
+        // merge the value
+        CHECK_RETHROW(merge_predecessor_operand_value(
             builder,
             &slot->operand,
             slot->value_node_id,
@@ -1352,7 +1352,7 @@ static err_t prepare_non_first_block_initial_op_state(
 
     size_t found_predecessors_amount = 0;
 
-    // we want to combine the op states of all direct predecessors of this block
+    // we want to merge the op states of all direct predecessors of this block
     for (size_t i = 0; i < builder->cfg->blocks_amount; i++) {
         if (i == prepared_block_id) {
             // skip the block itself
@@ -1375,9 +1375,9 @@ static err_t prepare_non_first_block_initial_op_state(
                 SUCCESS_CLEANUP();
             }
 
-            // the prepared block may have multiple predecessors, and we want to combine all of
+            // the prepared block may have multiple predecessors, and we want to merge all of
             // their op states into one.
-            CHECK_RETHROW(combine_predecessor_op_state(builder, i, found_predecessors_amount));
+            CHECK_RETHROW(merge_predecessor_op_state(builder, i, found_predecessors_amount));
 
             found_predecessors_amount++;
         }
@@ -1387,8 +1387,8 @@ static err_t prepare_non_first_block_initial_op_state(
     // predecessors.
     CHECK(found_predecessors_amount > 0);
 
-    // our op state should now represent a combined state of all predecessors. all values are
-    // combined using phi nodes.
+    // our op state should now represent a merged state of all predecessors. all values are
+    // merged using phi nodes.
     // in some cases, one of the predecessors might initialize a register while another predecessor
     // does not. in this case, we will have partially initialized phi nodes, which only have some of
     // their inputs connected.
