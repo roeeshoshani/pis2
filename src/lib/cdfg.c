@@ -1675,6 +1675,8 @@ static err_t node_find_input_by_predicate(
 
         // make sure that we only found one such item.
         CHECK(found_node_id == CDFG_ITEM_ID_INVALID);
+
+        found_node_id = i;
     }
 
     *out_found_node_id = found_node_id;
