@@ -170,8 +170,8 @@ static err_t write_gpr_merge(ctx_t* ctx, const pis_operand_t* gpr, const pis_ope
 
     // calculate the mask to be used on the container GPR to remove the relevant bits that will be
     // set by the shifted value.
-    size_t unshifted_mask = pis_size_max_unsigned_value(gpr->size);
-    size_t mask = unshifted_mask << shift_bits;
+    u64 value_bits_mask = pis_size_max_unsigned_value(gpr->size) << shift_bits;
+    u64 mask = (~value_bits_mask) & pis_size_max_unsigned_value(cpumode_size);
     pis_operand_t mask_operand = PIS_OPERAND_CONST(mask, cpumode_size);
 
     // mask the container GPR.
