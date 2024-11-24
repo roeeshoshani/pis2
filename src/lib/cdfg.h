@@ -26,6 +26,7 @@
     _(CDFG_CALCULATION_SHIFT_RIGHT_SIGNED, )                                                       \
     _(CDFG_CALCULATION_SHIFT_LEFT, )                                                               \
     _(CDFG_CALCULATION_UNSIGNED_LESS_THAN, )                                                       \
+    _(CDFG_CALCULATION_UNSIGNED_MUL, )                                                             \
     _(CDFG_CALCULATION_SIGNED_LESS_THAN, )                                                         \
     _(CDFG_CALCULATION_NEG, )                                                                      \
     _(CDFG_CALCULATION_COND_NEGATE, )                                                              \
