@@ -1473,7 +1473,11 @@ err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t end
 
     // make sure that all blocks were properly processed
     for (size_t i = 0; i < cfg->blocks_amount; i++) {
-        CHECK(builder->block_states[i].was_processed);
+        CHECK_TRACE(
+            builder->block_states[i].was_processed,
+            "block %lu was not processed while building the CDFG",
+            i
+        );
     }
 
 cleanup:
