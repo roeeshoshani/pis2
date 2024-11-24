@@ -1772,13 +1772,8 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
         did_anything = false;
         did_anything |= remove_unused_nodes_and_edges(cdfg);
         CHECK_RETHROW(remove_single_input_region_phi_nodes(cdfg, &did_anything));
-    }
-
-    did_anything = true;
-    while (did_anything) {
         CHECK_RETHROW(optimize_sub_equals_zero(cdfg, &did_anything));
     }
-
 cleanup:
     return err;
 }
