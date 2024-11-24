@@ -145,6 +145,21 @@ static cdfg_item_id_t find_imm_node(const cdfg_t* cdfg, u64 value) {
     return CDFG_ITEM_ID_INVALID;
 }
 
+/// tries to find an existing variable node with the given parameters in the cdfg.
+/// returns the id of the found node, or `CDFG_ITEM_ID_INVALID` if no such node was found.
+static cdfg_item_id_t find_var_node(const cdfg_t* cdfg, u64 reg_offset, pis_size_t reg_size) {
+    for (size_t i = 0; i < cdfg->nodes_amount; i++) {
+        const cdfg_node_t* node = &cdfg->node_storage[i];
+        if (node->kind != CDFG_NODE_KIND_VAR) {
+            continue;
+        }
+        if (node->content.var.reg_offset == reg_offset && node->content.var.reg_size == reg_size) {
+            return i;
+        }
+    }
+    return CDFG_ITEM_ID_INVALID;
+}
+
 /// returns an immediate node with the given immediate value, either by creating one or by reusing
 /// an existing one.
 static err_t make_imm_node(cdfg_t* cdfg, u64 value, cdfg_item_id_t* out_node_id) {
@@ -593,26 +608,29 @@ cleanup:
     return err;
 }
 
-static err_t make_var_node(
-    cdfg_builder_t* builder, const pis_operand_t* reg_operand, cdfg_item_id_t* out_node_id
-) {
+static err_t
+    make_var_node(cdfg_t* cdfg, const pis_operand_t* reg_operand, cdfg_item_id_t* out_node_id) {
     err_t err = SUCCESS;
 
     CHECK(reg_operand->addr.space == PIS_SPACE_REG);
 
-    cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(next_node_id(&builder->cdfg, &node_id));
-    builder->cdfg.node_storage[node_id] = (cdfg_node_t) {
-        .kind = CDFG_NODE_KIND_VAR,
-        .content =
-            {
-                .var =
-                    {
-                        .reg_offset = reg_operand->addr.offset,
-                        .reg_size = reg_operand->size,
-                    },
-            },
-    };
+    cdfg_item_id_t node_id = find_var_node(cdfg, reg_operand->addr.offset, reg_operand->size);
+
+    if (node_id == CDFG_ITEM_ID_INVALID) {
+        // no existing node, create a new one.
+        CHECK_RETHROW(next_node_id(cdfg, &node_id));
+        cdfg->node_storage[node_id] = (cdfg_node_t) {
+            .kind = CDFG_NODE_KIND_VAR,
+            .content =
+                {
+                    .var =
+                        {
+                            .reg_offset = reg_operand->addr.offset,
+                            .reg_size = reg_operand->size,
+                        },
+                },
+        };
+    }
 
     *out_node_id = node_id;
 cleanup:
@@ -643,7 +661,7 @@ static err_t read_reg_operand_byte_by_byte(
             read_operand_exact(&builder->op_state, &cur_byte_operand);
         if (cur_byte_val_node_id == CDFG_ITEM_ID_INVALID) {
             // this byte is uninitialized, create a variable for it.
-            CHECK_RETHROW(make_var_node(builder, &cur_byte_operand, &cur_byte_val_node_id));
+            CHECK_RETHROW(make_var_node(&builder->cdfg, &cur_byte_operand, &cur_byte_val_node_id));
         }
 
         cdfg_item_id_t cur_byte_reconstructed_node_id = CDFG_ITEM_ID_INVALID;
@@ -690,7 +708,7 @@ static err_t read_reg_operand(
 
         // first, create the variable node
         cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
-        CHECK_RETHROW(make_var_node(builder, operand, &node_id));
+        CHECK_RETHROW(make_var_node(&builder->cdfg, operand, &node_id));
 
         // now add a slot in the op state to point to it
         CHECK_RETHROW(make_op_state_slot(&builder->op_state, operand, node_id));
