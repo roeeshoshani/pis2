@@ -468,16 +468,16 @@ static err_t read_reg_operand(
         *out_node_id = node_id;
     } else {
         // node is either fully initialized or partially initialized.
+        //
+        // partially initialized nodes are not allowed in the CDFG. the lifter implementations
+        // must make sure to not emit intersection GPR accesses to make this ok.
+        //
+        // so, we expect the node to have an exact match node id.
         cdfg_item_id_t exact_match_node_id = read_operand_exact(&builder->op_state, operand);
-        if (exact_match_node_id != CDFG_ITEM_ID_INVALID) {
-            // found an exact match for the node, use it.
-            *out_node_id = exact_match_node_id;
-        } else {
-            // no exact match for the node. this means that the node is partially initialized.
-            // partially initialized nodes are not allowed in the CDFG. the lifter implementations
-            // must make sure to not emit intersection GPR accesses to make this ok.
-            CHECK_FAIL();
-        }
+        CHECK(exact_match_node_id != CDFG_ITEM_ID_INVALID);
+
+        // found an exact match for the node, use it.
+        *out_node_id = exact_match_node_id;
     }
 cleanup:
     return err;
@@ -565,16 +565,15 @@ static err_t write_reg_operand(
     } else {
         // no exact match. either the operand is partially initialized, or it is completely
         // uninitialized.
-        if (is_operand_fully_uninit(&builder->op_state, operand)) {
-            // operand is completely uninitialized. just add a new slot which contains the new value
-            // for this operand.
-            CHECK_RETHROW(make_op_state_slot(&builder->op_state, operand, value_node_id));
-        } else {
-            // operand is partially initialized.
-            // partially initialized nodes are not allowed in the CDFG. the lifter implementations
-            // must make sure to not emit intersection GPR accesses to make this ok.
-            CHECK_FAIL();
-        }
+        //
+        // partially initialized nodes are not allowed in the CDFG. the lifter implementations
+        // must make sure to not emit intersection GPR accesses to make this ok.
+        //
+        // so, we expect the operand to be fully uninitialized here.
+        CHECK(is_operand_fully_uninit(&builder->op_state, operand));
+        // operand is completely uninitialized. just add a new slot which contains the new value
+        // for this operand.
+        CHECK_RETHROW(make_op_state_slot(&builder->op_state, operand, value_node_id));
     }
 
 cleanup:
