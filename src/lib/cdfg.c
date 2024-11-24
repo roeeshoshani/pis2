@@ -6,6 +6,7 @@
 #include "operand_size.h"
 #include "pis.h"
 #include "trace.h"
+#include "utils.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -353,6 +354,15 @@ static err_t make_entry_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_ENTRY, out_node_id));
+
+cleanup:
+    return err;
+}
+
+static err_t make_finish_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_FINISH, out_node_id));
 
 cleanup:
     return err;
@@ -1153,7 +1163,20 @@ static err_t opcode_handler_jmp_cond(cdfg_builder_t* builder, const pis_insn_t* 
 
     CHECK_RETHROW(do_if(builder, cond_node_id));
 
-    goto cleanup;
+cleanup:
+    return err;
+}
+
+static err_t opcode_handler_ret(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    err_t err = SUCCESS;
+
+    CHECK_CODE(insn->operands_amount == 0, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
+
+    cdfg_item_id_t finish_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(make_finish_node(&builder->cdfg, &finish_node_id));
+
+    CHECK_RETHROW(link_cf_node(builder, finish_node_id));
+
 cleanup:
     return err;
 }
@@ -1179,6 +1202,7 @@ static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
     [PIS_OPCODE_JMP_COND] = opcode_handler_jmp_cond,
     [PIS_OPCODE_NEG] = opcode_handler_neg,
     [PIS_OPCODE_COND_NEGATE] = opcode_handler_cond_negate,
+    [PIS_OPCODE_JMP_RET] = opcode_handler_ret,
 };
 
 static err_t process_insn(cdfg_builder_t* builder, const pis_insn_t* insn) {
@@ -1498,6 +1522,9 @@ static void cdfg_dump_node_desc(const cdfg_node_t* node) {
     switch (node->kind) {
         case CDFG_NODE_KIND_ENTRY:
             TRACE_NO_NEWLINE("entry");
+            break;
+        case CDFG_NODE_KIND_FINISH:
+            TRACE_NO_NEWLINE("finish");
             break;
         case CDFG_NODE_KIND_VAR:
             TRACE_NO_NEWLINE(
