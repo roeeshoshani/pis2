@@ -6,6 +6,7 @@
 #include "operand_size.h"
 #include "pis.h"
 #include "trace.h"
+#include <stddef.h>
 #include <string.h>
 
 typedef err_t (*opcode_handler_t)(cdfg_builder_t* builder, const pis_insn_t* insn);
@@ -1233,6 +1234,7 @@ static err_t combine_predecessor_operand_value(
     cdfg_builder_t* builder,
     const pis_operand_t* operand,
     cdfg_item_id_t value_node_id,
+    cdfg_item_id_t region_node_id,
     size_t predecessor_index
 ) {
     err_t err = SUCCESS;
@@ -1247,6 +1249,11 @@ static err_t combine_predecessor_operand_value(
         // operand is completely uninitialized. create a phi node for it.
         phi_node_id = CDFG_ITEM_ID_INVALID;
         CHECK_RETHROW(make_phi_node(&builder->cdfg, &phi_node_id));
+
+        // connect the control flow from the region node to our new phi node
+        CHECK_RETHROW(
+            make_edge(&builder->cdfg, CDFG_EDGE_KIND_CONTROL_FLOW, region_node_id, phi_node_id, 0)
+        );
 
         // add a new slot for it
         CHECK_RETHROW(make_op_state_slot(&builder->op_state, operand, phi_node_id));
@@ -1326,12 +1333,10 @@ static err_t combine_predecessor_op_state(
             builder,
             &slot->operand,
             slot->value_node_id,
+            region_node_id,
             predecessor_index
         ));
     }
-
-    // TODO: iterate over the table and make sure that no phi nodes are partially initialized, that
-    // is, no phi nodes have only some values out of all the possible predecessors.
 
 cleanup:
     return err;
@@ -1381,6 +1386,30 @@ static err_t prepare_non_first_block_initial_op_state(
     // make sure that we found any predecessors. only the first block is allowed to have no
     // predecessors.
     CHECK(found_predecessors_amount > 0);
+
+    // our op state should now represent a combined state of all predecessors. all values are
+    // combined using phi nodes.
+    // in some cases, one of the predecessors might initialize a register while another predecessor
+    // does not. in this case, we will have partially initialized phi nodes, which only have some of
+    // their inputs connected.
+    // in those cases, we want to treat the register as uninitialized, since safe code should not
+    // use potentially uninitialized registers.
+    for (size_t i = 0; i < builder->op_state.used_slots_amount; i++) {
+        cdfg_op_state_slot_t* slot = &builder->op_state.slots[i];
+        if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
+            // this slot is vacant.
+            continue;
+        }
+        cdfg_item_id_t phi_node_id = slot->value_node_id;
+        cdfg_node_t* phi_node = &builder->cdfg.node_storage[phi_node_id];
+        if (phi_node->content.phi.inputs_amount != found_predecessors_amount) {
+            // sanity
+            CHECK(phi_node->content.phi.inputs_amount < found_predecessors_amount);
+
+            // invalidate this slot to make this register uninitialized
+            slot->value_node_id = CDFG_ITEM_ID_INVALID;
+        }
+    }
 
 cleanup:
     return err;
