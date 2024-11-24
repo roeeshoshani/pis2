@@ -1535,18 +1535,26 @@ static void node_id_find_and_replace(
     }
 }
 
-static err_t remove_single_input_phi_nodes(cdfg_t* cdfg, bool* did_anything) {
+static err_t remove_single_input_region_phi_nodes(cdfg_t* cdfg, bool* did_anything) {
     err_t err = SUCCESS;
 
     for (size_t i = 0; i < cdfg->nodes_amount; i++) {
         cdfg_node_t* node = &cdfg->node_storage[i];
-        if (node->kind != CDFG_NODE_KIND_PHI) {
-            // only phi nodes are relevant here
+        if (!(node->kind == CDFG_NODE_KIND_PHI || node->kind == CDFG_NODE_KIND_REGION)) {
+            // only phi/region nodes are relevant here
             continue;
         }
 
-        if (node->content.phi.inputs_amount != 1) {
-            // phi node has more than one input so it can't be optimized
+        // calculate the inputs amount of the phi/region node
+        size_t inputs_amount;
+        if (node->kind == CDFG_NODE_KIND_PHI) {
+            inputs_amount = node->content.phi.inputs_amount;
+        } else {
+            inputs_amount = node->content.region.inputs_amount;
+        }
+
+        if (inputs_amount != 1) {
+            // phi/region node has more than one input so it can't be optimized
             continue;
         }
 
@@ -1555,13 +1563,13 @@ static err_t remove_single_input_phi_nodes(cdfg_t* cdfg, bool* did_anything) {
 
         cdfg_edge_t* edge = &cdfg->edge_storage[input_edge_id];
 
-        // this phi node has a single input, its index should be zero.
+        // this phi/region node has a single input, its index should be zero.
         CHECK(edge->to_node_input_index == 0);
 
-        // find the underlying node of this phi
+        // find the underlying node of this phi/region node
         cdfg_item_id_t underlying_node_id = edge->from_node;
 
-        // replace all usages of the phi node with the underlying node.
+        // replace all usages of the phi/region node with the underlying node.
         node_id_find_and_replace(cdfg, i, underlying_node_id);
 
         // invalidate the current node. no need to remove the edges since they will be removed by
@@ -1582,7 +1590,7 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
     while (did_anything) {
         did_anything = false;
         did_anything |= remove_unused_nodes_and_edges(cdfg);
-        CHECK_RETHROW(remove_single_input_phi_nodes(cdfg, &did_anything));
+        CHECK_RETHROW(remove_single_input_region_phi_nodes(cdfg, &did_anything));
     }
 cleanup:
     return err;
