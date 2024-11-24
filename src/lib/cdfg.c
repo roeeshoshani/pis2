@@ -1542,8 +1542,8 @@ cleanup:
     return err;
 }
 
-/// replaces all uses of the given node as a the "from" node of an edge with the given other node.
-static void node_id_find_and_replace(
+/// replaces all usages of the given node as a the "from" node of an edge with the given other node.
+static void node_replace_usages(
     cdfg_t* cdfg, cdfg_item_id_t node_id_to_replace, cdfg_item_id_t replace_with_node_id
 ) {
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
@@ -1595,11 +1595,160 @@ static err_t remove_single_input_region_phi_nodes(cdfg_t* cdfg, bool* did_anythi
         cdfg_item_id_t underlying_node_id = edge->from_node;
 
         // replace all usages of the phi/region node with the underlying node.
-        node_id_find_and_replace(cdfg, i, underlying_node_id);
+        node_replace_usages(cdfg, i, underlying_node_id);
 
         // invalidate the current node. no need to remove the edges since they will be removed by
         // other optimization passes.
         node->kind = CDFG_NODE_KIND_INVALID;
+
+        *did_anything = true;
+    }
+cleanup:
+    return err;
+}
+
+static err_t node_find_inputs(
+    const cdfg_t* cdfg,
+    cdfg_item_id_t node_id,
+    cdfg_edge_kind_t edge_kind,
+    cdfg_item_id_t* input_node_ids,
+    size_t inputs_amount
+) {
+    err_t err = SUCCESS;
+    size_t cur_inputs_amount = 0;
+    for (size_t i = 0; i < cdfg->edges_amount; i++) {
+        const cdfg_edge_t* edge = &cdfg->edge_storage[i];
+        if (edge->to_node != node_id || edge->kind != edge_kind) {
+            continue;
+        }
+
+        CHECK(cur_inputs_amount < inputs_amount);
+        input_node_ids[cur_inputs_amount] = edge->from_node;
+        cur_inputs_amount++;
+    }
+
+    CHECK(cur_inputs_amount == inputs_amount);
+
+cleanup:
+    return err;
+}
+
+static err_t binop_node_find_data_inputs(
+    const cdfg_t* cdfg, cdfg_item_id_t node_id, cdfg_item_id_t input_node_ids[2]
+) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW(node_find_inputs(cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW, input_node_ids, 2));
+
+cleanup:
+    return err;
+}
+
+typedef bool (*node_predicate_t)(const cdfg_t* cdfg, cdfg_item_id_t node_id);
+
+static err_t node_find_input_by_predicate(
+    const cdfg_t* cdfg,
+    cdfg_item_id_t node_id,
+    cdfg_edge_kind_t edge_kind,
+    node_predicate_t predicate,
+    cdfg_item_id_t* out_found_node_id
+) {
+    err_t err = SUCCESS;
+
+    cdfg_item_id_t found_node_id = CDFG_ITEM_ID_INVALID;
+    for (size_t i = 0; i < cdfg->edges_amount; i++) {
+        const cdfg_edge_t* edge = &cdfg->edge_storage[i];
+        // make sure that the edge has the right kind
+        if (edge->kind != edge_kind) {
+            continue;
+        }
+
+        // make sure that the edge points to our node
+        if (edge->to_node != node_id) {
+            continue;
+        }
+
+        // make sure that the predicate holds for the src node
+        if (!predicate(cdfg, edge->from_node)) {
+            continue;
+        }
+
+        // make sure that we only found one such item.
+        CHECK(found_node_id == CDFG_ITEM_ID_INVALID);
+    }
+
+    *out_found_node_id = found_node_id;
+
+cleanup:
+    return err;
+}
+
+static bool node_is_zero_imm(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
+    const cdfg_node_t* from_node = &cdfg->node_storage[node_id];
+    return from_node->kind == CDFG_NODE_KIND_IMM && from_node->content.imm.value == 0;
+}
+
+static bool node_is_sub(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
+    const cdfg_node_t* from_node = &cdfg->node_storage[node_id];
+    return from_node->kind == CDFG_NODE_KIND_CALC &&
+           from_node->content.calc.calculation == CDFG_CALCULATION_SUB;
+}
+
+static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
+    err_t err = SUCCESS;
+
+    for (size_t cur_node_id = 0; cur_node_id < cdfg->nodes_amount; cur_node_id++) {
+        cdfg_node_t* node = &cdfg->node_storage[cur_node_id];
+        if (node->kind != CDFG_NODE_KIND_CALC) {
+            continue;
+        }
+        if (node->content.calc.calculation != CDFG_CALCULATION_EQUALS) {
+            continue;
+        }
+
+        // the current node is an equals node.
+
+        // we need one of the inputs to be a zero immediate operand.
+        cdfg_item_id_t zero_imm_node_id = CDFG_ITEM_ID_INVALID;
+        CHECK_RETHROW(node_find_input_by_predicate(
+            cdfg,
+            cur_node_id,
+            CDFG_EDGE_KIND_DATA_FLOW,
+            node_is_zero_imm,
+            &zero_imm_node_id
+        ));
+        if (zero_imm_node_id == CDFG_ITEM_ID_INVALID) {
+            continue;
+        }
+
+        // we need another one of the inputs to be a sub operation.
+        cdfg_item_id_t sub_node_id = CDFG_ITEM_ID_INVALID;
+        CHECK_RETHROW(node_find_input_by_predicate(
+            cdfg,
+            cur_node_id,
+            CDFG_EDGE_KIND_DATA_FLOW,
+            node_is_sub,
+            &sub_node_id
+        ));
+        if (sub_node_id == CDFG_ITEM_ID_INVALID) {
+            continue;
+        }
+
+        // doing `x - y == 0` is like doing `x == y`, so we want to create an equals node with the
+        // same operands as the sub node.
+        cdfg_item_id_t sub_input_node_ids[2] = {};
+        CHECK_RETHROW(binop_node_find_data_inputs(cdfg, sub_node_id, sub_input_node_ids));
+
+        cdfg_item_id_t optimized_eq_node_id = CDFG_ITEM_ID_INVALID;
+        CHECK_RETHROW(make_binop_node(
+            cdfg,
+            CDFG_CALCULATION_EQUALS,
+            sub_input_node_ids[0],
+            sub_input_node_ids[1],
+            &optimized_eq_node_id
+        ));
+
+        node_replace_usages(cdfg, cur_node_id, optimized_eq_node_id);
 
         *did_anything = true;
     }
@@ -1616,6 +1765,7 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
         did_anything = false;
         did_anything |= remove_unused_nodes_and_edges(cdfg);
         CHECK_RETHROW(remove_single_input_region_phi_nodes(cdfg, &did_anything));
+        CHECK_RETHROW(optimize_sub_equals_zero(cdfg, &did_anything));
     }
 cleanup:
     return err;
@@ -1735,7 +1885,7 @@ void cdfg_dump_dot(const cdfg_t* cdfg) {
 
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* edge = &cdfg->edge_storage[i];
-        if (edge->from_node == CDFG_ITEM_ID_INVALID || edge->to_node == CDFG_ITEM_ID_INVALID) {
+        if (edge->from_node == CDFG_ITEM_ID_INVALID) {
             // the edge is vacant.
             continue;
         }
