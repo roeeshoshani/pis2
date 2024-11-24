@@ -149,7 +149,7 @@ typedef struct {
 
     /// the op state at the end of this block.
     cdfg_op_state_t final_state;
-} __attribute__((packed)) cdfg_block_state_t;
+} cdfg_block_state_t;
 
 /// a CDFG builder.
 typedef struct {

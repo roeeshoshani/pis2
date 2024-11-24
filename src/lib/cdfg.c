@@ -1498,6 +1498,12 @@ static void cdfg_dump_node_desc(const cdfg_node_t* node) {
         case CDFG_NODE_KIND_IF:
             TRACE_NO_NEWLINE("if");
             break;
+        case CDFG_NODE_KIND_REGION:
+            TRACE_NO_NEWLINE("region");
+            break;
+        case CDFG_NODE_KIND_PHI:
+            TRACE_NO_NEWLINE("phi");
+            break;
     }
 }
 
