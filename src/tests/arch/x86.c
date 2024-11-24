@@ -78,12 +78,21 @@ static err_t generic_test_mov_reg_reg(
     err_t err = SUCCESS;
 
     CHECK(dst_reg->size == src_reg->size);
-    pis_size_t operand_size = dst_reg->size;
 
-    u64 src_reg_val = MAGIC64_1 & pis_size_max_unsigned_value(operand_size);
+    pis_operand_t src_container = reg_largest_enclosing(src_reg, cpumode);
+    u64 src_container_val = MAGIC64_1 & pis_size_max_unsigned_value(src_container.size);
+
+    pis_operand_t dst_container = reg_largest_enclosing(dst_reg, cpumode);
+    u64 dst_container_val = MAGIC64_2 & pis_size_max_unsigned_value(dst_container.size);
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, src_reg, src_reg_val));
+
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &src_container, src_container_val));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &dst_container, dst_container_val));
+
+    u64 src_reg_val = 0;
+    CHECK_RETHROW_VERBOSE(pis_emu_read_operand(&g_emu, src_reg, &src_reg_val));
+
     CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, code, cpumode, 0));
 
     // make sure that the dst reg was written
@@ -799,6 +808,11 @@ static err_t generic_test_mov_r8_imm8(
     err_t err = SUCCESS;
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
+
+    pis_operand_t reg_container = reg_largest_enclosing(reg, cpumode);
+    u64 container_value = MAGIC64_1 & pis_size_max_unsigned_value(reg_container.size);
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &reg_container, container_value));
+
     CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, code, cpumode, 0));
 
     CHECK_RETHROW_VERBOSE(emu_assert_operand_equals(&g_emu, reg, value));
@@ -1588,7 +1602,8 @@ static err_t generic_test_cbw_cwde_cdqe(
 
     pis_emu_init(&g_emu, PIS_ENDIANNESS_LITTLE);
 
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, src_reg, value));
+    pis_operand_t src_container = reg_largest_enclosing(src_reg, PIS_X86_CPUMODE_64_BIT);
+    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(&g_emu, &src_container, value));
 
     CHECK_RETHROW_VERBOSE(emulate_insn(&g_emu, code, PIS_X86_CPUMODE_64_BIT, 0));
 

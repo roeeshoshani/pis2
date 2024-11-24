@@ -146,23 +146,28 @@ pis_operand_t
     return PIS_OPERAND_REG(reg_encoding * 8, operand_size);
 }
 
+pis_operand_t reg_largest_enclosing(const pis_operand_t* reg, pis_x86_cpumode_t cpumode) {
+    pis_size_t cpumode_size = pis_x86_cpumode_get_operand_size(cpumode);
+    u32 cpumode_size_bytes = pis_size_to_bytes(cpumode_size);
+    u64 container_gpr_off = (reg->addr.offset / cpumode_size_bytes) * cpumode_size_bytes;
+    return PIS_OPERAND_REG(container_gpr_off, cpumode_size);
+}
+
 static err_t write_gpr_merge(ctx_t* ctx, const pis_operand_t* gpr, const pis_operand_t* value) {
     err_t err = SUCCESS;
 
     // find the cpumode size GPR that contains the given GPR.
-    pis_size_t cpumode_size = pis_x86_cpumode_get_operand_size(ctx->cpumode);
-    u32 cpumode_size_bytes = pis_size_to_bytes(cpumode_size);
-    u64 container_gpr_off = (gpr->addr.offset / cpumode_size_bytes) * cpumode_size_bytes;
-    pis_operand_t container_gpr = PIS_OPERAND_REG(container_gpr_off, cpumode_size);
+    pis_operand_t container_gpr = reg_largest_enclosing(gpr, ctx->cpumode);
+    pis_size_t container_size = container_gpr.size;
 
-    pis_operand_t zext_value = TMP_ALLOC(&ctx->tmp_allocator, cpumode_size);
+    pis_operand_t zext_value = TMP_ALLOC(&ctx->tmp_allocator, container_size);
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, zext_value, *value));
 
     // shift the value to put it at the right offset in the GPR
-    size_t shift_bytes = gpr->addr.offset - container_gpr_off;
+    size_t shift_bytes = gpr->addr.offset - container_gpr.addr.offset;
     size_t shift_bits = shift_bytes * 8;
-    pis_operand_t shift_bits_operand = PIS_OPERAND_CONST(shift_bits, cpumode_size);
-    pis_operand_t shifted_value = TMP_ALLOC(&ctx->tmp_allocator, cpumode_size);
+    pis_operand_t shift_bits_operand = PIS_OPERAND_CONST(shift_bits, container_size);
+    pis_operand_t shifted_value = TMP_ALLOC(&ctx->tmp_allocator, container_size);
     PIS_EMIT(
         &ctx->args->result,
         PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, shifted_value, zext_value, shift_bits_operand)
@@ -171,11 +176,11 @@ static err_t write_gpr_merge(ctx_t* ctx, const pis_operand_t* gpr, const pis_ope
     // calculate the mask to be used on the container GPR to remove the relevant bits that will be
     // set by the shifted value.
     u64 value_bits_mask = pis_size_max_unsigned_value(gpr->size) << shift_bits;
-    u64 mask = (~value_bits_mask) & pis_size_max_unsigned_value(cpumode_size);
-    pis_operand_t mask_operand = PIS_OPERAND_CONST(mask, cpumode_size);
+    u64 mask = (~value_bits_mask) & pis_size_max_unsigned_value(container_size);
+    pis_operand_t mask_operand = PIS_OPERAND_CONST(mask, container_size);
 
     // mask the container GPR.
-    pis_operand_t masked_container_gpr = TMP_ALLOC(&ctx->tmp_allocator, cpumode_size);
+    pis_operand_t masked_container_gpr = TMP_ALLOC(&ctx->tmp_allocator, container_size);
     PIS_EMIT(
         &ctx->args->result,
         PIS_INSN3(PIS_OPCODE_AND, masked_container_gpr, container_gpr, mask_operand)
