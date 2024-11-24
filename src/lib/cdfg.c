@@ -1411,6 +1411,8 @@ static err_t prepare_non_first_block_initial_op_state(
         }
     }
 
+    *can_process_block = true;
+
 cleanup:
     return err;
 }
