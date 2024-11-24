@@ -1622,6 +1622,20 @@ static void cdfg_dump_node(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
 /// dumps a DOT representation of the CDFG to stdout.
 void cdfg_dump_dot(const cdfg_t* cdfg) {
     TRACE("digraph {");
+
+    // make it dark theme
+    TRACE("bgcolor=\"#181818\"");
+    TRACE("node [");
+    TRACE("fontcolor = \"#e6e6e6\",");
+    TRACE("style = filled,");
+    TRACE("color = \"#e6e6e6\",");
+    TRACE("fillcolor = \"#333333\"");
+    TRACE("]");
+    TRACE("edge [");
+    TRACE("color = \"#e6e6e6\",");
+    TRACE("fontcolor = \"#e6e6e6\"");
+    TRACE("]");
+
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* edge = &cdfg->edge_storage[i];
         if (edge->from_node == CDFG_ITEM_ID_INVALID || edge->to_node == CDFG_ITEM_ID_INVALID) {
