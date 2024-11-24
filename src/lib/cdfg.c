@@ -421,193 +421,6 @@ cleanup:
     return err;
 }
 
-static err_t calc_extracted_byte_operand(
-    const pis_operand_t* operand, size_t byte_index, pis_operand_t* out_byte_operand
-) {
-    err_t err = SUCCESS;
-    pis_addr_t cur_byte_addr = {};
-    CHECK_RETHROW(pis_addr_add(&operand->addr, byte_index, &cur_byte_addr));
-    *out_byte_operand = PIS_OPERAND(cur_byte_addr, PIS_SIZE_1);
-cleanup:
-    return err;
-}
-
-/// calculates the shift amount by which a value needs to be shifted to extract the byte at the
-/// given index from it.
-static err_t extract_byte_shift_amount(
-    size_t byte_index, size_t value_size_in_bytes, pis_endianness_t endianness, size_t* shift_amount
-) {
-    err_t err = SUCCESS;
-
-    size_t value_size_in_bits = value_size_in_bytes * 8;
-    size_t bit_index = byte_index * 8;
-
-    switch (endianness) {
-        case PIS_ENDIANNESS_LITTLE:
-            *shift_amount = bit_index;
-            break;
-        case PIS_ENDIANNESS_BIG:
-            *shift_amount = value_size_in_bits - 8 - bit_index;
-            break;
-        default:
-            UNREACHABLE();
-    }
-
-cleanup:
-    return err;
-}
-
-/// builds a node which represents the extraction of the byte at the given index from the value
-/// represented by the given node id.
-static err_t extract_byte(
-    cdfg_builder_t* builder,
-    cdfg_item_id_t value_node_id,
-    size_t value_size_in_bytes,
-    size_t byte_index,
-    cdfg_item_id_t* out_node_id
-) {
-    err_t err = SUCCESS;
-
-    size_t shift_amount = 0;
-    CHECK_RETHROW(extract_byte_shift_amount(
-        byte_index,
-        value_size_in_bytes,
-        builder->endianness,
-        &shift_amount
-    ));
-
-    cdfg_item_id_t shift_amount_node_id = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(make_imm_node(&builder->cdfg, shift_amount, &shift_amount_node_id));
-
-    cdfg_item_id_t shifted_val_node_id = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(make_binop_node(
-        &builder->cdfg,
-        CDFG_CALCULATION_SHIFT_RIGHT,
-        value_node_id,
-        shift_amount_node_id,
-        &shifted_val_node_id
-    ));
-
-    cdfg_item_id_t mask_node_id = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(make_imm_node(&builder->cdfg, 0xff, &mask_node_id));
-
-    cdfg_item_id_t masked_val_node_id = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(make_binop_node(
-        &builder->cdfg,
-        CDFG_CALCULATION_AND,
-        shifted_val_node_id,
-        mask_node_id,
-        &masked_val_node_id
-    ));
-
-    *out_node_id = masked_val_node_id;
-
-cleanup:
-    return err;
-}
-
-/// left-shifts the given byte value node id such that it is placed at the requested byte index in
-/// the reconstructed value.
-static err_t reconstruct_byte(
-    cdfg_builder_t* builder,
-    cdfg_item_id_t byte_value_node_id,
-    size_t value_size_in_bytes,
-    size_t byte_index,
-    cdfg_item_id_t* out_node_id
-) {
-    err_t err = SUCCESS;
-
-    size_t shift_amount = 0;
-    CHECK_RETHROW(extract_byte_shift_amount(
-        byte_index,
-        value_size_in_bytes,
-        builder->endianness,
-        &shift_amount
-    ));
-
-    cdfg_item_id_t shift_amount_node_id = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(make_imm_node(&builder->cdfg, shift_amount, &shift_amount_node_id));
-
-    cdfg_item_id_t shifted_val_node_id = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(make_binop_node(
-        &builder->cdfg,
-        CDFG_CALCULATION_SHIFT_LEFT,
-        byte_value_node_id,
-        shift_amount_node_id,
-        &shifted_val_node_id
-    ));
-
-    *out_node_id = shifted_val_node_id;
-
-cleanup:
-    return err;
-}
-
-/// breaks the specified op state slot to byte-by-byte slots.
-static err_t break_op_state_slot_to_bytes(cdfg_builder_t* builder, cdfg_item_id_t slot_id) {
-    err_t err = SUCCESS;
-    cdfg_op_state_slot_t* slot = &builder->op_state.slots[slot_id];
-    if (slot->operand.size == PIS_SIZE_1) {
-        // the operand is already a single byte, so we don't need to do anything.
-        SUCCESS_CLEANUP();
-    }
-
-    // copy out the content of the slot as we are about to overwrite it.
-    cdfg_op_state_slot_t orig_slot = *slot;
-
-    // extract each of the bytes of the operand into its own slot.
-    u32 bytes = pis_size_to_bytes(orig_slot.operand.size);
-    for (size_t i = 0; i < bytes; i++) {
-        // first, choose the slot in which we will store this byte
-        cdfg_item_id_t cur_byte_slot_id;
-        if (i == 0) {
-            // the first byte is stored in the original slot
-            cur_byte_slot_id = slot_id;
-        } else {
-            // we allocate a new slots for the rest of the bytes
-            CHECK_RETHROW(next_op_state_slot_id(&builder->op_state, &cur_byte_slot_id));
-        }
-
-        // calculate the byte value
-        cdfg_item_id_t cur_byte_value_node_id = CDFG_ITEM_ID_INVALID;
-        CHECK_RETHROW(
-            extract_byte(builder, orig_slot.value_node_id, bytes, i, &cur_byte_value_node_id)
-        );
-
-        // calculate the operand that represents the byte value
-        pis_operand_t cur_byte_operand = {};
-        CHECK_RETHROW(calc_extracted_byte_operand(&orig_slot.operand, i, &cur_byte_operand));
-
-        // store it in the slot
-        builder->op_state.slots[cur_byte_slot_id] = (cdfg_op_state_slot_t) {
-            .operand = cur_byte_operand,
-            .value_node_id = cur_byte_value_node_id,
-        };
-    }
-cleanup:
-    return err;
-}
-
-/// break all op state slots that intersect with the given operand to individual bytes.
-static err_t
-    break_intersecting_slots_to_bytes(cdfg_builder_t* builder, const pis_operand_t* operand) {
-    err_t err = SUCCESS;
-
-    for (size_t i = 0; i < builder->op_state.used_slots_amount; i++) {
-        const cdfg_op_state_slot_t* slot = &builder->op_state.slots[i];
-        if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
-            // this slot is vacant.
-            continue;
-        }
-        if (pis_operands_intersect(operand, &slot->operand)) {
-            CHECK_RETHROW(break_op_state_slot_to_bytes(builder, i));
-        }
-    }
-
-cleanup:
-    return err;
-}
-
 static err_t
     make_var_node(cdfg_t* cdfg, const pis_operand_t* reg_operand, cdfg_item_id_t* out_node_id) {
     err_t err = SUCCESS;
@@ -637,67 +450,6 @@ cleanup:
     return err;
 }
 
-/// read a register operand byte by byte. this is used when no exact match operand it found for the
-/// register operand, and it requires partial reads.
-static err_t read_reg_operand_byte_by_byte(
-    cdfg_builder_t* builder, const pis_operand_t* operand, cdfg_item_id_t* out_node_id
-) {
-    err_t err = SUCCESS;
-
-    // first, break apart all existing operands that intersect with this operand to byte-by-byte
-    // operands.
-    CHECK_RETHROW(break_intersecting_slots_to_bytes(builder, operand));
-
-    cdfg_item_id_t reconstructed_val_node_id = CDFG_ITEM_ID_INVALID;
-
-    u32 bytes = pis_size_to_bytes(operand->size);
-    for (size_t i = 0; i < bytes; i++) {
-        // calculate the operand that represents the byte value
-        pis_operand_t cur_byte_operand = {};
-        CHECK_RETHROW(calc_extracted_byte_operand(operand, i, &cur_byte_operand));
-
-        // calculate the byte value of the current byte
-        cdfg_item_id_t cur_byte_val_node_id =
-            read_operand_exact(&builder->op_state, &cur_byte_operand);
-        if (cur_byte_val_node_id == CDFG_ITEM_ID_INVALID) {
-            // this byte is uninitialized, create a variable for it.
-            CHECK_RETHROW(make_var_node(&builder->cdfg, &cur_byte_operand, &cur_byte_val_node_id));
-        }
-
-        cdfg_item_id_t cur_byte_reconstructed_node_id = CDFG_ITEM_ID_INVALID;
-        CHECK_RETHROW(reconstruct_byte(
-            builder,
-            cur_byte_val_node_id,
-            bytes,
-            i,
-            &cur_byte_reconstructed_node_id
-        ));
-
-        // append the current reconstructed byte to the full reconstructed value.
-        if (reconstructed_val_node_id == CDFG_ITEM_ID_INVALID) {
-            reconstructed_val_node_id = cur_byte_reconstructed_node_id;
-        } else {
-            // bitwise or the currnet byte into the full reconstructed value
-            cdfg_item_id_t ored_values_node_id = CDFG_ITEM_ID_INVALID;
-            CHECK_RETHROW(make_binop_node(
-                &builder->cdfg,
-                CDFG_CALCULATION_OR,
-                reconstructed_val_node_id,
-                cur_byte_reconstructed_node_id,
-                &ored_values_node_id
-            ));
-
-            reconstructed_val_node_id = ored_values_node_id;
-        }
-    }
-
-    CHECK(reconstructed_val_node_id != CDFG_ITEM_ID_INVALID);
-    *out_node_id = reconstructed_val_node_id;
-
-cleanup:
-    return err;
-}
-
 static err_t read_reg_operand(
     cdfg_builder_t* builder, const pis_operand_t* operand, cdfg_item_id_t* out_node_id
 ) {
@@ -721,15 +473,10 @@ static err_t read_reg_operand(
             // found an exact match for the node, use it.
             *out_node_id = exact_match_node_id;
         } else {
-            // no exact match for the node. this means that the node requires partial reading.
-            // implementing this is really complicated as it must be able to merge multiple
-            // relevant op state slots, and it must be able to represent partially uninitialized
-            // regions in the resulting value, since it might be partially initialized.
-            //
-            // instead of doing this, we are breaking all slots related to this operand to
-            // byte-by-byte slots and then read it byte-by-byte, which is much simpler than handling
-            // all edge cases of partial reads.
-            CHECK_RETHROW(read_reg_operand_byte_by_byte(builder, operand, out_node_id));
+            // no exact match for the node. this means that the node is partially initialized.
+            // partially initialized nodes are not allowed in the CDFG. the lifter implementations
+            // must make sure to not emit intersection GPR accesses to make this ok.
+            CHECK_FAIL();
         }
     }
 cleanup:
@@ -805,42 +552,6 @@ cleanup:
     return err;
 }
 
-/// write to a partially initialized register operand.
-static err_t write_reg_operand_partially_init(
-    cdfg_builder_t* builder, const pis_operand_t* operand, cdfg_item_id_t value_node_id
-) {
-    err_t err = SUCCESS;
-
-    // first, break all existing slots that intersect with this operand to bytes.
-    CHECK_RETHROW(break_intersecting_slots_to_bytes(builder, operand));
-
-    // now write the operand byte-by-byte
-    u32 bytes = pis_size_to_bytes(operand->size);
-    for (size_t i = 0; i < bytes; i++) {
-        // calculate the value of the current byte
-        cdfg_item_id_t cur_byte_val_node_id = CDFG_ITEM_ID_INVALID;
-        CHECK_RETHROW(extract_byte(builder, value_node_id, bytes, i, &cur_byte_val_node_id));
-
-        // calculate the operand of the current byte
-        pis_operand_t cur_byte_operand = {};
-        CHECK_RETHROW(calc_extracted_byte_operand(operand, i, &cur_byte_operand));
-
-        cdfg_item_id_t cur_byte_slot_id = find_slot_exact(&builder->op_state, &cur_byte_operand);
-        if (cur_byte_slot_id != CDFG_ITEM_ID_INVALID) {
-            // found an existing slot. overwrite its value with the new value.
-            builder->op_state.slots[cur_byte_slot_id].value_node_id = cur_byte_val_node_id;
-        } else {
-            // no existing slot. just add a new slot which contains the new value for this operand.
-            CHECK_RETHROW(
-                make_op_state_slot(&builder->op_state, &cur_byte_operand, cur_byte_val_node_id)
-            );
-        }
-    }
-
-cleanup:
-    return err;
-}
-
 /// write to a register operand.
 static err_t write_reg_operand(
     cdfg_builder_t* builder, const pis_operand_t* operand, cdfg_item_id_t value_node_id
@@ -860,7 +571,9 @@ static err_t write_reg_operand(
             CHECK_RETHROW(make_op_state_slot(&builder->op_state, operand, value_node_id));
         } else {
             // operand is partially initialized.
-            CHECK_RETHROW(write_reg_operand_partially_init(builder, operand, value_node_id));
+            // partially initialized nodes are not allowed in the CDFG. the lifter implementations
+            // must make sure to not emit intersection GPR accesses to make this ok.
+            CHECK_FAIL();
         }
     }
 
