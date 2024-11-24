@@ -1470,19 +1470,28 @@ cleanup:
     return err;
 }
 
-static bool is_node_used(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
+static bool is_node_used_as_input(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
-        if (cdfg->edge_storage[i].to_node == node_id) {
+        if (cdfg->edge_storage[i].from_node == node_id) {
             return true;
         }
     }
     return false;
 }
 
-static void remove_unused_nodes(cdfg_t* cdfg) {
+/// removes unused nodes and edges. returns whether any nodes or edges were removed.
+static bool remove_unused_nodes_and_edges(cdfg_t* cdfg) {
+    bool removed_anything = false;
     for (size_t i = 0; i < cdfg->nodes_amount; i++) {
-        if (!is_node_used(cdfg, i)) {
+        cdfg_node_t* node = &cdfg->node_storage[i];
+        if (node->kind == CDFG_NODE_KIND_INVALID) {
+            // node is vacant.
+            continue;
+        }
+        if (!is_node_used_as_input(cdfg, i)) {
+            // if the node's value is not used anywhere, invalidate it.
             cdfg->node_storage[i].kind = CDFG_NODE_KIND_INVALID;
+            removed_anything = true;
         }
     }
 
@@ -1497,14 +1506,16 @@ static void remove_unused_nodes(cdfg_t* cdfg) {
         if (to_node->kind == CDFG_NODE_KIND_INVALID) {
             edge->from_node = CDFG_ITEM_ID_INVALID;
             edge->to_node = CDFG_ITEM_ID_INVALID;
+            removed_anything = true;
         }
     }
+    return removed_anything;
 }
 
 err_t cdfg_optimize(cdfg_t* cdfg) {
     err_t err = SUCCESS;
 
-    remove_unused_nodes(cdfg);
+    while (remove_unused_nodes_and_edges(cdfg)) {}
 
     goto cleanup;
 cleanup:
