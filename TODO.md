@@ -4,3 +4,5 @@ notes about stuff that needs to be done.
 - handle prefixes: REP* prefixes, LOCK prefix, segment override prefixes
 - do i always run the delay slot insn in conditional branch? i remember some edge case with this... check it.
 - in shellcode tests, test mips revisions other than revision 1.
+- somehow prevent the return value from being optimized out in the CDFG. let each arch have an "arch def" where it specifies its lifter,
+  its endianness, and its return value register operand, or something like that.
