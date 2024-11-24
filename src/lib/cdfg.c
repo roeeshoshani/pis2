@@ -181,6 +181,9 @@ static err_t make_edge(
     cdfg_item_id_t edge_id = CDFG_ITEM_ID_INVALID;
     CHECK_RETHROW(next_edge_id(cdfg, &edge_id));
 
+    // make sure that the value is in range of the bitfield.
+    CHECK(to_node_input_index < (1 << 7));
+
     cdfg->edge_storage[edge_id] = (cdfg_edge_t) {
         .kind = kind,
         .to_node_input_index = to_node_input_index,
@@ -233,18 +236,28 @@ cleanup:
     return err;
 }
 
-static err_t make_store_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
+static err_t
+    make_empty_node_of_kind(cdfg_t* cdfg, cdfg_node_kind_t kind, cdfg_item_id_t* out_node_id) {
     err_t err = SUCCESS;
 
     cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
     CHECK_RETHROW(next_node_id(cdfg, &node_id));
 
     cdfg->node_storage[node_id] = (cdfg_node_t) {
-        .kind = CDFG_NODE_KIND_STORE,
+        .kind = kind,
         .content = {},
     };
 
     *out_node_id = node_id;
+cleanup:
+    return err;
+}
+
+static err_t make_store_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_STORE, out_node_id));
+
 cleanup:
     return err;
 }
@@ -252,15 +265,7 @@ cleanup:
 static err_t make_load_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(next_node_id(cdfg, &node_id));
-
-    cdfg->node_storage[node_id] = (cdfg_node_t) {
-        .kind = CDFG_NODE_KIND_LOAD,
-        .content = {},
-    };
-
-    *out_node_id = node_id;
+    CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_LOAD, out_node_id));
 cleanup:
     return err;
 }
@@ -268,15 +273,26 @@ cleanup:
 static err_t make_if_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(next_node_id(cdfg, &node_id));
+    CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_IF, out_node_id));
 
-    cdfg->node_storage[node_id] = (cdfg_node_t) {
-        .kind = CDFG_NODE_KIND_IF,
-        .content = {},
-    };
+cleanup:
+    return err;
+}
 
-    *out_node_id = node_id;
+static err_t make_region_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_REGION, out_node_id));
+
+cleanup:
+    return err;
+}
+
+static err_t make_phi_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_PHI, out_node_id));
+
 cleanup:
     return err;
 }
@@ -335,15 +351,8 @@ cleanup:
 static err_t make_entry_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(next_node_id(cdfg, &node_id));
+    CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_ENTRY, out_node_id));
 
-    cdfg->node_storage[node_id] = (cdfg_node_t) {
-        .kind = CDFG_NODE_KIND_ENTRY,
-        .content = {},
-    };
-
-    *out_node_id = node_id;
 cleanup:
     return err;
 }
@@ -1220,11 +1229,109 @@ cleanup:
     return err;
 }
 
-static err_t
-    combine_predecessor_op_state(cdfg_builder_t* builder, cfg_item_id_t predecessor_block_id) {
+static err_t combine_predecessor_operand_value(
+    cdfg_builder_t* builder,
+    const pis_operand_t* operand,
+    cdfg_item_id_t value_node_id,
+    size_t predecessor_index
+) {
     err_t err = SUCCESS;
 
-    TODO();
+    cdfg_item_id_t phi_node_id;
+    cdfg_item_id_t slot_id = find_slot_exact(&builder->op_state, operand);
+    if (slot_id == CDFG_ITEM_ID_INVALID) {
+        // no exact match. make sure that the operand is fully uninitialized. partial initialization
+        // is not allowed when combining predecessors.
+        CHECK(is_operand_fully_uninit(&builder->op_state, operand));
+
+        // operand is completely uninitialized. create a phi node for it.
+        phi_node_id = CDFG_ITEM_ID_INVALID;
+        CHECK_RETHROW(make_phi_node(&builder->cdfg, &phi_node_id));
+
+        // add a new slot for it
+        CHECK_RETHROW(make_op_state_slot(&builder->op_state, operand, phi_node_id));
+    } else {
+        // found an exactly matching slot. the slot's value should be a phi node.
+        const cdfg_op_state_slot_t* existing_slot = &builder->op_state.slots[slot_id];
+        phi_node_id = existing_slot->value_node_id;
+    }
+
+    cdfg_node_t* phi_node = &builder->cdfg.node_storage[phi_node_id];
+    CHECK(phi_node->kind == CDFG_NODE_KIND_PHI);
+
+    // connect this value to the correct entry in the phi node.
+    CHECK_RETHROW(make_edge(
+        &builder->cdfg,
+        CDFG_EDGE_KIND_DATA_FLOW,
+        value_node_id,
+        phi_node_id,
+        predecessor_index
+    ));
+
+    // increment the phi node's input counter
+    phi_node->content.phi.inputs_amount++;
+
+cleanup:
+    return err;
+}
+
+/// combines the op state of the given predecessor block into the current op state.
+static err_t combine_predecessor_op_state(
+    cdfg_builder_t* builder, cfg_item_id_t predecessor_block_id, size_t predecessor_index
+) {
+    err_t err = SUCCESS;
+
+    const cdfg_op_state_t* predecessor_block_final_state =
+        &builder->block_states[predecessor_block_id].final_state;
+
+    // first, combine the control flow into a region node
+
+    if (builder->op_state.last_cf_node_id == CDFG_ITEM_ID_INVALID) {
+        // no node yet, create a new empty region node.
+        CHECK_RETHROW(make_region_node(&builder->cdfg, &builder->op_state.last_cf_node_id));
+    }
+
+
+    cdfg_item_id_t region_node_id = builder->op_state.last_cf_node_id;
+    cdfg_node_t* region_node = &builder->cdfg.node_storage[region_node_id];
+
+    // connect the control flow to the region node
+    CHECK_RETHROW(make_edge(
+        &builder->cdfg,
+        CDFG_EDGE_KIND_CONTROL_FLOW,
+        predecessor_block_final_state->last_cf_node_id,
+        builder->op_state.last_cf_node_id,
+        predecessor_index
+    ));
+
+    // increase the region inputs counter
+    region_node->content.region.inputs_amount++;
+
+    // now combine each of the operand values.
+    for (size_t i = 0; i < predecessor_block_final_state->used_slots_amount; i++) {
+        const cdfg_op_state_slot_t* slot = &predecessor_block_final_state->slots[i];
+        if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
+            // this slot is vacant.
+        }
+        if (slot->operand.addr.space == PIS_SPACE_TMP) {
+            // tmp operands don't need to be combined.
+            continue;
+        }
+
+        // sanity. only registers should be combined.
+        CHECK(slot->operand.addr.space == PIS_SPACE_REG);
+
+        // combine the value
+        CHECK_RETHROW(combine_predecessor_operand_value(
+            builder,
+            &slot->operand,
+            slot->value_node_id,
+            predecessor_index
+        ));
+    }
+
+    // TODO: iterate over the table and make sure that no phi nodes are partially initialized, that
+    // is, no phi nodes have only some values out of all the possible predecessors.
 
 cleanup:
     return err;
@@ -1238,8 +1345,9 @@ static err_t prepare_non_first_block_initial_op_state(
     builder->op_state.used_slots_amount = 0;
     builder->op_state.last_cf_node_id = CDFG_ITEM_ID_INVALID;
 
+    size_t found_predecessors_amount = 0;
+
     // we want to combine the op states of all direct predecessors of this block
-    bool found_any_predecessors = false;
     for (size_t i = 0; i < builder->cfg->blocks_amount; i++) {
         if (i == prepared_block_id) {
             // skip the block itself
@@ -1264,15 +1372,15 @@ static err_t prepare_non_first_block_initial_op_state(
 
             // the prepared block may have multiple predecessors, and we want to combine all of
             // their op states into one.
-            CHECK_RETHROW(combine_predecessor_op_state(builder, i));
+            CHECK_RETHROW(combine_predecessor_op_state(builder, i, found_predecessors_amount));
 
-            found_any_predecessors = true;
+            found_predecessors_amount++;
         }
     }
 
     // make sure that we found any predecessors. only the first block is allowed to have no
     // predecessors.
-    CHECK(found_any_predecessors);
+    CHECK(found_predecessors_amount > 0);
 
 cleanup:
     return err;

@@ -43,6 +43,8 @@ typedef enum {
     CDFG_NODE_KIND_LOAD,
     CDFG_NODE_KIND_ENTRY,
     CDFG_NODE_KIND_IF,
+    CDFG_NODE_KIND_REGION,
+    CDFG_NODE_KIND_PHI,
 } __attribute__((packed)) cdfg_node_kind_t;
 
 /// a CDFG variable node. this is used to represent an access to a register without previous
@@ -66,11 +68,25 @@ typedef struct {
     cdfg_calculation_t calculation;
 } __attribute__((packed)) cdfg_calc_node_t;
 
+/// a CDFG region node.
+typedef struct {
+    /// the amount of control flow paths that are combined by this region node.
+    size_t inputs_amount;
+} __attribute__((packed)) cdfg_region_node_t;
+
+/// a CDFG phi node.
+typedef struct {
+    /// the amount of different values that are combined by this phi node.
+    size_t inputs_amount;
+} __attribute__((packed)) cdfg_phi_node_t;
+
 /// the content of a CDFG node.
 typedef union {
     cdfg_var_node_t var;
     cdfg_imm_node_t imm;
     cdfg_calc_node_t calc;
+    cdfg_region_node_t region;
+    cdfg_phi_node_t phi;
 } __attribute__((packed)) cdfg_node_content_t;
 
 /// represents a single node in the CDFG
