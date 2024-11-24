@@ -1488,9 +1488,11 @@ static bool remove_unused_nodes_and_edges(cdfg_t* cdfg) {
             // node is vacant.
             continue;
         }
-        if (!is_node_used_as_input(cdfg, i)) {
-            // if the node's value is not used anywhere, invalidate it.
-            cdfg->node_storage[i].kind = CDFG_NODE_KIND_INVALID;
+
+        if (!is_node_used_as_input(cdfg, i) && node->kind != CDFG_NODE_KIND_FINISH) {
+            // if the node's value is not used anywhere, and it is not a finish node (which by
+            // definition must be kept), remove it.
+            node->kind = CDFG_NODE_KIND_INVALID;
             removed_anything = true;
         }
     }
