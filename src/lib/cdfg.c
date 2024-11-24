@@ -1514,12 +1514,76 @@ static bool remove_unused_nodes_and_edges(cdfg_t* cdfg) {
     return removed_anything;
 }
 
+/// returns the edge id of one of the input edges of the given node, if any.
+static cdfg_item_id_t node_find_any_input_edge(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
+    for (size_t i = 0; i < cdfg->edges_amount; i++) {
+        if (cdfg->edge_storage[i].to_node == node_id) {
+            return i;
+        }
+    }
+    return CDFG_ITEM_ID_INVALID;
+}
+
+/// replaces all uses of the given node as a the "from" node of an edge with the given other node.
+static void node_id_find_and_replace(
+    cdfg_t* cdfg, cdfg_item_id_t node_id_to_replace, cdfg_item_id_t replace_with_node_id
+) {
+    for (size_t i = 0; i < cdfg->edges_amount; i++) {
+        if (cdfg->edge_storage[i].from_node == node_id_to_replace) {
+            cdfg->edge_storage[i].from_node = replace_with_node_id;
+        }
+    }
+}
+
+static err_t remove_single_input_phi_nodes(cdfg_t* cdfg, bool* did_anything) {
+    err_t err = SUCCESS;
+
+    for (size_t i = 0; i < cdfg->nodes_amount; i++) {
+        cdfg_node_t* node = &cdfg->node_storage[i];
+        if (node->kind != CDFG_NODE_KIND_PHI) {
+            // only phi nodes are relevant here
+            continue;
+        }
+
+        if (node->content.phi.inputs_amount != 1) {
+            // phi node has more than one input so it can't be optimized
+            continue;
+        }
+
+        cdfg_item_id_t input_edge_id = node_find_any_input_edge(cdfg, i);
+        CHECK(input_edge_id != CDFG_ITEM_ID_INVALID);
+
+        cdfg_edge_t* edge = &cdfg->edge_storage[input_edge_id];
+
+        // this phi node has a single input, its index should be zero.
+        CHECK(edge->to_node_input_index == 0);
+
+        // find the underlying node of this phi
+        cdfg_item_id_t underlying_node_id = edge->from_node;
+
+        // replace all usages of the phi node with the underlying node.
+        node_id_find_and_replace(cdfg, i, underlying_node_id);
+
+        // invalidate the current node. no need to remove the edges since they will be removed by
+        // other optimization passes.
+        node->kind = CDFG_NODE_KIND_INVALID;
+
+        *did_anything = true;
+    }
+cleanup:
+    return err;
+}
+
 err_t cdfg_optimize(cdfg_t* cdfg) {
     err_t err = SUCCESS;
 
-    while (remove_unused_nodes_and_edges(cdfg)) {}
+    bool did_anything = true;
 
-    goto cleanup;
+    while (did_anything) {
+        did_anything = false;
+        did_anything |= remove_unused_nodes_and_edges(cdfg);
+        CHECK_RETHROW(remove_single_input_phi_nodes(cdfg, &did_anything));
+    }
 cleanup:
     return err;
 }
