@@ -1479,6 +1479,16 @@ static bool is_node_used_as_input(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
     return false;
 }
 
+static bool does_node_use_cf(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
+    for (size_t i = 0; i < cdfg->edges_amount; i++) {
+        const cdfg_edge_t* edge = &cdfg->edge_storage[i];
+        if (edge->kind == CDFG_EDGE_KIND_CONTROL_FLOW && edge->to_node == node_id) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /// removes unused nodes and edges. returns whether any nodes or edges were removed.
 static bool remove_unused_nodes_and_edges(cdfg_t* cdfg) {
     bool removed_anything = false;
@@ -1489,7 +1499,9 @@ static bool remove_unused_nodes_and_edges(cdfg_t* cdfg) {
             continue;
         }
 
-        if (!is_node_used_as_input(cdfg, i) && node->kind != CDFG_NODE_KIND_FINISH) {
+        bool is_node_required = is_node_used_as_input(cdfg, i) || does_node_use_cf(cdfg, i) ||
+                                node->kind == CDFG_NODE_KIND_FINISH;
+        if (!is_node_required) {
             // if the node's value is not used anywhere, and it is not a finish node (which by
             // definition must be kept), remove it.
             node->kind = CDFG_NODE_KIND_INVALID;
