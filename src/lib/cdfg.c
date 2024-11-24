@@ -1470,6 +1470,47 @@ cleanup:
     return err;
 }
 
+static bool is_node_used(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
+    for (size_t i = 0; i < cdfg->edges_amount; i++) {
+        if (cdfg->edge_storage[i].to_node == node_id) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void remove_unused_nodes(cdfg_t* cdfg) {
+    for (size_t i = 0; i < cdfg->nodes_amount; i++) {
+        if (!is_node_used(cdfg, i)) {
+            cdfg->node_storage[i].kind = CDFG_NODE_KIND_INVALID;
+        }
+    }
+
+    // remove all edges that now point to invalid nodes
+    for (size_t i = 0; i < cdfg->edges_amount; i++) {
+        cdfg_edge_t* edge = &cdfg->edge_storage[i];
+        if (edge->to_node == CDFG_ITEM_ID_INVALID) {
+            // this edge is vacant.
+            continue;
+        }
+        const cdfg_node_t* to_node = &cdfg->node_storage[edge->to_node];
+        if (to_node->kind == CDFG_NODE_KIND_INVALID) {
+            edge->from_node = CDFG_ITEM_ID_INVALID;
+            edge->to_node = CDFG_ITEM_ID_INVALID;
+        }
+    }
+}
+
+err_t cdfg_optimize(cdfg_t* cdfg) {
+    err_t err = SUCCESS;
+
+    remove_unused_nodes(cdfg);
+
+    goto cleanup;
+cleanup:
+    return err;
+}
+
 err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t endianness) {
     err_t err = SUCCESS;
 
@@ -1554,6 +1595,9 @@ static void cdfg_dump_node_desc(const cdfg_node_t* node) {
         case CDFG_NODE_KIND_PHI:
             TRACE_NO_NEWLINE("phi");
             break;
+        case CDFG_NODE_KIND_INVALID:
+            TRACE_NO_NEWLINE("invalid");
+            break;
     }
 }
 
@@ -1567,6 +1611,10 @@ void cdfg_dump_dot(const cdfg_t* cdfg) {
     TRACE("digraph {");
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* edge = &cdfg->edge_storage[i];
+        if (edge->from_node == CDFG_ITEM_ID_INVALID || edge->to_node == CDFG_ITEM_ID_INVALID) {
+            // the edge is vacant.
+            continue;
+        }
         cdfg_dump_node(cdfg, edge->from_node);
         TRACE_NO_NEWLINE(" -> ");
         cdfg_dump_node(cdfg, edge->to_node);

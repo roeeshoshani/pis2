@@ -37,6 +37,7 @@ typedef u16 cdfg_item_id_t;
 
 /// the kind of a CDFG node.
 typedef enum {
+    CDFG_NODE_KIND_INVALID,
     CDFG_NODE_KIND_VAR,
     CDFG_NODE_KIND_IMM,
     CDFG_NODE_KIND_CALC,
@@ -172,6 +173,8 @@ typedef struct {
 } cdfg_builder_t;
 
 void cdfg_reset(cdfg_t* cdfg);
+
+err_t cdfg_optimize(cdfg_t* cdfg);
 
 err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t endianness);
 
