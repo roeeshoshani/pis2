@@ -2,7 +2,6 @@
 #include "cursor.h"
 #include "errors.h"
 #include "except.h"
-#include "lifter.h"
 #include "pis.h"
 
 #include <string.h>
@@ -485,7 +484,7 @@ static err_t explore_unseen_path(cfg_builder_t* builder, size_t path_start_offse
             .machine_code_addr = builder->machine_code_start_addr + cur_offset,
         };
 
-        CHECK_RETHROW(builder->lifter(&lift_args));
+        CHECK_RETHROW(builder->cfg.arch->lifter(&lift_args));
 
         size_t next_offset = cur_offset + lift_args.result.machine_insn_len;
 
@@ -548,17 +547,18 @@ cleanup:
 
 static void builder_init(
     cfg_builder_t* builder,
-    pis_lifter_t lifter,
+    const pis_arch_def_t* arch,
     const u8* machine_code,
     size_t machine_code_len,
     u64 machine_code_start_addr
 ) {
-    builder->lifter = lifter;
     builder->machine_code = machine_code;
     builder->machine_code_len = machine_code_len;
     builder->machine_code_start_addr = machine_code_start_addr;
 
     cfg_reset(&builder->cfg);
+    builder->cfg.arch = arch;
+
     builder->cur_block_id = CFG_ITEM_ID_INVALID;
     builder->unexplored_paths_amount = 0;
 }
@@ -683,14 +683,14 @@ cleanup:
 
 err_t cfg_build(
     cfg_builder_t* builder,
-    pis_lifter_t lifter,
+    const pis_arch_def_t* arch,
     const u8* machine_code,
     size_t machine_code_len,
     u64 machine_code_start_addr
 ) {
     err_t err = SUCCESS;
 
-    builder_init(builder, lifter, machine_code, machine_code_len, machine_code_start_addr);
+    builder_init(builder, arch, machine_code, machine_code_len, machine_code_start_addr);
 
     CHECK_RETHROW(enqueue_unexplored_path(builder, 0));
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "arch_def.h"
 #include "lifter.h"
 #include "pis.h"
 #include "types.h"
@@ -56,6 +57,8 @@ typedef struct {
 
     cfg_block_t block_storage[CFG_MAX_BLOCKS];
     size_t blocks_amount;
+
+    const pis_arch_def_t* arch;
 } cfg_t;
 
 /// a path in the code that is currently unexplored when building a CFG.
@@ -68,9 +71,6 @@ typedef struct {
 typedef struct {
     /// the id of the block currently being built.
     cfg_item_id_t cur_block_id;
-
-    /// the lifter to use when building the CFG.
-    pis_lifter_t lifter;
 
     /// the machine code to use when building the CFG.
     const u8* machine_code;
@@ -101,7 +101,7 @@ err_t cfg_block_is_direct_predecessor(
 
 err_t cfg_build(
     cfg_builder_t* builder,
-    pis_lifter_t lifter,
+    const pis_arch_def_t* arch,
     const u8* machine_code,
     size_t machine_code_len,
     u64 machine_code_start_addr
