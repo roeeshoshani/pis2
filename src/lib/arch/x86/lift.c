@@ -2206,11 +2206,6 @@ cleanup:
     return err;
 }
 
-static bool is_gpr(const pis_operand_t* operand) {
-    return operand->addr.space == PIS_SPACE_REG &&
-           operand->addr.offset < X86_R15.addr.offset + pis_size_to_bytes(X86_R15.size);
-}
-
 static err_t lifted_op_write(ctx_t* ctx, const lifted_op_t* op, const pis_operand_t* value) {
     err_t err = SUCCESS;
     switch (op->kind) {
