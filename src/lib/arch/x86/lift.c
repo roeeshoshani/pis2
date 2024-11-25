@@ -2082,10 +2082,13 @@ static err_t
 
             pis_operand_t reg_operand = decode_specific_reg(op_info->zext_specific_reg.reg, size);
 
+            pis_operand_t reg_value = {};
+            CHECK_RETHROW(read_gpr(ctx, &reg_operand, &reg_value));
+
             pis_operand_t extended_reg = {};
             CHECK_RETHROW(read_resize_zext(
                 ctx,
-                &reg_operand,
+                &reg_value,
                 op_size_to_pis_operand_size(extended_size),
                 &extended_reg
             ));
