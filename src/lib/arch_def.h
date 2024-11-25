@@ -1,3 +1,5 @@
+#pragma once
+
 #include "endianness.h"
 #include "lifter.h"
 
