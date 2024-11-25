@@ -153,12 +153,18 @@ pis_operand_t reg_largest_enclosing(const pis_operand_t* reg, pis_x86_cpumode_t 
     return PIS_OPERAND_REG(container_gpr_off, cpumode_size);
 }
 
-static err_t write_gpr_merge(ctx_t* ctx, const pis_operand_t* gpr, const pis_operand_t* value) {
+err_t write_gpr(ctx_t* ctx, const pis_operand_t* gpr, const pis_operand_t* value) {
     err_t err = SUCCESS;
 
     // find the cpumode size GPR that contains the given GPR.
     pis_operand_t container_gpr = reg_largest_enclosing(gpr, ctx->cpumode);
     pis_size_t container_size = container_gpr.size;
+
+    if (pis_operand_equals(gpr, &container_gpr)) {
+        // just overwrite the entire GPR
+        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, container_gpr, *value));
+        SUCCESS_CLEANUP();
+    }
 
     pis_operand_t zext_value = TMP_ALLOC(&ctx->tmp_allocator, container_size);
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, zext_value, *value));
@@ -166,20 +172,27 @@ static err_t write_gpr_merge(ctx_t* ctx, const pis_operand_t* gpr, const pis_ope
     // shift the value to put it at the right offset in the GPR
     size_t shift_bytes = gpr->addr.offset - container_gpr.addr.offset;
     size_t shift_bits = shift_bytes * 8;
-    pis_operand_t shift_bits_operand = PIS_OPERAND_CONST(shift_bits, container_size);
-    pis_operand_t shifted_value = TMP_ALLOC(&ctx->tmp_allocator, container_size);
-    PIS_EMIT(
-        &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, shifted_value, zext_value, shift_bits_operand)
-    );
+    pis_operand_t shifted_value;
+    if (shift_bytes == 0) {
+        // no shift needed, use the unshifted value
+        shifted_value = zext_value;
+    } else {
+        // shift needed, shift the value accordingly
+        pis_operand_t shift_bits_operand = PIS_OPERAND_CONST(shift_bits, container_size);
+        shifted_value = TMP_ALLOC(&ctx->tmp_allocator, container_size);
+        PIS_EMIT(
+            &ctx->args->result,
+            PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, shifted_value, zext_value, shift_bits_operand)
+        );
+    }
 
     // calculate the mask to be used on the container GPR to remove the relevant bits that will be
     // set by the shifted value.
     u64 value_bits_mask = pis_size_max_unsigned_value(gpr->size) << shift_bits;
     u64 mask = (~value_bits_mask) & pis_size_max_unsigned_value(container_size);
-    pis_operand_t mask_operand = PIS_OPERAND_CONST(mask, container_size);
 
     // mask the container GPR.
+    pis_operand_t mask_operand = PIS_OPERAND_CONST(mask, container_size);
     pis_operand_t masked_container_gpr = TMP_ALLOC(&ctx->tmp_allocator, container_size);
     PIS_EMIT(
         &ctx->args->result,
@@ -196,39 +209,51 @@ cleanup:
     return err;
 }
 
-err_t write_gpr(ctx_t* ctx, const pis_operand_t* gpr, const pis_operand_t* value) {
+err_t read_gpr(ctx_t* ctx, const pis_operand_t* out_value, const pis_operand_t* gpr) {
     err_t err = SUCCESS;
 
-    CHECK(gpr->size == value->size);
+    // find the cpumode size GPR that contains the given GPR.
+    pis_operand_t container_gpr = reg_largest_enclosing(gpr, ctx->cpumode);
+    pis_size_t container_size = container_gpr.size;
 
-    pis_size_t size = gpr->size;
-
-    switch (size) {
-        case PIS_SIZE_1:
-        case PIS_SIZE_2:
-            // writing to 1 or 2 byte gprs only affects the written bits, and needs to be merged
-            // into the larger operand somehow.
-            CHECK_RETHROW(write_gpr_merge(ctx, gpr, value));
-            break;
-        case PIS_SIZE_4:
-            switch (ctx->cpumode) {
-                case PIS_X86_CPUMODE_32_BIT:
-                    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *gpr, *value));
-                    break;
-                case PIS_X86_CPUMODE_64_BIT: {
-                    pis_operand_t gpr64 = PIS_OPERAND(gpr->addr, PIS_SIZE_8);
-                    // writes to 32 bit gprs zero out the upper half of the 64 bit gpr.
-                    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, gpr64, *value));
-                    break;
-                }
-            }
-            break;
-        case PIS_SIZE_8:
-            // 64-bit GPR writes are only allowed in 64-bit mode.
-            CHECK(ctx->cpumode == PIS_X86_CPUMODE_64_BIT);
-            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *gpr, *value));
-            break;
+    if (pis_operand_equals(gpr, &container_gpr)) {
+        // just read the entire GPR
+        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *out_value, container_gpr));
+        SUCCESS_CLEANUP();
     }
+
+    // shift the GPR's content to put the desired bits in the lsb.
+    size_t shift_bytes = gpr->addr.offset - container_gpr.addr.offset;
+    size_t shift_bits = shift_bytes * 8;
+    pis_operand_t shifted_value;
+    if (shift_bytes == 0) {
+        // no shift needed, use the unshifted GPR value
+        shifted_value = container_gpr;
+    } else {
+        // shift needed, shift the value accordingly
+        pis_operand_t shift_bits_operand = PIS_OPERAND_CONST(shift_bits, container_size);
+        shifted_value = TMP_ALLOC(&ctx->tmp_allocator, container_size);
+        PIS_EMIT(
+            &ctx->args->result,
+            PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, shifted_value, container_gpr, shift_bits_operand)
+        );
+    }
+
+    // calculate a mask for the bits which we want to take from the GPR
+    u64 mask = pis_size_max_unsigned_value(gpr->size);
+
+    // mask the shifted container GPR.
+    pis_operand_t mask_operand = PIS_OPERAND_CONST(mask, container_size);
+    pis_operand_t masked_value = TMP_ALLOC(&ctx->tmp_allocator, container_size);
+    PIS_EMIT(
+        &ctx->args->result,
+        PIS_INSN3(PIS_OPCODE_AND, masked_value, shifted_value, mask_operand)
+    );
+
+    // OR the shifted value into the masked GPR to get the final result
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, *out_value, masked_value));
+
+
 cleanup:
     return err;
 }
