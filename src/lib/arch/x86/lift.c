@@ -31,7 +31,7 @@ typedef struct {
 
 typedef enum {
     LIFTED_OP_KIND_VALUE,
-    LIFTED_OP_KIND_WRITABLE_VALUE,
+    LIFTED_OP_KIND_REG,
     LIFTED_OP_KIND_MEM,
     LIFTED_OP_KIND_IMPLICIT,
 } lifted_op_kind_t;
@@ -45,6 +45,7 @@ typedef struct {
     lifted_op_kind_t kind;
     union {
         pis_operand_t value;
+        pis_operand_t reg;
         lifted_op_mem_t mem;
         struct {
             pis_size_t size;
@@ -2027,8 +2028,8 @@ static err_t
             op_size_t size = calc_size(ctx, op_info->reg.size_info_index);
 
             *lifted_operand = (lifted_op_t) {
-                .kind = LIFTED_OP_KIND_WRITABLE_VALUE,
-                .value = reg_get_operand(
+                .kind = LIFTED_OP_KIND_REG,
+                .reg = reg_get_operand(
                     reg_encoding,
                     op_size_to_pis_operand_size(size),
                     &ctx->prefixes
@@ -2058,8 +2059,8 @@ static err_t
                 };
             } else {
                 *lifted_operand = (lifted_op_t) {
-                    .kind = LIFTED_OP_KIND_WRITABLE_VALUE,
-                    .value = rm_operand.addr_or_reg,
+                    .kind = LIFTED_OP_KIND_REG,
+                    .reg = rm_operand.addr_or_reg,
                 };
             }
             break;
@@ -2068,8 +2069,8 @@ static err_t
             op_size_t size = calc_size(ctx, op_info->specific_reg.size_info_index);
 
             *lifted_operand = (lifted_op_t) {
-                .kind = LIFTED_OP_KIND_WRITABLE_VALUE,
-                .value = decode_specific_reg(op_info->specific_reg.reg, size),
+                .kind = LIFTED_OP_KIND_REG,
+                .reg = decode_specific_reg(op_info->specific_reg.reg, size),
             };
             break;
         }
@@ -2170,8 +2171,9 @@ static pis_size_t lifted_op_size(const lifted_op_t* op) {
         case LIFTED_OP_KIND_MEM:
             return op->mem.size;
         case LIFTED_OP_KIND_VALUE:
-        case LIFTED_OP_KIND_WRITABLE_VALUE:
             return op->value.size;
+        case LIFTED_OP_KIND_REG:
+            return op->reg.size;
         default:
             // unreachable
             return PIS_SIZE_1;
@@ -2188,9 +2190,14 @@ static err_t lifted_op_read(ctx_t* ctx, const lifted_op_t* op, pis_operand_t* va
             break;
         }
         case LIFTED_OP_KIND_VALUE:
-        case LIFTED_OP_KIND_WRITABLE_VALUE:
             *value = op->value;
             break;
+        case LIFTED_OP_KIND_REG: {
+            pis_operand_t tmp = TMP_ALLOC(&ctx->tmp_allocator, op->reg.size);
+            CHECK_RETHROW(read_gpr(ctx, &tmp, &op->reg));
+            *value = tmp;
+            break;
+        }
         case LIFTED_OP_KIND_IMPLICIT:
             // can't read implicit operands
             UNREACHABLE();
@@ -2212,12 +2219,10 @@ static err_t lifted_op_write(ctx_t* ctx, const lifted_op_t* op, const pis_operan
             break;
         }
         case LIFTED_OP_KIND_VALUE:
-        case LIFTED_OP_KIND_WRITABLE_VALUE:
-            if (is_gpr(&op->value)) {
-                CHECK_RETHROW(write_gpr(ctx, &op->value, value));
-            } else {
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, op->value, *value));
-            }
+            PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, op->value, *value));
+            break;
+        case LIFTED_OP_KIND_REG:
+            CHECK_RETHROW(write_gpr(ctx, &op->reg, value));
             break;
         case LIFTED_OP_KIND_IMPLICIT:
             // can't write to implicit operands
@@ -2468,11 +2473,14 @@ static err_t handle_mnemonic_bt(ctx_t* ctx, const lifted_op_t* ops, size_t ops_a
         case LIFTED_OP_KIND_MEM:
             CHECK_RETHROW(do_bt_memory(ctx, &ops[0].mem.addr, &bit_offset));
             break;
-        case LIFTED_OP_KIND_VALUE:
-        case LIFTED_OP_KIND_WRITABLE_VALUE:
-            CHECK(ops[0].value.addr.space == PIS_SPACE_REG);
-            CHECK_RETHROW(do_bt_reg(ctx, &ops[0].value, &bit_offset));
+        case LIFTED_OP_KIND_REG: {
+            pis_operand_t tmp = TMP_ALLOC(&ctx->tmp_allocator, ops[0].reg.size);
+            CHECK_RETHROW(read_gpr(ctx, &tmp, &ops[0].reg));
+
+            CHECK_RETHROW(do_bt_reg(ctx, &tmp, &bit_offset));
+
             break;
+        }
         default:
             UNREACHABLE();
     }
