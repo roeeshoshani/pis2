@@ -2,7 +2,6 @@
 #include "../lib/cdfg.h"
 #include "../lib/cfg.h"
 #include "../lib/except.h"
-#include "../lib/pis.h"
 #include <stdarg.h>
 #include <stdio.h>
 
@@ -22,10 +21,10 @@ int main() {
     };
 
     cfg_builder_t cfg_builder = {};
-    CHECK_RETHROW(cfg_build(&cfg_builder, pis_lifter_x86_64, code, ARRAY_SIZE(code), 0));
+    CHECK_RETHROW(cfg_build(&cfg_builder, &pis_arch_def_x86_64, code, ARRAY_SIZE(code), 0));
 
     cdfg_builder_t cdfg_builder = {};
-    CHECK_RETHROW(cdfg_build(&cdfg_builder, &cfg_builder.cfg, PIS_ENDIANNESS_LITTLE));
+    CHECK_RETHROW(cdfg_build(&cdfg_builder, &cfg_builder.cfg));
 
     CHECK_RETHROW(cdfg_optimize(&cdfg_builder.cdfg));
 

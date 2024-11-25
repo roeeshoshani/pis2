@@ -168,15 +168,12 @@ typedef struct {
 
     /// the current operands state.
     cdfg_op_state_t op_state;
-
-    /// the endianness of the lifted code.
-    pis_endianness_t endianness;
 } cdfg_builder_t;
 
 void cdfg_reset(cdfg_t* cdfg);
 
 err_t cdfg_optimize(cdfg_t* cdfg);
 
-err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t endianness);
+err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg);
 
 void cdfg_dump_dot(const cdfg_t* cdfg);

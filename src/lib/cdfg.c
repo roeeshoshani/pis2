@@ -1,6 +1,5 @@
 #include "cdfg.h"
 #include "cfg.h"
-#include "endianness.h"
 #include "errors.h"
 #include "except.h"
 #include "operand_size.h"
@@ -1528,11 +1527,10 @@ cleanup:
     return err;
 }
 
-err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg, pis_endianness_t endianness) {
+err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg) {
     err_t err = SUCCESS;
 
     // initialize the builder
-    builder->endianness = endianness;
     builder->cfg = cfg;
     cdfg_reset(&builder->cdfg);
 
