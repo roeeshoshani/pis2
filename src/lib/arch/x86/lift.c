@@ -3335,13 +3335,13 @@ cleanup:
     return err;
 }
 
-const cdfg_arch_def_t cdfg_arch_def_x86_64 = {
+const pis_arch_def_t pis_arch_def_x86_64 = {
     .lifter = pis_lifter_x86_64,
     .endianness = PIS_ENDIANNESS_LITTLE,
     .return_value = &X86_RAX,
 };
 
-const cdfg_arch_def_t cdfg_arch_def_i686 = {
+const pis_arch_def_t pis_arch_def_i686 = {
     .lifter = pis_lifter_i686,
     .endianness = PIS_ENDIANNESS_LITTLE,
     .return_value = &X86_EAX,

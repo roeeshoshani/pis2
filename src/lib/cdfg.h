@@ -6,7 +6,7 @@
 #include "operand_size.h"
 #include "pis.h"
 #include "types.h"
-#include "cdfg_arch_def.h"
+#include "arch_def.h"
 
 #define CDFG_MAX_NODES 8192
 #define CDFG_MAX_EDGES 16384

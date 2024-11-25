@@ -1510,13 +1510,13 @@ cleanup:
     return err;
 }
 
-const cdfg_arch_def_t cdfg_arch_def_mipsbe32r1 = {
+const pis_arch_def_t pis_arch_def_mipsbe32r1 = {
     .lifter = pis_lifter_mipsbe32r1,
     .endianness = PIS_ENDIANNESS_BIG,
     .return_value = &MIPS_REG_V0,
 };
 
-const cdfg_arch_def_t cdfg_arch_def_mipsel32r1 = {
+const pis_arch_def_t pis_arch_def_mipsel32r1 = {
     .lifter = pis_lifter_mipsel32r1,
     .endianness = PIS_ENDIANNESS_LITTLE,
     .return_value = &MIPS_REG_V0,
