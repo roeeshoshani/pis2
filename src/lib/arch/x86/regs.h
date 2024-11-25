@@ -110,4 +110,4 @@ pis_operand_t reg_largest_enclosing(const pis_operand_t* reg, pis_x86_cpumode_t 
 
 err_t write_gpr(ctx_t* ctx, const pis_operand_t* gpr, const pis_operand_t* value);
 
-err_t read_gpr(ctx_t* ctx, const pis_operand_t* out_value, const pis_operand_t* gpr);
+err_t read_gpr(ctx_t* ctx, const pis_operand_t* gpr, pis_operand_t* out_value);

@@ -2193,8 +2193,8 @@ static err_t lifted_op_read(ctx_t* ctx, const lifted_op_t* op, pis_operand_t* va
             *value = op->value;
             break;
         case LIFTED_OP_KIND_REG: {
-            pis_operand_t tmp = TMP_ALLOC(&ctx->tmp_allocator, op->reg.size);
-            CHECK_RETHROW(read_gpr(ctx, &tmp, &op->reg));
+            pis_operand_t tmp = {};
+            CHECK_RETHROW(read_gpr(ctx, &op->reg, &tmp));
             *value = tmp;
             break;
         }
@@ -2474,8 +2474,8 @@ static err_t handle_mnemonic_bt(ctx_t* ctx, const lifted_op_t* ops, size_t ops_a
             CHECK_RETHROW(do_bt_memory(ctx, &ops[0].mem.addr, &bit_offset));
             break;
         case LIFTED_OP_KIND_REG: {
-            pis_operand_t tmp = TMP_ALLOC(&ctx->tmp_allocator, ops[0].reg.size);
-            CHECK_RETHROW(read_gpr(ctx, &tmp, &ops[0].reg));
+            pis_operand_t tmp = {};
+            CHECK_RETHROW(read_gpr(ctx, &ops[0].reg, &tmp));
 
             CHECK_RETHROW(do_bt_reg(ctx, &tmp, &bit_offset));
 

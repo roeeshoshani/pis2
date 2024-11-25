@@ -209,7 +209,7 @@ cleanup:
     return err;
 }
 
-err_t read_gpr(ctx_t* ctx, const pis_operand_t* out_value, const pis_operand_t* gpr) {
+err_t read_gpr(ctx_t* ctx, const pis_operand_t* gpr, pis_operand_t* out_value) {
     err_t err = SUCCESS;
 
     // find the cpumode size GPR that contains the given GPR.
@@ -218,7 +218,7 @@ err_t read_gpr(ctx_t* ctx, const pis_operand_t* out_value, const pis_operand_t* 
 
     if (pis_operand_equals(gpr, &container_gpr)) {
         // just read the entire GPR
-        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *out_value, container_gpr));
+        *out_value = container_gpr;
         SUCCESS_CLEANUP();
     }
 
@@ -239,20 +239,11 @@ err_t read_gpr(ctx_t* ctx, const pis_operand_t* out_value, const pis_operand_t* 
         );
     }
 
-    // calculate a mask for the bits which we want to take from the GPR
-    u64 mask = pis_size_max_unsigned_value(gpr->size);
+    // get the lower bits of the shifted gpr
+    pis_operand_t result = TMP_ALLOC(&ctx->tmp_allocator, gpr->size);
+    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, result, shifted_value));
 
-    // mask the shifted container GPR.
-    pis_operand_t mask_operand = PIS_OPERAND_CONST(mask, container_size);
-    pis_operand_t masked_value = TMP_ALLOC(&ctx->tmp_allocator, container_size);
-    PIS_EMIT(
-        &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_AND, masked_value, shifted_value, mask_operand)
-    );
-
-    // OR the shifted value into the masked GPR to get the final result
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, *out_value, masked_value));
-
+    *out_value = result;
 
 cleanup:
     return err;
