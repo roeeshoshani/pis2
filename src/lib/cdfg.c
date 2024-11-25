@@ -908,10 +908,17 @@ static err_t opcode_handler_ret(cdfg_builder_t* builder, const pis_insn_t* insn)
 
     UNUSED(insn);
 
+    cdfg_item_id_t retval_node_id = CDFG_ITEM_ID_INVALID;
+    CHECK_RETHROW(read_operand(builder, builder->cfg->arch->return_value, &retval_node_id));
+
     cdfg_item_id_t finish_node_id = CDFG_ITEM_ID_INVALID;
     CHECK_RETHROW(make_finish_node(&builder->cdfg, &finish_node_id));
 
     CHECK_RETHROW(link_cf_node(builder, finish_node_id));
+
+    CHECK_RETHROW(
+        make_edge(&builder->cdfg, CDFG_EDGE_KIND_DATA_FLOW, retval_node_id, finish_node_id, 0)
+    );
 
 cleanup:
     return err;
