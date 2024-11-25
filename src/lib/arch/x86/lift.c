@@ -1,3 +1,4 @@
+#include "lift.h"
 #include "../../errors.h"
 #include "../../except.h"
 #include "../../pis.h"
@@ -3333,3 +3334,15 @@ err_t pis_lifter_i686(pis_lift_args_t* args) {
 cleanup:
     return err;
 }
+
+const cdfg_arch_def_t cdfg_arch_def_x86_64 = {
+    .lifter = pis_lifter_x86_64,
+    .endianness = PIS_ENDIANNESS_LITTLE,
+    .return_value = &X86_RAX,
+};
+
+const cdfg_arch_def_t cdfg_arch_def_i686 = {
+    .lifter = pis_lifter_i686,
+    .endianness = PIS_ENDIANNESS_LITTLE,
+    .return_value = &X86_EAX,
+};
