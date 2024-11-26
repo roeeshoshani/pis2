@@ -2,8 +2,8 @@
 
 #include "endianness.h"
 #include "except.h"
-#include "size.h"
 #include "recursive_macros.h"
+#include "size.h"
 #include "str_enum.h"
 #include "types.h"
 
@@ -46,13 +46,11 @@
         .operands_amount = 4,                                                                      \
     })
 
-#define PIS_ADDR_INIT(SPACE, OFFSET)                                                               \
-    { .space = SPACE, .offset = OFFSET }
+#define PIS_ADDR_INIT(SPACE, OFFSET) {.space = SPACE, .offset = OFFSET}
 
 #define PIS_ADDR(SPACE, OFFSET) ((pis_addr_t) PIS_ADDR_INIT(SPACE, OFFSET))
 
-#define PIS_OPERAND_INIT(ADDR, SIZE)                                                               \
-    { .addr = ADDR, .size = SIZE }
+#define PIS_OPERAND_INIT(ADDR, SIZE) {.addr = ADDR, .size = SIZE}
 
 #define PIS_OPERAND(ADDR, SIZE) ((pis_operand_t) PIS_OPERAND_INIT(ADDR, SIZE))
 
@@ -165,27 +163,52 @@
     _(PIS_OPCODES_AMOUNT, )
 STR_ENUM(pis_opcode, PIS_OPCODE, PACKED);
 
-#define PIS_SPACE(_)                                                                               \
-    _(PIS_SPACE_CONST, )                                                                           \
-    _(PIS_SPACE_REG, )                                                                             \
-    _(PIS_SPACE_RAM, )                                                                             \
-    _(PIS_SPACE_TMP, )
-STR_ENUM(pis_space, PIS_SPACE, PACKED);
+#define PIS_VAR_SPACE(_)                                                                           \
+    _(PIS_VAR_SPACE_REG, )                                                                         \
+    _(PIS_VAR_SPACE_TMP, )
+STR_ENUM(pis_var_space, PIS_VAR_SPACE, PACKED);
 
-typedef struct {
-    pis_space_t space;
-    u64 offset;
-} PACKED pis_addr_t;
+#define PIS_OP_KIND(_)                                                                             \
+    _(PIS_OP_KIND_IMM, )                                                                           \
+    _(PIS_OP_KIND_VAR, )                                                                           \
+    _(PIS_OP_KIND_RAM, )
+STR_ENUM(pis_op_kind, PIS_OP_KIND, PACKED);
 
-typedef struct {
-    pis_addr_t addr;
+/// a type used to represent the offset of a variable in an operand space.
+typedef u16 pis_var_off_t;
+
+/// a variable operand. this is used to represent registers and tmps.
+typedef union {
+    pis_var_space_t space;
+    pis_var_off_t offset;
     pis_size_t size;
-} PACKED pis_operand_t;
+} pis_var_t;
+
+/// an immediate operand.
+typedef union {
+    u64 value;
+} pis_imm_op_t;
+
+/// a ram operand.
+typedef union {
+    u64 addr;
+} pis_ram_op_t;
+
+typedef union {
+    pis_var_t var;
+    pis_ram_op_t ram;
+    pis_imm_op_t imm;
+} pis_op_value_t;
+
+typedef struct {
+    pis_op_kind_t kind;
+    pis_op_value_t v;
+} PACKED pis_op_t;
 
 typedef struct {
     u8 operands_amount;
     pis_opcode_t opcode;
-    pis_operand_t operands[PIS_INSN_MAX_OPERANDS_AMOUNT];
+    pis_op_t operands[PIS_INSN_MAX_OPERANDS_AMOUNT];
 } PACKED pis_insn_t;
 
 typedef struct {
@@ -194,11 +217,11 @@ typedef struct {
     u8 machine_insn_len;
 } pis_lift_res_t;
 
-void pis_addr_dump(const pis_addr_t* addr);
-bool pis_addr_equals(const pis_addr_t* a, const pis_addr_t* b);
+void pis_var_dump(pis_var_t var);
+bool pis_var_equals(pis_var_t a, pis_var_t b);
 
-void pis_operand_dump(const pis_operand_t* operand);
-bool pis_operand_equals(const pis_operand_t* a, const pis_operand_t* b);
+void pis_op_dump(const pis_op_t* operand);
+bool pis_op_equals(const pis_op_t* a, const pis_op_t* b);
 
 void pis_insn_dump(const pis_insn_t* insn);
 bool pis_insn_equals(const pis_insn_t* a, const pis_insn_t* b);
@@ -215,16 +238,8 @@ u64 pis_const_negate(u64 const_value, pis_size_t operand_size);
 
 u64 pis_sign_extend_byte(i8 byte, pis_size_t desired_size);
 
-err_t pis_addr_add(const pis_addr_t* addr, u64 amount, pis_addr_t* new_addr);
-
-bool pis_space_is_writable(pis_space_t space);
-
-bool pis_addr_is_writable(const pis_addr_t* addr);
-
-bool pis_operand_is_writable(const pis_operand_t* operand);
-
 bool pis_opcode_is_jmp(pis_opcode_t opcode);
 
-bool pis_operand_contains(const pis_operand_t* operand, const pis_operand_t* sub_operand);
+bool pis_var_contains(pis_var_t var, pis_var_t sub_var);
 
-bool pis_operands_intersect(const pis_operand_t* operand_a, const pis_operand_t* operand_b);
+bool pis_vars_intersect(pis_var_t var_a, pis_var_t var_b);

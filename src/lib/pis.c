@@ -6,30 +6,57 @@
 #include <limits.h>
 
 STR_ENUM_IMPL(pis_opcode, PIS_OPCODE);
-STR_ENUM_IMPL(pis_space, PIS_SPACE);
+STR_ENUM_IMPL(pis_var_space, PIS_VAR_SPACE);
+STR_ENUM_IMPL(pis_op_kind, PIS_OP_KIND);
 
-void pis_addr_dump(const pis_addr_t* addr) {
-    TRACE_NO_NEWLINE("%s[0x%lx]", pis_space_to_str(addr->space), (unsigned long) addr->offset);
+void pis_var_dump(pis_var_t var) {
+    TRACE_NO_NEWLINE(
+        "%s[0x%x]:%u",
+        pis_var_space_to_str(var.space),
+        var.offset,
+        pis_size_to_bytes(var.size)
+    );
 }
 
-bool pis_addr_equals(const pis_addr_t* a, const pis_addr_t* b) {
-    return a->space == b->space && a->offset == b->offset;
+bool pis_var_equals(pis_var_t a, pis_var_t b) {
+    return a.space == b.space && a.offset == b.offset && a.size == b.size;
 }
 
-void pis_operand_dump(const pis_operand_t* operand) {
-    pis_addr_dump(&operand->addr);
-    TRACE_NO_NEWLINE(":0x%x", (unsigned) pis_size_to_bytes(operand->size));
+void pis_op_dump(const pis_op_t* operand) {
+    switch (operand->kind) {
+        case PIS_OP_KIND_IMM:
+            TRACE_NO_NEWLINE("0x%lx", operand->v.imm.value);
+            break;
+        case PIS_OP_KIND_VAR:
+            pis_var_dump(operand->v.var);
+            break;
+        case PIS_OP_KIND_RAM:
+            TRACE_NO_NEWLINE("RAM[0x%lx]", operand->v.ram.addr);
+            break;
+    }
 }
 
-bool pis_operand_equals(const pis_operand_t* a, const pis_operand_t* b) {
-    return a->size == b->size && pis_addr_equals(&a->addr, &b->addr);
+bool pis_operand_equals(const pis_op_t* a, const pis_op_t* b) {
+    if (a->kind != b->kind) {
+        return false;
+    }
+    switch (a->kind) {
+        case PIS_OP_KIND_IMM:
+            return a->v.imm.value == b->v.imm.value;
+        case PIS_OP_KIND_VAR:
+            return pis_var_equals(a->v.var, b->v.var);
+        case PIS_OP_KIND_RAM:
+            return a->v.ram.addr == b->v.ram.addr;
+        default:
+            return false;
+    }
 }
 
 void pis_insn_dump(const pis_insn_t* insn) {
     TRACE_NO_NEWLINE("%s (", pis_opcode_to_str(insn->opcode));
     size_t operands_amount = MIN(insn->operands_amount, PIS_INSN_MAX_OPERANDS_AMOUNT);
     for (size_t i = 0; i < operands_amount; i++) {
-        pis_operand_dump(&insn->operands[i]);
+        pis_op_dump(&insn->operands[i]);
         if (i + 1 < operands_amount) {
             // not the last operand, add a comma
             TRACE_NO_NEWLINE(", ");
@@ -115,31 +142,6 @@ u64 pis_sign_extend_byte(i8 byte, pis_size_t desired_size) {
     }
 }
 
-err_t pis_addr_add(const pis_addr_t* addr, u64 amount, pis_addr_t* new_addr) {
-    err_t err = SUCCESS;
-    CHECK_CODE(addr->offset <= UINT64_MAX - amount, PIS_ERR_ADDR_OVERFLOW);
-
-    pis_addr_t sum = *addr;
-    sum.offset += amount;
-
-    *new_addr = sum;
-
-cleanup:
-    return err;
-}
-
-bool pis_space_is_writable(pis_space_t space) {
-    return space == PIS_SPACE_REG || space == PIS_SPACE_TMP;
-}
-
-bool pis_addr_is_writable(const pis_addr_t* addr) {
-    return pis_space_is_writable(addr->space);
-}
-
-bool pis_operand_is_writable(const pis_operand_t* operand) {
-    return pis_addr_is_writable(&operand->addr);
-}
-
 bool pis_opcode_is_jmp(pis_opcode_t opcode) {
     switch (opcode) {
         case PIS_OPCODE_JMP:
@@ -153,35 +155,31 @@ bool pis_opcode_is_jmp(pis_opcode_t opcode) {
     }
 }
 
-/// checks if the given operand fully contains the given sub-operand.
-bool pis_operand_contains(const pis_operand_t* operand, const pis_operand_t* sub_operand) {
-    if (operand->addr.space != sub_operand->addr.space) {
-        // the operands are not even in the same space.
+/// checks if the given var fully contains the given sub-var.
+bool pis_var_contains(pis_var_t var, pis_var_t sub_var) {
+    if (var.space != sub_var.space) {
         return false;
     }
+    pis_var_off_t var_start = var.offset;
+    pis_var_off_t var_end = var_start + pis_size_to_bytes(var.size);
 
-    u64 operand_start = operand->addr.offset;
-    u64 operand_end = operand_start + pis_size_to_bytes(operand->size);
+    pis_var_off_t sub_var_start = sub_var.offset;
+    pis_var_off_t sub_var_end = sub_var_start + pis_size_to_bytes(sub_var.size);
 
-    u64 sub_operand_start = sub_operand->addr.offset;
-    u64 sub_operand_end = sub_operand_start + pis_size_to_bytes(sub_operand->size);
-
-    return sub_operand_start >= operand_start && sub_operand_end <= operand_end;
+    return sub_var_start >= var_start && sub_var_end <= var_end;
 }
 
 /// checks if the given 2 operands intersect. that is, there is at least one byte of operand space
 /// which is included in both operands.
-bool pis_operands_intersect(const pis_operand_t* operand_a, const pis_operand_t* operand_b) {
-    if (operand_a->addr.space != operand_b->addr.space) {
-        // the operands are not even in the same space.
+bool pis_vars_intersect(pis_var_t var_a, pis_var_t var_b) {
+    if (var_a.space != var_b.space) {
         return false;
     }
+    pis_var_off_t var_a_start = var_a.offset;
+    pis_var_off_t var_a_end = var_a_start + pis_size_to_bytes(var_a.size);
 
-    u64 operand_a_start = operand_a->addr.offset;
-    u64 operand_a_end = operand_a_start + pis_size_to_bytes(operand_a->size);
+    pis_var_off_t var_b_start = var_b.offset;
+    pis_var_off_t var_b_end = var_b_start + pis_size_to_bytes(var_b.size);
 
-    u64 operand_b_start = operand_b->addr.offset;
-    u64 operand_b_end = operand_b_start + pis_size_to_bytes(operand_b->size);
-
-    return operand_a_start < operand_b_end && operand_b_start < operand_a_end;
+    return var_a_start < var_b_end && var_b_start < var_a_end;
 }

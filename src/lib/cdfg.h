@@ -55,7 +55,7 @@ typedef enum {
 /// initialization of it. used for example to represent arguments to functions.
 typedef struct {
     /// the offset in the register space of the register access that this variable represents.
-    u64 reg_offset;
+    pis_var_off_t reg_offset;
 
     /// the size of the register access that this variable represents.
     pis_size_t reg_size;
@@ -130,8 +130,8 @@ typedef struct {
 
 /// a single slot in the operands state. represents the value of a single operand.
 typedef struct {
-    /// the operand whose value is represented in this slot.
-    pis_operand_t operand;
+    /// the variable whose value is represented in this slot.
+    pis_var_t var;
 
     /// the node which represents the current value of the operand.
     cdfg_item_id_t value_node_id;
