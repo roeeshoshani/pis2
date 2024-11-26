@@ -2,7 +2,7 @@
 
 #include "endianness.h"
 #include "except.h"
-#include "operand_size.h"
+#include "size.h"
 #include "recursive_macros.h"
 #include "str_enum.h"
 #include "types.h"

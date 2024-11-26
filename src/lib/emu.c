@@ -2,8 +2,8 @@
 #include "emu/mem_storage.h"
 #include "errors.h"
 #include "except.h"
-#include "operand_size.h"
 #include "pis.h"
+#include "size.h"
 #include "utils.h"
 #include <endian.h>
 #include <limits.h>

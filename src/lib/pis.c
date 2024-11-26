@@ -1,7 +1,7 @@
 #include "pis.h"
 #include "errors.h"
 #include "except.h"
-#include "operand_size.h"
+#include "size.h"
 #include "trace.h"
 #include <limits.h>
 

@@ -3,7 +3,7 @@
 #include "cfg.h"
 #include "endianness.h"
 #include "except.h"
-#include "operand_size.h"
+#include "size.h"
 #include "pis.h"
 #include "types.h"
 #include "arch_def.h"

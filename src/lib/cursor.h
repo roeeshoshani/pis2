@@ -2,7 +2,7 @@
 
 #include "endianness.h"
 #include "except.h"
-#include "operand_size.h"
+#include "size.h"
 #include "types.h"
 
 #define CURSOR_INIT(PTR, LEN)                                                                      \

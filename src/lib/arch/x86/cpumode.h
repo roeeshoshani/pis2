@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../operand_size.h"
+#include "../../size.h"
 
 typedef enum {
     PIS_X86_CPUMODE_32_BIT,

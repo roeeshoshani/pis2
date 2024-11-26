@@ -2,8 +2,8 @@
 #include "cfg.h"
 #include "errors.h"
 #include "except.h"
-#include "operand_size.h"
 #include "pis.h"
+#include "size.h"
 #include "trace.h"
 #include "utils.h"
 #include <stddef.h>

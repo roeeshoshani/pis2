@@ -1,4 +1,4 @@
-#include "operand_size.h"
+#include "size.h"
 
 u32 pis_size_to_bytes(pis_size_t operand_size) {
     return (u32) operand_size;
