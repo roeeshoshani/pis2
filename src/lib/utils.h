@@ -16,3 +16,5 @@
 
 #define USED __attribute__((used))
 #define UNUSED_ATTR __attribute__((unused))
+
+#define PACKED __attribute__((packed))

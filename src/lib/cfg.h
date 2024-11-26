@@ -34,7 +34,7 @@ typedef struct {
 
     /// the length in bytes of the machine instruction that this unit represents.
     u8 machine_insn_len;
-} __attribute__((packed)) cfg_unit_t;
+} PACKED cfg_unit_t;
 
 /// represents a single CFG "block". a block is a collection of units which ends with some control
 /// flow operation, and can be pointed to by other blocks.

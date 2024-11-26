@@ -163,30 +163,30 @@
     _(PIS_OPCODE_UNSIGNED_REM, )                                                                   \
     _(PIS_OPCODE_UNSIGNED_DIV, )                                                                   \
     _(PIS_OPCODES_AMOUNT, )
-STR_ENUM(pis_opcode, PIS_OPCODE, __attribute__((packed)));
+STR_ENUM(pis_opcode, PIS_OPCODE, PACKED);
 
 #define PIS_SPACE(_)                                                                               \
     _(PIS_SPACE_CONST, )                                                                           \
     _(PIS_SPACE_REG, )                                                                             \
     _(PIS_SPACE_RAM, )                                                                             \
     _(PIS_SPACE_TMP, )
-STR_ENUM(pis_space, PIS_SPACE, __attribute__((packed)));
+STR_ENUM(pis_space, PIS_SPACE, PACKED);
 
 typedef struct {
     pis_space_t space;
     u64 offset;
-} __attribute__((packed)) pis_addr_t;
+} PACKED pis_addr_t;
 
 typedef struct {
     pis_addr_t addr;
     pis_size_t size;
-} __attribute__((packed)) pis_operand_t;
+} PACKED pis_operand_t;
 
 typedef struct {
     u8 operands_amount;
     pis_opcode_t opcode;
     pis_operand_t operands[PIS_INSN_MAX_OPERANDS_AMOUNT];
-} __attribute__((packed)) pis_insn_t;
+} PACKED pis_insn_t;
 
 typedef struct {
     pis_insn_t insns[PIS_LIFT_MAX_INSNS_AMOUNT];

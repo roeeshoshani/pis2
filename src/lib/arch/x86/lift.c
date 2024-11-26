@@ -2825,12 +2825,12 @@ cleanup:
     return err;
 }
 
-typedef struct __attribute__((packed)) {
+typedef struct {
     mnemonic_handler_t handler;
     u8 allow_lock_prefix : 1;
     u8 allow_repz_or_rep_prefix : 1;
     u8 allow_repnz_or_bnd_prefix : 1;
-} mnemonic_info_t;
+} PACKED mnemonic_info_t;
 
 static const mnemonic_info_t mnemonics_table[MNEMONIC_MAX + 1] = {
     [MNEMONIC_SHR] =

@@ -32,7 +32,7 @@
     _(CDFG_CALCULATION_NEG, )                                                                      \
     _(CDFG_CALCULATION_COND_NEGATE, )                                                              \
     _(CDFG_CALCULATION_EQUALS, )
-STR_ENUM(cdfg_calculation, CDFG_CALCULATION, __attribute__((packed)));
+STR_ENUM(cdfg_calculation, CDFG_CALCULATION, PACKED);
 
 typedef u16 cdfg_item_id_t;
 
@@ -49,7 +49,7 @@ typedef enum {
     CDFG_NODE_KIND_IF,
     CDFG_NODE_KIND_REGION,
     CDFG_NODE_KIND_PHI,
-} __attribute__((packed)) cdfg_node_kind_t;
+} PACKED cdfg_node_kind_t;
 
 /// a CDFG variable node. this is used to represent an access to a register without previous
 /// initialization of it. used for example to represent arguments to functions.
@@ -59,30 +59,30 @@ typedef struct {
 
     /// the size of the register access that this variable represents.
     pis_size_t reg_size;
-} __attribute__((packed)) cdfg_var_node_t;
+} PACKED cdfg_var_node_t;
 
 /// a CDFG immediate value.
 typedef struct {
     u64 value;
-} __attribute__((packed)) cdfg_imm_node_t;
+} PACKED cdfg_imm_node_t;
 
 /// a CDFG calculation node.
 typedef struct {
     /// the calculation that is performed by this node.
     cdfg_calculation_t calculation;
-} __attribute__((packed)) cdfg_calc_node_t;
+} PACKED cdfg_calc_node_t;
 
 /// a CDFG region node.
 typedef struct {
     /// the amount of control flow paths that are combined by this region node.
     size_t inputs_amount;
-} __attribute__((packed)) cdfg_region_node_t;
+} PACKED cdfg_region_node_t;
 
 /// a CDFG phi node.
 typedef struct {
     /// the amount of different values that are combined by this phi node.
     size_t inputs_amount;
-} __attribute__((packed)) cdfg_phi_node_t;
+} PACKED cdfg_phi_node_t;
 
 /// the content of a CDFG node.
 typedef union {
@@ -91,18 +91,18 @@ typedef union {
     cdfg_calc_node_t calc;
     cdfg_region_node_t region;
     cdfg_phi_node_t phi;
-} __attribute__((packed)) cdfg_node_content_t;
+} PACKED cdfg_node_content_t;
 
 /// represents a single node in the CDFG
 typedef struct {
     cdfg_node_kind_t kind;
     cdfg_node_content_t content;
-} __attribute__((packed)) cdfg_node_t;
+} PACKED cdfg_node_t;
 
 typedef enum {
     CDFG_EDGE_KIND_DATA_FLOW,
     CDFG_EDGE_KIND_CONTROL_FLOW,
-} __attribute__((packed)) cdfg_edge_kind_t;
+} PACKED cdfg_edge_kind_t;
 
 /// represents a single edge in the CDFG
 typedef struct {
@@ -117,7 +117,7 @@ typedef struct {
 
     /// the destination node.
     cdfg_item_id_t to_node;
-} __attribute__((packed)) cdfg_edge_t;
+} PACKED cdfg_edge_t;
 
 /// a control data flow graph.
 typedef struct {
@@ -135,7 +135,7 @@ typedef struct {
 
     /// the node which represents the current value of the operand.
     cdfg_item_id_t value_node_id;
-} __attribute__((packed)) cdfg_op_state_slot_t;
+} PACKED cdfg_op_state_slot_t;
 
 /// the state of all operands at a single point in time.
 typedef struct {
