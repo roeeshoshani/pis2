@@ -497,7 +497,7 @@ static err_t
     cdfg_op_state_slot_id_t existing_slot_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(op_state_find_slot(&builder->op_state, var, &existing_slot_id));
 
-    if (existing_slot_id.id == CDFG_ITEM_ID_INVALID) {
+    if (existing_slot_id.id != CDFG_ITEM_ID_INVALID) {
         // found existing slot. overwrite its value with the new value.
         builder->op_state.slots[existing_slot_id.id].value_node_id = value_node_id;
     } else {
