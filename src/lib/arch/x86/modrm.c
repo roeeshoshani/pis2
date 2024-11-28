@@ -23,7 +23,7 @@ sib_t sib_decode_byte(u8 sib_byte) {
     };
 }
 
-static err_t build_sib_addr_into(ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into) {
+static err_t build_sib_addr_into(ctx_t* ctx, const modrm_t* modrm, const pis_op_t* into) {
     err_t err = SUCCESS;
 
     u8 sib_byte = 0;
@@ -41,7 +41,7 @@ static err_t build_sib_addr_into(ctx_t* ctx, const modrm_t* modrm, const pis_ope
             PIS_INSN2(PIS_OPCODE_MOVE, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
         );
     } else {
-        pis_operand_t base_reg_operand = reg_get_operand(
+        pis_op_t base_reg_operand = reg_get_operand(
             apply_rex_bit_to_reg_encoding(sib.base, ctx->prefixes.rex.b),
             ctx->addr_size,
             &ctx->prefixes
@@ -55,9 +55,9 @@ static err_t build_sib_addr_into(ctx_t* ctx, const modrm_t* modrm, const pis_ope
         // no index
     } else {
         // build the scaled index into a tmp
-        pis_operand_t sib_tmp = TMP_ALLOC(&ctx->tmp_allocator, ctx->addr_size);
+        pis_op_t sib_tmp = TMP_ALLOC(&ctx->tmp_allocator, ctx->addr_size);
 
-        pis_operand_t index_reg_operand = reg_get_operand(index, ctx->addr_size, &ctx->prefixes);
+        pis_op_t index_reg_operand = reg_get_operand(index, ctx->addr_size, &ctx->prefixes);
         PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, sib_tmp, index_reg_operand));
         PIS_EMIT(
             &ctx->args->result,
@@ -77,7 +77,7 @@ cleanup:
 }
 
 static err_t
-    build_modrm_rm_addr_16_into(const ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into) {
+    build_modrm_rm_addr_16_into(const ctx_t* ctx, const modrm_t* modrm, const pis_op_t* into) {
     err_t err = SUCCESS;
 
     if (modrm->mod == 0b00 && modrm->rm == 0b110) {
@@ -92,32 +92,68 @@ static err_t
         // handle the base regs
         switch (modrm->rm) {
             case 0b000:
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, X86_BX));
-                PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, X86_SI));
+                PIS_EMIT(
+                    &ctx->args->result,
+                    PIS_INSN2(PIS_OPCODE_MOVE, *into, pis_reg_to_op(X86_BX))
+                );
+                PIS_EMIT(
+                    &ctx->args->result,
+                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, pis_reg_to_op(X86_SI))
+                );
                 break;
             case 0b001:
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, X86_BX));
-                PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, X86_DI));
+                PIS_EMIT(
+                    &ctx->args->result,
+                    PIS_INSN2(PIS_OPCODE_MOVE, *into, pis_reg_to_op(X86_BX))
+                );
+                PIS_EMIT(
+                    &ctx->args->result,
+                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, pis_reg_to_op(X86_DI))
+                );
                 break;
             case 0b010:
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, X86_BP));
-                PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, X86_SI));
+                PIS_EMIT(
+                    &ctx->args->result,
+                    PIS_INSN2(PIS_OPCODE_MOVE, *into, pis_reg_to_op(X86_BP))
+                );
+                PIS_EMIT(
+                    &ctx->args->result,
+                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, pis_reg_to_op(X86_SI))
+                );
                 break;
             case 0b011:
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, X86_BP));
-                PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, X86_DI));
+                PIS_EMIT(
+                    &ctx->args->result,
+                    PIS_INSN2(PIS_OPCODE_MOVE, *into, pis_reg_to_op(X86_BP))
+                );
+                PIS_EMIT(
+                    &ctx->args->result,
+                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, pis_reg_to_op(X86_DI))
+                );
                 break;
             case 0b100:
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, X86_SI));
+                PIS_EMIT(
+                    &ctx->args->result,
+                    PIS_INSN2(PIS_OPCODE_MOVE, *into, pis_reg_to_op(X86_SI))
+                );
                 break;
             case 0b101:
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, X86_DI));
+                PIS_EMIT(
+                    &ctx->args->result,
+                    PIS_INSN2(PIS_OPCODE_MOVE, *into, pis_reg_to_op(X86_DI))
+                );
                 break;
             case 0b110:
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, X86_BP));
+                PIS_EMIT(
+                    &ctx->args->result,
+                    PIS_INSN2(PIS_OPCODE_MOVE, *into, pis_reg_to_op(X86_BP))
+                );
                 break;
             case 0b111:
-                PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, X86_BX));
+                PIS_EMIT(
+                    &ctx->args->result,
+                    PIS_INSN2(PIS_OPCODE_MOVE, *into, pis_reg_to_op(X86_BX))
+                );
                 break;
         }
 
@@ -162,8 +198,7 @@ cleanup:
     return err;
 }
 
-static err_t
-    build_modrm_rm_addr_32_into(ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into) {
+static err_t build_modrm_rm_addr_32_into(ctx_t* ctx, const modrm_t* modrm, const pis_op_t* into) {
     err_t err = SUCCESS;
 
     if (modrm->rm == 0b101 && modrm->mod == 0b00) {
@@ -179,8 +214,7 @@ static err_t
             CHECK_RETHROW(build_sib_addr_into(ctx, modrm, into));
         } else {
             // base register encoded in rm
-            pis_operand_t base_reg_operand =
-                reg_get_operand(modrm->rm, ctx->addr_size, &ctx->prefixes);
+            pis_op_t base_reg_operand = reg_get_operand(modrm->rm, ctx->addr_size, &ctx->prefixes);
             PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *into, base_reg_operand));
         }
 
@@ -226,8 +260,7 @@ cleanup:
     return err;
 }
 
-static err_t
-    build_modrm_rm_addr_64_into(ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into) {
+static err_t build_modrm_rm_addr_64_into(ctx_t* ctx, const modrm_t* modrm, const pis_op_t* into) {
     err_t err = SUCCESS;
 
     if (modrm->rm == 0b101 && modrm->mod == 0b00) {
@@ -255,7 +288,7 @@ static err_t
             CHECK_RETHROW(build_sib_addr_into(ctx, modrm, into));
         } else {
             // base register encoded in rm
-            pis_operand_t base_reg_operand = reg_get_operand(
+            pis_op_t base_reg_operand = reg_get_operand(
                 apply_rex_bit_to_reg_encoding(modrm->rm, ctx->prefixes.rex.b),
                 ctx->addr_size,
                 &ctx->prefixes
@@ -311,7 +344,7 @@ cleanup:
     return err;
 }
 
-static err_t build_modrm_rm_addr_into(ctx_t* ctx, const modrm_t* modrm, const pis_operand_t* into) {
+static err_t build_modrm_rm_addr_into(ctx_t* ctx, const modrm_t* modrm, const pis_op_t* into) {
     err_t err = SUCCESS;
 
     // make sure that the addressing mode of the r/m field is not a register, but a memory address.
@@ -332,7 +365,7 @@ static err_t build_modrm_rm_addr_into(ctx_t* ctx, const modrm_t* modrm, const pi
     }
 
     // account for segment override prefixes
-    pis_operand_t segment_base = {};
+    pis_op_t segment_base = {};
     if (insn_has_segment_override(ctx, &segment_base)) {
         PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, *into, *into, segment_base));
     }
@@ -348,7 +381,7 @@ err_t modrm_decode_rm_operand(
 
     if (modrm->mod == 0b11) {
         // in this case, the r/m field is a register and not a memory operand
-        pis_operand_t rm_reg_operand = reg_get_operand(
+        pis_op_t rm_reg_operand = reg_get_operand(
             apply_rex_bit_to_reg_encoding(modrm->rm, ctx->prefixes.rex.b),
             operand_size,
             &ctx->prefixes
@@ -360,7 +393,7 @@ err_t modrm_decode_rm_operand(
         };
     } else {
         // in this case, the r/m field is a memory operand
-        pis_operand_t rm_addr_tmp = TMP_ALLOC(&ctx->tmp_allocator, ctx->addr_size);
+        pis_op_t rm_addr_tmp = TMP_ALLOC(&ctx->tmp_allocator, ctx->addr_size);
         CHECK_RETHROW(build_modrm_rm_addr_into(ctx, modrm, &rm_addr_tmp));
 
         *rm_operand = (modrm_rm_operand_t) {

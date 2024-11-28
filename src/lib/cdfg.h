@@ -1,12 +1,13 @@
 #pragma once
 
+#include "arch_def.h"
 #include "cfg.h"
 #include "endianness.h"
 #include "except.h"
-#include "size.h"
 #include "pis.h"
+#include "size.h"
+#include "space.h"
 #include "types.h"
-#include "arch_def.h"
 
 #define CDFG_MAX_NODES 8192
 #define CDFG_MAX_EDGES 16384
@@ -32,33 +33,50 @@
     _(CDFG_CALCULATION_NEG, )                                                                      \
     _(CDFG_CALCULATION_COND_NEGATE, )                                                              \
     _(CDFG_CALCULATION_EQUALS, )
+
+/// the kind of calculation performed by a calculation node
 STR_ENUM(cdfg_calculation, CDFG_CALCULATION, PACKED);
 
-typedef u16 cdfg_item_id_t;
+#define CDFG_NODE_KIND(_)                                                                          \
+    _(CDFG_NODE_KIND_INVALID, )                                                                    \
+    _(CDFG_NODE_KIND_VAR, )                                                                        \
+    _(CDFG_NODE_KIND_IMM, )                                                                        \
+    _(CDFG_NODE_KIND_CALC, )                                                                       \
+    _(CDFG_NODE_KIND_STORE, )                                                                      \
+    _(CDFG_NODE_KIND_LOAD, )                                                                       \
+    _(CDFG_NODE_KIND_ENTRY, )                                                                      \
+    _(CDFG_NODE_KIND_FINISH, )                                                                     \
+    _(CDFG_NODE_KIND_IF, )                                                                         \
+    _(CDFG_NODE_KIND_REGION, )                                                                     \
+    _(CDFG_NODE_KIND_PHI, )
 
 /// the kind of a CDFG node.
-typedef enum {
-    CDFG_NODE_KIND_INVALID,
-    CDFG_NODE_KIND_VAR,
-    CDFG_NODE_KIND_IMM,
-    CDFG_NODE_KIND_CALC,
-    CDFG_NODE_KIND_STORE,
-    CDFG_NODE_KIND_LOAD,
-    CDFG_NODE_KIND_ENTRY,
-    CDFG_NODE_KIND_FINISH,
-    CDFG_NODE_KIND_IF,
-    CDFG_NODE_KIND_REGION,
-    CDFG_NODE_KIND_PHI,
-} PACKED cdfg_node_kind_t;
+STR_ENUM(cdfg_node_kind, CDFG_NODE_KIND, PACKED);
+
+/// a type used to represent IDs of items in the CDFG. the IDs are indexes into storage arrays. we are very limited by memory usage,
+/// so our arrays will be very small, and 16-bit indexes should be more than enough for all of them.
+typedef u16 cdfg_item_id_t;
+
+/// the id of a CDFG node
+typedef struct {
+    cdfg_item_id_t id;
+} cdfg_node_id_t;
+
+/// the id of a CDFG edge
+typedef struct {
+    cdfg_item_id_t id;
+} cdfg_edge_id_t;
+
+/// the id of a slot in a CDFG operand state table.
+typedef struct {
+    cdfg_item_id_t id;
+} cdfg_op_state_slot_id_t;
 
 /// a CDFG variable node. this is used to represent an access to a register without previous
 /// initialization of it. used for example to represent arguments to functions.
 typedef struct {
-    /// the offset in the register space of the register access that this variable represents.
-    pis_var_off_t reg_offset;
-
-    /// the size of the register access that this variable represents.
-    pis_size_t reg_size;
+    /// the region in the register space of the register access that this variable represents.
+    pis_region_t reg_region;
 } PACKED cdfg_var_node_t;
 
 /// a CDFG immediate value.
@@ -106,17 +124,17 @@ typedef enum {
 
 /// represents a single edge in the CDFG
 typedef struct {
-    /// the kind of node.
+    /// the kind of edge.
     cdfg_edge_kind_t kind : 1;
 
-    /// which of the inputs of the destination node does this edge represent?
+    /// which one of the inputs of the destination node does this edge represent?
     u8 to_node_input_index : 7;
 
     /// the source node.
-    cdfg_item_id_t from_node;
+    cdfg_node_id_t from_node;
 
     /// the destination node.
-    cdfg_item_id_t to_node;
+    cdfg_node_id_t to_node;
 } PACKED cdfg_edge_t;
 
 /// a control data flow graph.
@@ -130,11 +148,11 @@ typedef struct {
 
 /// a single slot in the operands state. represents the value of a single operand.
 typedef struct {
-    /// the variable whose value is represented in this slot.
+    /// the variable operand whose value is represented in this slot.
     pis_var_t var;
 
     /// the node which represents the current value of the operand.
-    cdfg_item_id_t value_node_id;
+    cdfg_node_id_t value_node_id;
 } PACKED cdfg_op_state_slot_t;
 
 /// the state of all operands at a single point in time.
@@ -143,7 +161,7 @@ typedef struct {
     size_t used_slots_amount;
 
     /// the id of the last control flow node.
-    cdfg_item_id_t last_cf_node_id;
+    cdfg_node_id_t last_cf_node_id;
 } cdfg_op_state_t;
 
 /// the state of a CFG block in the process of building the CDFG.

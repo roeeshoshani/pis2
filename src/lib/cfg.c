@@ -162,9 +162,9 @@ static err_t insn_is_cfg_jump(const pis_insn_t* insn, bool* is_cfg_jump) {
         // instruction, since it might also be an inter-instruction jump.
 
         CHECK(insn->operands_amount >= 1);
-        const pis_operand_t* jmp_target = &insn->operands[0];
+        const pis_op_t* jmp_target = &insn->operands[0];
 
-        if (jmp_target->addr.space == PIS_SPACE_CONST) {
+        if (jmp_target->kind == PIS_OP_KIND_IMM) {
             // this jump is an inter-instruction jump. this is used for example to implement the
             // x86 `REP` prefix, and does not represent an actual CFG jump instruction.
             *is_cfg_jump = false;
@@ -257,12 +257,12 @@ cleanup:
 
 /// enqueue an unexplored path that should be explored when building a CFG.
 static err_t
-    enqueue_unexplored_path_by_jmp_target(cfg_builder_t* builder, const pis_operand_t* jmp_target) {
+    enqueue_unexplored_path_by_jmp_target(cfg_builder_t* builder, const pis_op_t* jmp_target) {
     err_t err = SUCCESS;
 
-    CHECK(jmp_target->addr.space == PIS_SPACE_RAM);
+    CHECK(jmp_target->kind == PIS_OP_KIND_RAM);
 
-    u64 ram_addr = jmp_target->addr.offset;
+    u64 ram_addr = jmp_target->v.ram.addr;
     CHECK(ram_addr >= builder->machine_code_start_addr);
 
     u64 offset = ram_addr - builder->machine_code_start_addr;
@@ -430,7 +430,7 @@ static err_t
 
     // find the target of the jump
     CHECK(insn->operands_amount >= 1);
-    const pis_operand_t* jmp_target = &insn->operands[0];
+    const pis_op_t* jmp_target = &insn->operands[0];
 
     switch (insn->opcode) {
         case PIS_OPCODE_JMP:
@@ -589,13 +589,13 @@ static err_t cfg_block_successors_cfg_jump(
     err_t err = SUCCESS;
 
     CHECK(last_insn->operands_amount >= 1);
-    const pis_operand_t* jmp_target = &last_insn->operands[0];
+    const pis_op_t* jmp_target = &last_insn->operands[0];
 
     switch (last_insn->opcode) {
         case PIS_OPCODE_JMP: {
             // regular jump. the only successor is the target of the jump.
-            CHECK(jmp_target->addr.space == PIS_SPACE_RAM);
-            u64 ram_addr = jmp_target->addr.offset;
+            CHECK(jmp_target->kind == PIS_OP_KIND_RAM);
+            u64 ram_addr = jmp_target->v.ram.addr;
             CHECK_RETHROW(find_block_starting_at_addr(cfg, ram_addr, &successor_block_ids[0]));
             break;
         }
@@ -607,8 +607,8 @@ static err_t cfg_block_successors_cfg_jump(
             // fallthrough.
 
             // jump target successor
-            CHECK(jmp_target->addr.space == PIS_SPACE_RAM);
-            u64 ram_addr = jmp_target->addr.offset;
+            CHECK(jmp_target->kind == PIS_OP_KIND_RAM);
+            u64 ram_addr = jmp_target->v.ram.addr;
             CHECK_RETHROW(find_block_starting_at_addr(cfg, ram_addr, &successor_block_ids[0]));
 
             // fallthrough successor

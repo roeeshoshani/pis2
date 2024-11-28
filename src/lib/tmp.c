@@ -1,8 +1,9 @@
 #include "tmp.h"
+#include "pis.h"
 
-err_t tmp_alloc(tmp_allocator_t* tmp_allocator, pis_size_t size, pis_operand_t* new_tmp) {
+err_t tmp_alloc(tmp_allocator_t* tmp_allocator, pis_size_t size, pis_op_t* new_tmp) {
     err_t err = SUCCESS;
-    pis_operand_t result = PIS_OPERAND_TMP(tmp_allocator->cur_tmp_offset, size);
+    pis_op_t result = PIS_OPERAND_TMP(tmp_allocator->cur_tmp_offset, size);
 
     u64 size_in_bytes = pis_size_to_bytes(size);
 

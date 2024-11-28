@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../pis.h"
+#include "../../reg.h"
 
 #define MIPS_GPRS_AMOUNT (32)
 

@@ -4,8 +4,10 @@
 #include "except.h"
 #include "recursive_macros.h"
 #include "size.h"
+#include "space.h"
 #include "str_enum.h"
 #include "types.h"
+#include "utils.h"
 
 #define PIS_INSN_MAX_OPERANDS_AMOUNT (4)
 
@@ -46,76 +48,59 @@
         .operands_amount = 4,                                                                      \
     })
 
-#define PIS_ADDR_INIT(SPACE, OFFSET) {.space = SPACE, .offset = OFFSET}
+#define PIS_OPERAND_RAM(ADDR, SIZE)                                                                \
+    ((pis_op_t) {                                                                                  \
+        .kind = PIS_OP_KIND_RAM,                                                                   \
+        .size = SIZE,                                                                              \
+        .v =                                                                                       \
+            {                                                                                      \
+                .ram =                                                                             \
+                    {                                                                              \
+                        .addr = ADDR,                                                              \
+                    },                                                                             \
+            },                                                                                     \
+    })
 
-#define PIS_ADDR(SPACE, OFFSET) ((pis_addr_t) PIS_ADDR_INIT(SPACE, OFFSET))
 
-#define PIS_OPERAND_INIT(ADDR, SIZE) {.addr = ADDR, .size = SIZE}
+#define PIS_OPERAND_VAR(SPACE, OFFSET, SIZE)                                                       \
+    ((pis_op_t) {                                                                                  \
+        .kind = PIS_OP_KIND_VAR,                                                                   \
+        .size = SIZE,                                                                              \
+        .v =                                                                                       \
+            {                                                                                      \
+                .var =                                                                             \
+                    {                                                                              \
+                        .addr =                                                                    \
+                            {                                                                      \
+                                .offset = OFFSET,                                                  \
+                                .space = SPACE,                                                    \
+                            },                                                                     \
+                    },                                                                             \
+            },                                                                                     \
+    })
 
-#define PIS_OPERAND(ADDR, SIZE) ((pis_operand_t) PIS_OPERAND_INIT(ADDR, SIZE))
 
-#define PIS_OPERAND_REG(OFFSET, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_REG, OFFSET), SIZE))
+#define PIS_OPERAND_TMP(OFFSET, SIZE) (PIS_OPERAND_VAR(PIS_VAR_SPACE_TMP, OFFSET, SIZE))
 
-#define PIS_OPERAND_RAM(OFFSET, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_RAM, OFFSET), SIZE))
+#define PIS_OPERAND_REG(OFFSET, SIZE) (PIS_OPERAND_VAR(PIS_VAR_SPACE_REG, OFFSET, SIZE))
 
-#define PIS_OPERAND_TMP(OFFSET, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_TMP, OFFSET), SIZE))
-
-#define PIS_OPERAND_CONST(VALUE, SIZE) (PIS_OPERAND(PIS_ADDR(PIS_SPACE_CONST, VALUE), SIZE))
+#define PIS_OPERAND_CONST(VALUE, SIZE)                                                             \
+    ((pis_op_t) {                                                                                  \
+        .kind = PIS_OP_KIND_IMM,                                                                   \
+        .size = SIZE,                                                                              \
+        .v =                                                                                       \
+            {                                                                                      \
+                .imm =                                                                             \
+                    {                                                                              \
+                        .value = VALUE,                                                            \
+                    },                                                                             \
+            },                                                                                     \
+    })
 
 #define PIS_OPERAND_CONST_NEG(ABS_VALUE, SIZE)                                                     \
-    (PIS_OPERAND(PIS_ADDR(PIS_SPACE_CONST, pis_const_negate(ABS_VALUE, SIZE)), SIZE))
+    (PIS_OPERAND_CONST(pis_const_negate(ABS_VALUE, SIZE), SIZE))
 
 #define PIS_EMIT(LIFT_RES, INSN) CHECK_RETHROW(pis_lift_res_emit((LIFT_RES), &(INSN)))
-
-#define DECLARE_REG_OPERAND(NAME) extern const pis_operand_t NAME;
-
-#define DECLARE_REG_OPERANDS(...) MAP(DECLARE_REG_OPERAND, ##__VA_ARGS__)
-
-#define DEFINE_REG_OPERAND(NAME, OFFSET, SIZE)                                                     \
-    const pis_operand_t NAME = PIS_OPERAND_INIT(PIS_ADDR_INIT(PIS_SPACE_REG, OFFSET), SIZE)
-
-#define DEFINE_REG_OPERANDS(                                                                       \
-    START_OFFSET,                                                                                  \
-    OFFSET_STEP_SIZE,                                                                              \
-    OPERAND_SIZE,                                                                                  \
-    FIRST_NAME,                                                                                    \
-    SECOND_NAME,                                                                                   \
-    ...                                                                                            \
-)                                                                                                  \
-    DEFINE_REG_OPERAND(FIRST_NAME, START_OFFSET, OPERAND_SIZE);                                    \
-    REC_MACRO_EVAL(_DEFINE_REG_OPERANDS_REC_0(                                                     \
-        START_OFFSET,                                                                              \
-        OFFSET_STEP_SIZE,                                                                          \
-        OPERAND_SIZE,                                                                              \
-        SECOND_NAME,                                                                               \
-        ##__VA_ARGS__,                                                                             \
-        REC_MACRO_END,                                                                             \
-        0                                                                                          \
-    ))
-
-#define _DEFINE_REG_OPERANDS_REC_0(                                                                \
-    PREV_OFFSET,                                                                                   \
-    OFFSET_STEP_SIZE,                                                                              \
-    OPERAND_SIZE,                                                                                  \
-    CUR_NAME,                                                                                      \
-    NEXT_NAME,                                                                                     \
-    ...                                                                                            \
-)                                                                                                  \
-    DEFINE_REG_OPERAND(CUR_NAME, PREV_OFFSET + OFFSET_STEP_SIZE, OPERAND_SIZE);                    \
-    REC_MACRO_TEST(NEXT_NAME, _DEFINE_REG_OPERANDS_REC_1)                                          \
-    (PREV_OFFSET + OFFSET_STEP_SIZE, OFFSET_STEP_SIZE, OPERAND_SIZE, NEXT_NAME, ##__VA_ARGS__)
-
-#define _DEFINE_REG_OPERANDS_REC_1(                                                                \
-    PREV_OFFSET,                                                                                   \
-    OFFSET_STEP_SIZE,                                                                              \
-    OPERAND_SIZE,                                                                                  \
-    CUR_NAME,                                                                                      \
-    NEXT_NAME,                                                                                     \
-    ...                                                                                            \
-)                                                                                                  \
-    DEFINE_REG_OPERAND(CUR_NAME, PREV_OFFSET + OFFSET_STEP_SIZE, OPERAND_SIZE);                    \
-    REC_MACRO_TEST(NEXT_NAME, _DEFINE_REG_OPERANDS_REC_0)                                          \
-    (PREV_OFFSET + OFFSET_STEP_SIZE, OFFSET_STEP_SIZE, OPERAND_SIZE, NEXT_NAME, ##__VA_ARGS__)
 
 #define PIS_OPCODE(_)                                                                              \
     _(PIS_OPCODE_MOVE, )                                                                           \
@@ -174,15 +159,23 @@ STR_ENUM(pis_var_space, PIS_VAR_SPACE, PACKED);
     _(PIS_OP_KIND_RAM, )
 STR_ENUM(pis_op_kind, PIS_OP_KIND, PACKED);
 
-/// a type used to represent the offset of a variable in an operand space.
-typedef u16 pis_var_off_t;
-
-/// a variable operand. this is used to represent registers and tmps.
-typedef union {
+/// the address of a variable operand. variable operands are used to represent registers and tmps.
+typedef struct {
     pis_var_space_t space;
-    pis_var_off_t offset;
-    pis_size_t size;
-} pis_var_t;
+    pis_off_t offset;
+} PACKED pis_var_addr_t;
+
+/// a variable. this is used to represent registers and tmps.
+typedef struct {
+    pis_var_space_t space : 4;
+    pis_size_t size : 4;
+    pis_off_t offset;
+} PACKED pis_var_t;
+
+/// the value of a variable operand.
+typedef struct {
+    pis_var_addr_t addr;
+} PACKED pis_var_op_t;
 
 /// an immediate operand.
 typedef union {
@@ -194,36 +187,58 @@ typedef union {
     u64 addr;
 } pis_ram_op_t;
 
+/// the value of an operand. the value depends on the kind of the operand.
 typedef union {
-    pis_var_t var;
+    pis_var_op_t var;
     pis_ram_op_t ram;
     pis_imm_op_t imm;
 } pis_op_value_t;
 
+/// an operand.
 typedef struct {
-    pis_op_kind_t kind;
+    pis_op_kind_t kind : 4;
+    pis_size_t size : 4;
     pis_op_value_t v;
 } PACKED pis_op_t;
 
+/// an instruction.
 typedef struct {
-    u8 operands_amount;
     pis_opcode_t opcode;
     pis_op_t operands[PIS_INSN_MAX_OPERANDS_AMOUNT];
+    u8 operands_amount;
 } PACKED pis_insn_t;
 
+/// the result of lifting a machine instruction to pis instructions.
 typedef struct {
     pis_insn_t insns[PIS_LIFT_MAX_INSNS_AMOUNT];
     u8 insns_amount;
     u8 machine_insn_len;
 } pis_lift_res_t;
 
-void pis_var_dump(pis_var_t var);
-bool pis_var_equals(pis_var_t a, pis_var_t b);
+void pis_var_addr_dump(pis_var_addr_t addr);
 
-void pis_op_dump(const pis_op_t* operand);
-bool pis_op_equals(const pis_op_t* a, const pis_op_t* b);
+bool pis_var_addrs_equal(pis_var_addr_t a, pis_var_addr_t b);
+
+void pis_var_dump(pis_var_t var);
+
+bool pis_var_contains(pis_var_t var, pis_var_t sub_var);
+
+bool pis_vars_equal(pis_var_t a, pis_var_t b);
+
+bool pis_vars_intersect(pis_var_t a, pis_var_t b);
+
+pis_region_t pis_var_region(pis_var_t var);
+
+pis_var_addr_t pis_var_addr(pis_var_t var);
+
+void pis_op_dump(const pis_op_t* op);
+
+bool pis_ops_equal(const pis_op_t* a, const pis_op_t* b);
+
+pis_var_t pis_op_var(const pis_op_t* op);
 
 void pis_insn_dump(const pis_insn_t* insn);
+
 bool pis_insn_equals(const pis_insn_t* a, const pis_insn_t* b);
 
 err_t pis_lift_res_emit(pis_lift_res_t* result, const pis_insn_t* insn);
@@ -239,7 +254,3 @@ u64 pis_const_negate(u64 const_value, pis_size_t operand_size);
 u64 pis_sign_extend_byte(i8 byte, pis_size_t desired_size);
 
 bool pis_opcode_is_jmp(pis_opcode_t opcode);
-
-bool pis_var_contains(pis_var_t var, pis_var_t sub_var);
-
-bool pis_vars_intersect(pis_var_t var_a, pis_var_t var_b);

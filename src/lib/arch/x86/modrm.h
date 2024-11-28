@@ -24,7 +24,7 @@ typedef struct {
 
     /// an operand containting address of the r/m field if it is a memory operand, or the register
     /// operand if the r/m field is a register.
-    pis_operand_t addr_or_reg;
+    pis_op_t addr_or_reg;
 } modrm_rm_operand_t;
 
 modrm_t modrm_decode_byte(u8 modrm_byte);

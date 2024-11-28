@@ -4,6 +4,7 @@
 #include "except.h"
 #include "pis.h"
 #include "size.h"
+#include "space.h"
 #include "trace.h"
 #include "utils.h"
 #include <stddef.h>
@@ -35,39 +36,39 @@ cleanup:
     return err;
 }
 
-static err_t next_node_id(cdfg_t* cdfg, cdfg_item_id_t* id) {
+static err_t next_node_id(cdfg_t* cdfg, cdfg_node_id_t* id) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(next_id(&cdfg->nodes_amount, CDFG_MAX_NODES, id));
+    CHECK_RETHROW(next_id(&cdfg->nodes_amount, CDFG_MAX_NODES, &id->id));
 
 cleanup:
     return err;
 }
 
-static err_t next_edge_id(cdfg_t* cdfg, cdfg_item_id_t* id) {
+static err_t next_edge_id(cdfg_t* cdfg, cdfg_edge_id_t* id) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(next_id(&cdfg->edges_amount, CDFG_MAX_EDGES, id));
+    CHECK_RETHROW(next_id(&cdfg->edges_amount, CDFG_MAX_EDGES, &id->id));
 
 cleanup:
     return err;
 }
 
-static err_t next_op_state_slot_id(cdfg_op_state_t* op_state, cdfg_item_id_t* id) {
+static err_t next_op_state_slot_id(cdfg_op_state_t* op_state, cdfg_op_state_slot_id_t* id) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(next_id(&op_state->used_slots_amount, CDFG_OP_STATE_MAX_SLOTS, id));
+    CHECK_RETHROW(next_id(&op_state->used_slots_amount, CDFG_OP_STATE_MAX_SLOTS, &id->id));
 
 cleanup:
     return err;
 }
 
 static err_t
-    make_op_state_slot(cdfg_op_state_t* op_state, pis_var_t var, cdfg_item_id_t value_node_id) {
+    make_op_state_slot(cdfg_op_state_t* op_state, pis_var_t var, cdfg_node_id_t value_node_id) {
     err_t err = SUCCESS;
-    cdfg_item_id_t slot_id = CDFG_ITEM_ID_INVALID;
+    cdfg_op_state_slot_id_t slot_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(next_op_state_slot_id(op_state, &slot_id));
-    op_state->slots[slot_id] = (cdfg_op_state_slot_t) {
+    op_state->slots[slot_id.id] = (cdfg_op_state_slot_t) {
         .var = var,
         .value_node_id = value_node_id,
     };
@@ -75,99 +76,90 @@ cleanup:
     return err;
 }
 
-/// tries to find an exact match for the given operand in the operand state. if an exact match was
-/// found, returns the id of the slot which matched the operand.
-static cdfg_item_id_t find_slot_exact(const cdfg_op_state_t* op_state, pis_var_t var) {
+static err_t op_state_find_slot(
+    const cdfg_op_state_t* op_state, pis_var_t var, cdfg_op_state_slot_id_t* out_slot_id
+) {
+    err_t err = SUCCESS;
+
+    out_slot_id->id = CDFG_ITEM_ID_INVALID;
+
     for (size_t i = 0; i < op_state->used_slots_amount; i++) {
         const cdfg_op_state_slot_t* slot = &op_state->slots[i];
-        if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
-            // this slot is vacant.
-            continue;
-        }
-        if (pis_var_equals(var, slot->var)) {
-            // exact match
-            return i;
-        }
-    }
-
-    // no exact match was found
-    return CDFG_ITEM_ID_INVALID;
-}
-
-/// tries to find an exact match for the given operand in the operand state. if an exact match was
-/// found, returns the id of the node which represents the value of the given operand.
-static cdfg_item_id_t read_var_operand_exact(const cdfg_op_state_t* op_state, pis_var_t var) {
-    cdfg_item_id_t slot_id = find_slot_exact(op_state, var);
-    if (slot_id == CDFG_ITEM_ID_INVALID) {
-        return CDFG_ITEM_ID_INVALID;
-    }
-    return op_state->slots[slot_id].value_node_id;
-}
-
-/// checks if the given operand is fully uninitialized. that is, none of its bytes are
-/// initialized. if at least one of its bytes is initialized, then it is not considered fully
-/// uninitialized.
-static bool is_var_fully_uninit(const cdfg_op_state_t* op_state, pis_var_t var) {
-    for (size_t i = 0; i < op_state->used_slots_amount; i++) {
-        const cdfg_op_state_slot_t* slot = &op_state->slots[i];
-        if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
+        if (slot->value_node_id.id == CDFG_ITEM_ID_INVALID) {
             // this slot is vacant.
             continue;
         }
         if (pis_vars_intersect(var, slot->var)) {
-            // found a slot which intersects with the examined operand. this means that at least one
-            // of its bytes is initialized, so it is not fully uninitialized.
-            return false;
+            // partially initialized nodes are not allowed in the CDFG. the lifter implementations
+            // must make sure to not emit intersection GPR accesses to make this ok.
+            CHECK(pis_vars_equal(var, slot->var));
+
+            out_slot_id->id = i;
         }
     }
 
-    // none of the slots in the operand state intersect with the operand, so it is fully
-    // uninitialized.
-    return true;
+cleanup:
+    return err;
+}
+
+static err_t op_state_find_var_value(
+    const cdfg_op_state_t* op_state, pis_var_t var, cdfg_node_id_t* out_node_id
+) {
+    err_t err = SUCCESS;
+
+    cdfg_op_state_slot_id_t slot_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(op_state_find_slot(op_state, var, &slot_id));
+    if (slot_id.id == CDFG_ITEM_ID_INVALID) {
+        out_node_id->id = CDFG_ITEM_ID_INVALID;
+    } else {
+        *out_node_id = op_state->slots[slot_id.id].value_node_id;
+    }
+cleanup:
+    return err;
 }
 
 /// tries to find an existing immediate node with the given value in the cdfg.
 /// returns the id of the found node, or `CDFG_ITEM_ID_INVALID` if no such node was found.
-static cdfg_item_id_t find_imm_node(const cdfg_t* cdfg, u64 value) {
+static cdfg_node_id_t find_imm_node(const cdfg_t* cdfg, u64 value) {
     for (size_t i = 0; i < cdfg->nodes_amount; i++) {
         const cdfg_node_t* node = &cdfg->node_storage[i];
         if (node->kind != CDFG_NODE_KIND_IMM) {
             continue;
         }
         if (node->content.imm.value == value) {
-            return i;
+            return (cdfg_node_id_t) {.id = i};
         }
     }
-    return CDFG_ITEM_ID_INVALID;
+    return (cdfg_node_id_t) {.id = CDFG_ITEM_ID_INVALID};
 }
 
 /// tries to find an existing variable node with the given parameters in the cdfg.
 /// returns the id of the found node, or `CDFG_ITEM_ID_INVALID` if no such node was found.
-static cdfg_item_id_t find_var_node(const cdfg_t* cdfg, u64 reg_offset, pis_size_t reg_size) {
+static cdfg_node_id_t find_var_node(const cdfg_t* cdfg, pis_region_t region) {
     for (size_t i = 0; i < cdfg->nodes_amount; i++) {
         const cdfg_node_t* node = &cdfg->node_storage[i];
         if (node->kind != CDFG_NODE_KIND_VAR) {
             continue;
         }
-        if (node->content.var.reg_offset == reg_offset && node->content.var.reg_size == reg_size) {
-            return i;
+        if (pis_regions_equal(node->content.var.reg_region, region)) {
+            return (cdfg_node_id_t) {.id = i};
         }
     }
-    return CDFG_ITEM_ID_INVALID;
+    return (cdfg_node_id_t) {.id = CDFG_ITEM_ID_INVALID};
 }
 
 /// returns an immediate node with the given immediate value, either by creating one or by reusing
 /// an existing one.
-static err_t make_imm_node(cdfg_t* cdfg, u64 value, cdfg_item_id_t* out_node_id) {
+static err_t make_imm_node(cdfg_t* cdfg, u64 value, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t node_id = find_imm_node(cdfg, value);
+    cdfg_node_id_t node_id = find_imm_node(cdfg, value);
 
-    if (node_id == CDFG_ITEM_ID_INVALID) {
+    if (node_id.id == CDFG_ITEM_ID_INVALID) {
         // no existing node, create a new one.
         CHECK_RETHROW(next_node_id(cdfg, &node_id));
 
-        cdfg->node_storage[node_id] = (cdfg_node_t) {
+        cdfg->node_storage[node_id.id] = (cdfg_node_t) {
             .kind = CDFG_NODE_KIND_IMM,
             .content =
                 {
@@ -185,19 +177,19 @@ cleanup:
 static err_t make_edge(
     cdfg_t* cdfg,
     cdfg_edge_kind_t kind,
-    cdfg_item_id_t from_node,
-    cdfg_item_id_t to_node,
+    cdfg_node_id_t from_node,
+    cdfg_node_id_t to_node,
     u8 to_node_input_index
 ) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t edge_id = CDFG_ITEM_ID_INVALID;
+    cdfg_edge_id_t edge_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(next_edge_id(cdfg, &edge_id));
 
     // make sure that the value is in range of the bitfield.
     CHECK(to_node_input_index < (1 << 7));
 
-    cdfg->edge_storage[edge_id] = (cdfg_edge_t) {
+    cdfg->edge_storage[edge_id.id] = (cdfg_edge_t) {
         .kind = kind,
         .to_node_input_index = to_node_input_index,
         .from_node = from_node,
@@ -209,13 +201,13 @@ cleanup:
 }
 
 static err_t
-    make_calc_node(cdfg_t* cdfg, cdfg_calculation_t calculation, cdfg_item_id_t* out_node_id) {
+    make_calc_node(cdfg_t* cdfg, cdfg_calculation_t calculation, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(next_node_id(cdfg, &node_id));
 
-    cdfg->node_storage[node_id] = (cdfg_node_t) {
+    cdfg->node_storage[node_id.id] = (cdfg_node_t) {
         .kind = CDFG_NODE_KIND_CALC,
         .content =
             {
@@ -232,7 +224,7 @@ cleanup:
 }
 
 /// link a node which requires control flow into the control flow chain.
-static err_t link_cf_node(cdfg_builder_t* builder, cdfg_item_id_t node_id) {
+static err_t link_cf_node(cdfg_builder_t* builder, cdfg_node_id_t node_id) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(make_edge(
@@ -250,13 +242,13 @@ cleanup:
 }
 
 static err_t
-    make_empty_node_of_kind(cdfg_t* cdfg, cdfg_node_kind_t kind, cdfg_item_id_t* out_node_id) {
+    make_empty_node_of_kind(cdfg_t* cdfg, cdfg_node_kind_t kind, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(next_node_id(cdfg, &node_id));
 
-    cdfg->node_storage[node_id] = (cdfg_node_t) {
+    cdfg->node_storage[node_id.id] = (cdfg_node_t) {
         .kind = kind,
         .content = {},
     };
@@ -266,7 +258,7 @@ cleanup:
     return err;
 }
 
-static err_t make_store_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
+static err_t make_store_node(cdfg_t* cdfg, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_STORE, out_node_id));
@@ -275,7 +267,7 @@ cleanup:
     return err;
 }
 
-static err_t make_load_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
+static err_t make_load_node(cdfg_t* cdfg, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_LOAD, out_node_id));
@@ -283,7 +275,7 @@ cleanup:
     return err;
 }
 
-static err_t make_if_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
+static err_t make_if_node(cdfg_t* cdfg, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_IF, out_node_id));
@@ -292,7 +284,7 @@ cleanup:
     return err;
 }
 
-static err_t make_region_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
+static err_t make_region_node(cdfg_t* cdfg, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_REGION, out_node_id));
@@ -301,7 +293,7 @@ cleanup:
     return err;
 }
 
-static err_t make_phi_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
+static err_t make_phi_node(cdfg_t* cdfg, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_PHI, out_node_id));
@@ -310,10 +302,10 @@ cleanup:
     return err;
 }
 
-static err_t do_if(cdfg_builder_t* builder, cdfg_item_id_t cond_node_id) {
+static err_t do_if(cdfg_builder_t* builder, cdfg_node_id_t cond_node_id) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t if_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t if_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(make_if_node(&builder->cdfg, &if_node_id));
 
     CHECK_RETHROW(make_edge(&builder->cdfg, CDFG_EDGE_KIND_DATA_FLOW, cond_node_id, if_node_id, 0));
@@ -324,10 +316,10 @@ cleanup:
 }
 
 static err_t
-    do_store(cdfg_builder_t* builder, cdfg_item_id_t addr_node_id, cdfg_item_id_t val_node_id) {
+    do_store(cdfg_builder_t* builder, cdfg_node_id_t addr_node_id, cdfg_node_id_t val_node_id) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t store_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t store_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(make_store_node(&builder->cdfg, &store_node_id));
 
     CHECK_RETHROW(
@@ -343,11 +335,11 @@ cleanup:
 }
 
 static err_t do_load(
-    cdfg_builder_t* builder, cdfg_item_id_t addr_node_id, cdfg_item_id_t* out_loaded_val_node_id
+    cdfg_builder_t* builder, cdfg_node_id_t addr_node_id, cdfg_node_id_t* out_loaded_val_node_id
 ) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t load_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t load_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(make_load_node(&builder->cdfg, &load_node_id));
 
     CHECK_RETHROW(make_edge(&builder->cdfg, CDFG_EDGE_KIND_DATA_FLOW, addr_node_id, load_node_id, 0)
@@ -361,7 +353,7 @@ cleanup:
     return err;
 }
 
-static err_t make_entry_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
+static err_t make_entry_node(cdfg_t* cdfg, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_ENTRY, out_node_id));
@@ -370,7 +362,7 @@ cleanup:
     return err;
 }
 
-static err_t make_finish_node(cdfg_t* cdfg, cdfg_item_id_t* out_node_id) {
+static err_t make_finish_node(cdfg_t* cdfg, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
 
     CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_FINISH, out_node_id));
@@ -382,13 +374,13 @@ cleanup:
 static err_t make_binop_node(
     cdfg_t* cdfg,
     cdfg_calculation_t calculation,
-    cdfg_item_id_t lhs_node_id,
-    cdfg_item_id_t rhs_node_id,
-    cdfg_item_id_t* out_binop_node_id
+    cdfg_node_id_t lhs_node_id,
+    cdfg_node_id_t rhs_node_id,
+    cdfg_node_id_t* out_binop_node_id
 ) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(make_calc_node(cdfg, calculation, &node_id));
 
     CHECK_RETHROW(make_edge(cdfg, CDFG_EDGE_KIND_DATA_FLOW, lhs_node_id, node_id, 0));
@@ -402,12 +394,12 @@ cleanup:
 static err_t make_unary_op_node(
     cdfg_t* cdfg,
     cdfg_calculation_t calculation,
-    cdfg_item_id_t input_node_id,
-    cdfg_item_id_t* out_binop_node_id
+    cdfg_node_id_t input_node_id,
+    cdfg_node_id_t* out_binop_node_id
 ) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(make_calc_node(cdfg, calculation, &node_id));
 
     CHECK_RETHROW(make_edge(cdfg, CDFG_EDGE_KIND_DATA_FLOW, input_node_id, node_id, 0));
@@ -417,26 +409,23 @@ cleanup:
     return err;
 }
 
-static err_t make_var_node(cdfg_t* cdfg, pis_var_t var, cdfg_item_id_t* out_node_id) {
+static err_t make_var_node(cdfg_t* cdfg, pis_var_t var, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
 
     // variable nodes are only for register operands
     CHECK(var.space == PIS_VAR_SPACE_REG);
 
-    cdfg_item_id_t node_id = find_var_node(cdfg, var.offset, var.size);
+    pis_region_t region = pis_var_region(var);
+    cdfg_node_id_t node_id = find_var_node(cdfg, region);
 
-    if (node_id == CDFG_ITEM_ID_INVALID) {
+    if (node_id.id == CDFG_ITEM_ID_INVALID) {
         // no existing node, create a new one.
         CHECK_RETHROW(next_node_id(cdfg, &node_id));
-        cdfg->node_storage[node_id] = (cdfg_node_t) {
+        cdfg->node_storage[node_id.id] = (cdfg_node_t) {
             .kind = CDFG_NODE_KIND_VAR,
             .content =
                 {
-                    .var =
-                        {
-                            .reg_offset = var.offset,
-                            .reg_size = var.size,
-                        },
+                    .var = {.reg_region = region},
                 },
         };
     }
@@ -446,14 +435,22 @@ cleanup:
     return err;
 }
 
-static err_t read_var_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_item_id_t* out_node_id) {
+static err_t read_var_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
 
-    if (is_var_fully_uninit(&builder->op_state, var)) {
-        // the reg operand is fully uninitialized. initialize it to a new variable node.
+    cdfg_node_id_t existing_node_id = {.id = CDFG_ITEM_ID_INVALID};
+    op_state_find_var_value(&builder->op_state, var, &existing_node_id);
+
+    if (existing_node_id.id == CDFG_ITEM_ID_INVALID) {
+        // the variable operand is uninitialized.
+
+        // only register operands are allowed to be read when uninitialized.
+        CHECK(var.space == PIS_VAR_SPACE_REG);
+
+        // initialize it to a new variable node.
 
         // first, create the variable node
-        cdfg_item_id_t node_id = CDFG_ITEM_ID_INVALID;
+        cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
         CHECK_RETHROW(make_var_node(&builder->cdfg, var, &node_id));
 
         // now add a slot in the op state to point to it
@@ -461,17 +458,8 @@ static err_t read_var_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_item_
 
         *out_node_id = node_id;
     } else {
-        // node is either fully initialized or partially initialized.
-        //
-        // partially initialized nodes are not allowed in the CDFG. the lifter implementations
-        // must make sure to not emit intersection GPR accesses to make this ok.
-        //
-        // so, we expect the node to have an exact match node id.
-        cdfg_item_id_t exact_match_node_id = read_var_operand_exact(&builder->op_state, var);
-        CHECK(exact_match_node_id != CDFG_ITEM_ID_INVALID);
-
-        // found an exact match for the node, use it.
-        *out_node_id = exact_match_node_id;
+        // the variable operand is initialized, use its value.
+        *out_node_id = existing_node_id;
     }
 cleanup:
     return err;
@@ -480,14 +468,14 @@ cleanup:
 /// reads the given operand according to the current op state and returns the id of a node which
 /// represents the value of the operand.
 static err_t
-    read_operand(cdfg_builder_t* builder, const pis_op_t* op, cdfg_item_id_t* out_node_id) {
+    read_operand(cdfg_builder_t* builder, const pis_op_t* op, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
     switch (op->kind) {
         case PIS_OP_KIND_IMM:
             CHECK_RETHROW(make_imm_node(&builder->cdfg, op->v.imm.value, out_node_id));
             break;
         case PIS_OP_KIND_VAR:
-            CHECK_RETHROW(read_var_operand(builder, op->v.var, out_node_id));
+            CHECK_RETHROW(read_var_operand(builder, pis_op_var(op), out_node_id));
             break;
         case PIS_OP_KIND_RAM:
             // ram operands are only used in jump instructions, and can't be read directly. reading
@@ -503,24 +491,18 @@ cleanup:
 }
 
 static err_t
-    write_var_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_item_id_t value_node_id) {
+    write_var_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_node_id_t value_node_id) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t exact_slot_id = find_slot_exact(&builder->op_state, var);
-    if (exact_slot_id != CDFG_ITEM_ID_INVALID) {
-        // found an exactly matching slot. overwrite its value with the new value.
-        builder->op_state.slots[exact_slot_id].value_node_id = value_node_id;
+    cdfg_op_state_slot_id_t existing_slot_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(op_state_find_slot(&builder->op_state, var, &existing_slot_id));
+
+    if (existing_slot_id.id == CDFG_ITEM_ID_INVALID) {
+        // found existing slot. overwrite its value with the new value.
+        builder->op_state.slots[existing_slot_id.id].value_node_id = value_node_id;
     } else {
-        // no exact match. either the operand is partially initialized, or it is completely
-        // uninitialized.
-        //
-        // partially initialized nodes are not allowed in the CDFG. the lifter implementations
-        // must make sure to not emit intersection GPR accesses to make this ok.
-        //
-        // so, we expect the operand to be fully uninitialized here.
-        CHECK(is_var_fully_uninit(&builder->op_state, var));
-        // operand is completely uninitialized. just add a new slot which contains the new value
-        // for this operand.
+        // operand isuninitialized. just add a new slot which contains the new value for this
+        // operand.
         CHECK_RETHROW(make_op_state_slot(&builder->op_state, var, value_node_id));
     }
 
@@ -530,11 +512,11 @@ cleanup:
 
 /// writes the given operand to the current op state.
 static err_t
-    write_operand(cdfg_builder_t* builder, const pis_op_t* op, cdfg_item_id_t value_node_id) {
+    write_operand(cdfg_builder_t* builder, const pis_op_t* op, cdfg_node_id_t value_node_id) {
     err_t err = SUCCESS;
     switch (op->kind) {
         case PIS_OP_KIND_VAR:
-            CHECK_RETHROW(write_var_operand(builder, op->v.var, value_node_id));
+            CHECK_RETHROW(write_var_operand(builder, pis_op_var(op), value_node_id));
             break;
         case PIS_OP_KIND_IMM:
             // can't write to const operands.
@@ -559,13 +541,13 @@ static err_t opcode_handler_binop(
     err_t err = SUCCESS;
     CHECK_CODE(insn->operands_amount == 3, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
 
-    cdfg_item_id_t lhs_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t lhs_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(read_operand(builder, &insn->operands[1], &lhs_node_id));
 
-    cdfg_item_id_t rhs_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t rhs_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(read_operand(builder, &insn->operands[2], &rhs_node_id));
 
-    cdfg_item_id_t result_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t result_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(
         make_binop_node(&builder->cdfg, calculation, lhs_node_id, rhs_node_id, &result_node_id)
     );
@@ -581,10 +563,10 @@ static err_t opcode_handler_unary_op(
     err_t err = SUCCESS;
     CHECK_CODE(insn->operands_amount == 2, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
 
-    cdfg_item_id_t input_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t input_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(read_operand(builder, &insn->operands[1], &input_node_id));
 
-    cdfg_item_id_t result_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t result_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(make_unary_op_node(&builder->cdfg, calculation, input_node_id, &result_node_id));
 
     CHECK_RETHROW(write_operand(builder, &insn->operands[0], result_node_id));
@@ -598,13 +580,13 @@ static err_t opcode_handler_comparison(
     err_t err = SUCCESS;
     CHECK_CODE(insn->operands_amount == 3, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
 
-    cdfg_item_id_t lhs_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t lhs_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(read_operand(builder, &insn->operands[1], &lhs_node_id));
 
-    cdfg_item_id_t rhs_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t rhs_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(read_operand(builder, &insn->operands[2], &rhs_node_id));
 
-    cdfg_item_id_t result_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t result_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(
         make_binop_node(&builder->cdfg, calculation, lhs_node_id, rhs_node_id, &result_node_id)
     );
@@ -618,7 +600,7 @@ cleanup:
 static err_t do_move_nocheck(cdfg_builder_t* builder, const pis_insn_t* insn) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t src_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t src_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(read_operand(builder, &insn->operands[1], &src_node_id));
 
     CHECK_RETHROW(write_operand(builder, &insn->operands[0], src_node_id));
@@ -657,10 +639,10 @@ static err_t opcode_handler_store(cdfg_builder_t* builder, const pis_insn_t* ins
     err_t err = SUCCESS;
     CHECK_CODE(insn->operands_amount == 2, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
 
-    cdfg_item_id_t addr_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t addr_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(read_operand(builder, &insn->operands[0], &addr_node_id));
 
-    cdfg_item_id_t val_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t val_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(read_operand(builder, &insn->operands[1], &val_node_id));
 
     CHECK_RETHROW(do_store(builder, addr_node_id, val_node_id));
@@ -673,10 +655,10 @@ static err_t opcode_handler_load(cdfg_builder_t* builder, const pis_insn_t* insn
     err_t err = SUCCESS;
     CHECK_CODE(insn->operands_amount == 2, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
 
-    cdfg_item_id_t addr_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t addr_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(read_operand(builder, &insn->operands[1], &addr_node_id));
 
-    cdfg_item_id_t loaded_val_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t loaded_val_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(do_load(builder, addr_node_id, &loaded_val_node_id));
 
     CHECK_RETHROW(write_operand(builder, &insn->operands[0], loaded_val_node_id));
@@ -795,7 +777,7 @@ static err_t opcode_handler_jmp_cond(cdfg_builder_t* builder, const pis_insn_t* 
 
     CHECK_CODE(insn->operands_amount == 2, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
 
-    cdfg_item_id_t cond_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t cond_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(read_operand(builder, &insn->operands[1], &cond_node_id));
 
     CHECK_RETHROW(do_if(builder, cond_node_id));
@@ -809,10 +791,11 @@ static err_t opcode_handler_ret(cdfg_builder_t* builder, const pis_insn_t* insn)
 
     UNUSED(insn);
 
-    cdfg_item_id_t retval_node_id = CDFG_ITEM_ID_INVALID;
-    CHECK_RETHROW(read_operand(builder, builder->cfg->arch->return_value, &retval_node_id));
+    cdfg_node_id_t retval_node_id = {.id = CDFG_ITEM_ID_INVALID};
+    pis_op_t return_value = pis_reg_to_op(*builder->cfg->arch->return_value);
+    CHECK_RETHROW(read_operand(builder, &return_value, &retval_node_id));
 
-    cdfg_item_id_t finish_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t finish_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(make_finish_node(&builder->cdfg, &finish_node_id));
 
     CHECK_RETHROW(link_cf_node(builder, finish_node_id));
@@ -868,13 +851,13 @@ cleanup:
 static void invalidate_tmps(cdfg_op_state_t* op_state) {
     for (size_t i = 0; i < op_state->used_slots_amount; i++) {
         cdfg_op_state_slot_t* slot = &op_state->slots[i];
-        if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
+        if (slot->value_node_id.id == CDFG_ITEM_ID_INVALID) {
             // this slot is vacant.
             continue;
         }
         if (slot->var.space == PIS_VAR_SPACE_TMP) {
             // invalidate the slot
-            slot->value_node_id = CDFG_ITEM_ID_INVALID;
+            slot->value_node_id.id = CDFG_ITEM_ID_INVALID;
         }
     }
 }
@@ -910,37 +893,52 @@ cleanup:
 static err_t merge_predecessor_var_operand_value(
     cdfg_builder_t* builder,
     pis_var_t var,
-    cdfg_item_id_t value_node_id,
-    cdfg_item_id_t region_node_id,
+    cdfg_node_id_t value_node_id,
+    cdfg_node_id_t region_node_id,
     size_t predecessor_index
 ) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t phi_node_id;
-    cdfg_item_id_t slot_id = find_slot_exact(&builder->op_state, var);
-    if (slot_id == CDFG_ITEM_ID_INVALID) {
-        // no exact match. make sure that the operand is fully uninitialized. partial initialization
-        // is not allowed when combining predecessors.
-        CHECK(is_var_fully_uninit(&builder->op_state, var));
+    cdfg_node_id_t phi_node_id;
+    cdfg_op_state_slot_id_t slot_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(op_state_find_slot(&builder->op_state, var, &slot_id));
+    if (slot_id.id == CDFG_ITEM_ID_INVALID) {
+        // operand is uninitialized. it can mean one of two things:
+        // - if we are the first predecessor, then we just haven't initialized this operand yet.
+        // - if we are not the first predecessor, it means that the first predecessor didn't provide
+        //   a value for this operand.
+        //   in this case, it means that this variable may potentially be uninitialized, in which
+        //   case we just want to assume that it is completely uninitialized.
+        //   so, in this case we shouldn't initialize it at all.
+        if (predecessor_index != 0) {
+            // we are not the first predecessor, so this value is potentially uninitialized, so
+            // don't initialize it at all.
+            SUCCESS_CLEANUP();
+        } else {
+            // we are the first predecessor, so initialize the value, as explained above.
 
-        // operand is completely uninitialized. create a phi node for it.
-        phi_node_id = CDFG_ITEM_ID_INVALID;
-        CHECK_RETHROW(make_phi_node(&builder->cdfg, &phi_node_id));
+            // create a phi node for it.
+            CHECK_RETHROW(make_phi_node(&builder->cdfg, &phi_node_id));
 
-        // connect the control flow from the region node to our new phi node
-        CHECK_RETHROW(
-            make_edge(&builder->cdfg, CDFG_EDGE_KIND_CONTROL_FLOW, region_node_id, phi_node_id, 0)
-        );
+            // connect the control flow from the region node to our new phi node
+            CHECK_RETHROW(make_edge(
+                &builder->cdfg,
+                CDFG_EDGE_KIND_CONTROL_FLOW,
+                region_node_id,
+                phi_node_id,
+                0
+            ));
 
-        // add a new slot for it
-        CHECK_RETHROW(make_op_state_slot(&builder->op_state, var, phi_node_id));
+            // add a new slot for it
+            CHECK_RETHROW(make_op_state_slot(&builder->op_state, var, phi_node_id));
+        }
     } else {
-        // found an exactly matching slot. the slot's value should be a phi node.
-        const cdfg_op_state_slot_t* existing_slot = &builder->op_state.slots[slot_id];
+        // found an existing slot.
+        const cdfg_op_state_slot_t* existing_slot = &builder->op_state.slots[slot_id.id];
         phi_node_id = existing_slot->value_node_id;
     }
 
-    cdfg_node_t* phi_node = &builder->cdfg.node_storage[phi_node_id];
+    cdfg_node_t* phi_node = &builder->cdfg.node_storage[phi_node_id.id];
     CHECK(phi_node->kind == CDFG_NODE_KIND_PHI);
 
     // connect this value to the correct entry in the phi node.
@@ -970,14 +968,14 @@ static err_t merge_predecessor_op_state(
 
     // first, merge the control flow into a region node
 
-    if (builder->op_state.last_cf_node_id == CDFG_ITEM_ID_INVALID) {
+    if (builder->op_state.last_cf_node_id.id == CDFG_ITEM_ID_INVALID) {
         // no node yet, create a new empty region node.
         CHECK_RETHROW(make_region_node(&builder->cdfg, &builder->op_state.last_cf_node_id));
     }
 
 
-    cdfg_item_id_t region_node_id = builder->op_state.last_cf_node_id;
-    cdfg_node_t* region_node = &builder->cdfg.node_storage[region_node_id];
+    cdfg_node_id_t region_node_id = builder->op_state.last_cf_node_id;
+    cdfg_node_t* region_node = &builder->cdfg.node_storage[region_node_id.id];
 
     // connect the control flow to the region node
     CHECK_RETHROW(make_edge(
@@ -994,7 +992,7 @@ static err_t merge_predecessor_op_state(
     // now merge each of the operand values.
     for (size_t i = 0; i < predecessor_block_final_state->used_slots_amount; i++) {
         const cdfg_op_state_slot_t* slot = &predecessor_block_final_state->slots[i];
-        if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
+        if (slot->value_node_id.id == CDFG_ITEM_ID_INVALID) {
             // this slot is vacant.
         }
         if (slot->var.space == PIS_VAR_SPACE_REG) {
@@ -1022,7 +1020,7 @@ static err_t prepare_non_first_block_initial_op_state(
     err_t err = SUCCESS;
 
     builder->op_state.used_slots_amount = 0;
-    builder->op_state.last_cf_node_id = CDFG_ITEM_ID_INVALID;
+    builder->op_state.last_cf_node_id.id = CDFG_ITEM_ID_INVALID;
 
     size_t found_predecessors_amount = 0;
 
@@ -1070,18 +1068,18 @@ static err_t prepare_non_first_block_initial_op_state(
     // use potentially uninitialized registers.
     for (size_t i = 0; i < builder->op_state.used_slots_amount; i++) {
         cdfg_op_state_slot_t* slot = &builder->op_state.slots[i];
-        if (slot->value_node_id == CDFG_ITEM_ID_INVALID) {
+        if (slot->value_node_id.id == CDFG_ITEM_ID_INVALID) {
             // this slot is vacant.
             continue;
         }
-        cdfg_item_id_t phi_node_id = slot->value_node_id;
-        cdfg_node_t* phi_node = &builder->cdfg.node_storage[phi_node_id];
+        cdfg_node_id_t phi_node_id = slot->value_node_id;
+        cdfg_node_t* phi_node = &builder->cdfg.node_storage[phi_node_id.id];
         if (phi_node->content.phi.inputs_amount != found_predecessors_amount) {
             // sanity
             CHECK(phi_node->content.phi.inputs_amount < found_predecessors_amount);
 
             // invalidate this slot to make this register uninitialized
-            slot->value_node_id = CDFG_ITEM_ID_INVALID;
+            slot->value_node_id.id = CDFG_ITEM_ID_INVALID;
         }
     }
 
@@ -1100,7 +1098,7 @@ static err_t prepare_block_initial_op_state(
     if (block_id == 0) {
         // for the first block, create an empty op state with a single initial entry node.
         builder->op_state.used_slots_amount = 0;
-        builder->op_state.last_cf_node_id = CDFG_ITEM_ID_INVALID;
+        builder->op_state.last_cf_node_id.id = CDFG_ITEM_ID_INVALID;
         CHECK_RETHROW(make_entry_node(&builder->cdfg, &builder->op_state.last_cf_node_id));
         *can_process_block = true;
     } else {
@@ -1112,19 +1110,19 @@ cleanup:
     return err;
 }
 
-static bool is_node_used_as_input(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
+static bool is_node_used_as_input(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
-        if (cdfg->edge_storage[i].from_node == node_id) {
+        if (cdfg->edge_storage[i].from_node.id == node_id.id) {
             return true;
         }
     }
     return false;
 }
 
-static bool does_node_use_cf(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
+static bool does_node_use_cf(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* edge = &cdfg->edge_storage[i];
-        if (edge->kind == CDFG_EDGE_KIND_CONTROL_FLOW && edge->to_node == node_id) {
+        if (edge->kind == CDFG_EDGE_KIND_CONTROL_FLOW && edge->to_node.id == node_id.id) {
             return true;
         }
     }
@@ -1135,13 +1133,15 @@ static bool does_node_use_cf(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
 static bool remove_unused_nodes_and_edges(cdfg_t* cdfg) {
     bool removed_anything = false;
     for (size_t i = 0; i < cdfg->nodes_amount; i++) {
+        cdfg_node_id_t node_id = {.id = i};
         cdfg_node_t* node = &cdfg->node_storage[i];
         if (node->kind == CDFG_NODE_KIND_INVALID) {
             // node is vacant.
             continue;
         }
 
-        bool is_node_required = is_node_used_as_input(cdfg, i) || does_node_use_cf(cdfg, i) ||
+        bool is_node_required = is_node_used_as_input(cdfg, node_id) ||
+                                does_node_use_cf(cdfg, node_id) ||
                                 node->kind == CDFG_NODE_KIND_FINISH;
         if (!is_node_required) {
             // if the node's value is not used anywhere, and it is not a finish node (which by
@@ -1154,14 +1154,14 @@ static bool remove_unused_nodes_and_edges(cdfg_t* cdfg) {
     // remove all edges that now point to invalid nodes
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         cdfg_edge_t* edge = &cdfg->edge_storage[i];
-        if (edge->to_node == CDFG_ITEM_ID_INVALID) {
+        if (edge->to_node.id == CDFG_ITEM_ID_INVALID) {
             // this edge is vacant.
             continue;
         }
-        const cdfg_node_t* to_node = &cdfg->node_storage[edge->to_node];
+        const cdfg_node_t* to_node = &cdfg->node_storage[edge->to_node.id];
         if (to_node->kind == CDFG_NODE_KIND_INVALID) {
-            edge->from_node = CDFG_ITEM_ID_INVALID;
-            edge->to_node = CDFG_ITEM_ID_INVALID;
+            edge->from_node.id = CDFG_ITEM_ID_INVALID;
+            edge->to_node.id = CDFG_ITEM_ID_INVALID;
             removed_anything = true;
         }
     }
@@ -1173,14 +1173,14 @@ static bool remove_unused_nodes_and_edges(cdfg_t* cdfg) {
 static err_t node_find_single_input_edge(
     const cdfg_t* cdfg,
     cdfg_edge_kind_t kind,
-    cdfg_item_id_t node_id,
-    cdfg_item_id_t* out_found_item_id
+    cdfg_node_id_t node_id,
+    cdfg_node_id_t* out_found_item_id
 ) {
     err_t err = SUCCESS;
     cdfg_item_id_t found_id = CDFG_ITEM_ID_INVALID;
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* edge = &cdfg->edge_storage[i];
-        if (edge->to_node == node_id && edge->kind == kind) {
+        if (edge->to_node.id == node_id.id && edge->kind == kind) {
             // make sure that we don't find multiple matchine edges.
             CHECK(found_id == CDFG_ITEM_ID_INVALID);
 
@@ -1191,17 +1191,17 @@ static err_t node_find_single_input_edge(
     // make sure that we found any matching edge.
     CHECK(found_id != CDFG_ITEM_ID_INVALID);
 
-    *out_found_item_id = found_id;
+    out_found_item_id->id = found_id;
 cleanup:
     return err;
 }
 
 /// replaces all usages of the given node as a the "from" node of an edge with the given other node.
 static void node_replace_usages(
-    cdfg_t* cdfg, cdfg_item_id_t node_id_to_replace, cdfg_item_id_t replace_with_node_id
+    cdfg_t* cdfg, cdfg_node_id_t node_id_to_replace, cdfg_node_id_t replace_with_node_id
 ) {
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
-        if (cdfg->edge_storage[i].from_node == node_id_to_replace) {
+        if (cdfg->edge_storage[i].from_node.id == node_id_to_replace.id) {
             cdfg->edge_storage[i].from_node = replace_with_node_id;
         }
     }
@@ -1211,6 +1211,7 @@ static err_t remove_single_input_region_phi_nodes(cdfg_t* cdfg, bool* did_anythi
     err_t err = SUCCESS;
 
     for (size_t i = 0; i < cdfg->nodes_amount; i++) {
+        cdfg_node_id_t node_id = {.id = i};
         cdfg_node_t* node = &cdfg->node_storage[i];
         if (!(node->kind == CDFG_NODE_KIND_PHI || node->kind == CDFG_NODE_KIND_REGION)) {
             // only phi/region nodes are relevant here
@@ -1237,19 +1238,20 @@ static err_t remove_single_input_region_phi_nodes(cdfg_t* cdfg, bool* did_anythi
             desired_edge_kind = CDFG_EDGE_KIND_CONTROL_FLOW;
         }
 
-        cdfg_item_id_t input_edge_id = CDFG_ITEM_ID_INVALID;
-        CHECK_RETHROW(node_find_single_input_edge(cdfg, desired_edge_kind, i, &input_edge_id));
+        cdfg_node_id_t input_edge_id = {.id = CDFG_ITEM_ID_INVALID};
+        CHECK_RETHROW(node_find_single_input_edge(cdfg, desired_edge_kind, node_id, &input_edge_id)
+        );
 
-        cdfg_edge_t* edge = &cdfg->edge_storage[input_edge_id];
+        cdfg_edge_t* edge = &cdfg->edge_storage[input_edge_id.id];
 
         // this phi/region node has a single input, its index should be zero.
         CHECK(edge->to_node_input_index == 0);
 
         // find the underlying node of this phi/region node
-        cdfg_item_id_t underlying_node_id = edge->from_node;
+        cdfg_node_id_t underlying_node_id = edge->from_node;
 
         // replace all usages of the phi/region node with the underlying node.
-        node_replace_usages(cdfg, i, underlying_node_id);
+        node_replace_usages(cdfg, node_id, underlying_node_id);
 
         // invalidate the current node. no need to remove the edges since they will be removed by
         // other optimization passes.
@@ -1263,16 +1265,16 @@ cleanup:
 
 static err_t node_find_inputs(
     const cdfg_t* cdfg,
-    cdfg_item_id_t node_id,
+    cdfg_node_id_t node_id,
     cdfg_edge_kind_t edge_kind,
-    cdfg_item_id_t* input_node_ids,
+    cdfg_node_id_t* input_node_ids,
     size_t inputs_amount
 ) {
     err_t err = SUCCESS;
     size_t cur_inputs_amount = 0;
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* edge = &cdfg->edge_storage[i];
-        if (edge->to_node != node_id || edge->kind != edge_kind) {
+        if (edge->to_node.id != node_id.id || edge->kind != edge_kind) {
             continue;
         }
 
@@ -1293,7 +1295,7 @@ cleanup:
 }
 
 static err_t binop_node_find_data_inputs(
-    const cdfg_t* cdfg, cdfg_item_id_t node_id, cdfg_item_id_t input_node_ids[2]
+    const cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_node_id_t input_node_ids[2]
 ) {
     err_t err = SUCCESS;
 
@@ -1303,18 +1305,18 @@ cleanup:
     return err;
 }
 
-typedef bool (*node_predicate_t)(const cdfg_t* cdfg, cdfg_item_id_t node_id);
+typedef bool (*node_predicate_t)(const cdfg_t* cdfg, cdfg_node_id_t node_id);
 
 static err_t node_find_input_by_predicate(
     const cdfg_t* cdfg,
-    cdfg_item_id_t node_id,
+    cdfg_node_id_t node_id,
     cdfg_edge_kind_t edge_kind,
     node_predicate_t predicate,
-    cdfg_item_id_t* out_found_node_id
+    cdfg_node_id_t* out_found_node_id
 ) {
     err_t err = SUCCESS;
 
-    cdfg_item_id_t found_node_id = CDFG_ITEM_ID_INVALID;
+    cdfg_node_id_t found_node_id = {.id = CDFG_ITEM_ID_INVALID};
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* edge = &cdfg->edge_storage[i];
         // make sure that the edge has the right kind
@@ -1323,7 +1325,7 @@ static err_t node_find_input_by_predicate(
         }
 
         // make sure that the edge points to our node
-        if (edge->to_node != node_id) {
+        if (edge->to_node.id != node_id.id) {
             continue;
         }
 
@@ -1333,7 +1335,7 @@ static err_t node_find_input_by_predicate(
         }
 
         // make sure that we only found one such item.
-        CHECK(found_node_id == CDFG_ITEM_ID_INVALID);
+        CHECK(found_node_id.id == CDFG_ITEM_ID_INVALID);
 
         found_node_id = edge->from_node;
     }
@@ -1344,13 +1346,13 @@ cleanup:
     return err;
 }
 
-static bool node_is_zero_imm(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
-    const cdfg_node_t* from_node = &cdfg->node_storage[node_id];
+static bool node_is_zero_imm(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
+    const cdfg_node_t* from_node = &cdfg->node_storage[node_id.id];
     return from_node->kind == CDFG_NODE_KIND_IMM && from_node->content.imm.value == 0;
 }
 
-static bool node_is_sub(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
-    const cdfg_node_t* from_node = &cdfg->node_storage[node_id];
+static bool node_is_sub(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
+    const cdfg_node_t* from_node = &cdfg->node_storage[node_id.id];
     return from_node->kind == CDFG_NODE_KIND_CALC &&
            from_node->content.calc.calculation == CDFG_CALCULATION_SUB;
 }
@@ -1358,8 +1360,9 @@ static bool node_is_sub(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
 static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
     err_t err = SUCCESS;
 
-    for (size_t cur_node_id = 0; cur_node_id < cdfg->nodes_amount; cur_node_id++) {
-        cdfg_node_t* node = &cdfg->node_storage[cur_node_id];
+    for (size_t cur_node_index = 0; cur_node_index < cdfg->nodes_amount; cur_node_index++) {
+        cdfg_node_id_t cur_node_id = {.id = cur_node_index};
+        cdfg_node_t* node = &cdfg->node_storage[cur_node_index];
         if (node->kind != CDFG_NODE_KIND_CALC) {
             continue;
         }
@@ -1370,7 +1373,7 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
         // the current node is an equals node.
 
         // we need one of the inputs to be a zero immediate operand.
-        cdfg_item_id_t zero_imm_node_id = CDFG_ITEM_ID_INVALID;
+        cdfg_node_id_t zero_imm_node_id = {.id = CDFG_ITEM_ID_INVALID};
         CHECK_RETHROW(node_find_input_by_predicate(
             cdfg,
             cur_node_id,
@@ -1378,12 +1381,12 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
             node_is_zero_imm,
             &zero_imm_node_id
         ));
-        if (zero_imm_node_id == CDFG_ITEM_ID_INVALID) {
+        if (zero_imm_node_id.id == CDFG_ITEM_ID_INVALID) {
             continue;
         }
 
         // we need another one of the inputs to be a sub operation.
-        cdfg_item_id_t sub_node_id = CDFG_ITEM_ID_INVALID;
+        cdfg_node_id_t sub_node_id = {.id = CDFG_ITEM_ID_INVALID};
         CHECK_RETHROW(node_find_input_by_predicate(
             cdfg,
             cur_node_id,
@@ -1391,16 +1394,16 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
             node_is_sub,
             &sub_node_id
         ));
-        if (sub_node_id == CDFG_ITEM_ID_INVALID) {
+        if (sub_node_id.id == CDFG_ITEM_ID_INVALID) {
             continue;
         }
 
         // doing `x - y == 0` is like doing `x == y`, so we want to create an equals node with the
         // same operands as the sub node.
-        cdfg_item_id_t sub_input_node_ids[2] = {};
+        cdfg_node_id_t sub_input_node_ids[2] = {};
         CHECK_RETHROW(binop_node_find_data_inputs(cdfg, sub_node_id, sub_input_node_ids));
 
-        cdfg_item_id_t optimized_eq_node_id = CDFG_ITEM_ID_INVALID;
+        cdfg_node_id_t optimized_eq_node_id = {.id = CDFG_ITEM_ID_INVALID};
         CHECK_RETHROW(make_binop_node(
             cdfg,
             CDFG_CALCULATION_EQUALS,
@@ -1490,8 +1493,8 @@ static void cdfg_dump_node_desc(const cdfg_node_t* node) {
         case CDFG_NODE_KIND_VAR:
             TRACE_NO_NEWLINE(
                 "var_off_0x%x_sz_%u",
-                node->content.var.reg_offset,
-                pis_size_to_bytes(node->content.var.reg_size)
+                node->content.var.reg_region.offset,
+                pis_size_to_bytes(node->content.var.reg_region.size)
             );
             break;
         case CDFG_NODE_KIND_IMM:
@@ -1521,9 +1524,9 @@ static void cdfg_dump_node_desc(const cdfg_node_t* node) {
     }
 }
 
-static void cdfg_dump_node(const cdfg_t* cdfg, cdfg_item_id_t node_id) {
-    TRACE_NO_NEWLINE("id_%u_", node_id);
-    cdfg_dump_node_desc(&cdfg->node_storage[node_id]);
+static void cdfg_dump_node(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
+    TRACE_NO_NEWLINE("id_%u_", node_id.id);
+    cdfg_dump_node_desc(&cdfg->node_storage[node_id.id]);
 }
 
 /// dumps a DOT representation of the CDFG to stdout.
@@ -1545,7 +1548,7 @@ void cdfg_dump_dot(const cdfg_t* cdfg) {
 
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* edge = &cdfg->edge_storage[i];
-        if (edge->from_node == CDFG_ITEM_ID_INVALID) {
+        if (edge->from_node.id == CDFG_ITEM_ID_INVALID) {
             // the edge is vacant.
             continue;
         }

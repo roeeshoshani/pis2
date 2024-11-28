@@ -29,7 +29,7 @@ typedef struct {
     pis_lifter_t lift;
     prepare_fn_t prepare;
     pis_endianness_t endianness;
-    const pis_operand_t* result_operand;
+    const pis_reg_t* result_operand;
 } arch_def_t;
 
 /// initialize registers that should be unused by the shellcode.
@@ -37,10 +37,11 @@ typedef struct {
 /// preserving register values.
 /// we initialize them with magic values so that if the shellcode accidentally accesses them due to
 /// a bug in the lifting logic, it will get garbage values, which will hopefully fail the tests.
-static err_t init_unused_regs(pis_emu_t* emu, const pis_operand_t* regs[], size_t count) {
+static err_t init_unused_regs(pis_emu_t* emu, const pis_reg_t regs[], size_t count) {
     err_t err = SUCCESS;
     for (size_t i = 0; i < count; i++) {
-        CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, regs[i], UNUSED_REG_MAGIC));
+        pis_op_t op = pis_reg_to_op(regs[i]);
+        CHECK_RETHROW_VERBOSE(pis_emu_write_op(emu, &op, UNUSED_REG_MAGIC));
     }
 cleanup:
     return err;
@@ -55,31 +56,31 @@ static err_t prepare_x86_64(pis_emu_t* emu, const shellcode_args_t* args) {
     sp -= 8;
     CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(emu, sp, SHELLCODE_FINISH_ADDR, PIS_SIZE_8));
 
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &X86_RSP, sp));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_reg(emu, X86_RSP, sp));
 
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &X86_RDI, args->arg1));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &X86_RSI, args->arg2));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &X86_RDX, args->arg3));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &X86_RCX, args->arg4));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_reg(emu, X86_RDI, args->arg1));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_reg(emu, X86_RSI, args->arg2));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_reg(emu, X86_RDX, args->arg3));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_reg(emu, X86_RCX, args->arg4));
 
-    const pis_operand_t* unused_regs[] = {
-        &X86_RAX,
-        &X86_RBX,
-        &X86_RBP,
-        &X86_R8,
-        &X86_R9,
-        &X86_R10,
-        &X86_R11,
-        &X86_R12,
-        &X86_R13,
-        &X86_R14,
-        &X86_R15,
-        &X86_CS_BASE,
-        &X86_SS_BASE,
-        &X86_DS_BASE,
-        &X86_ES_BASE,
-        &X86_FS_BASE,
-        &X86_GS_BASE,
+    const pis_reg_t unused_regs[] = {
+        X86_RAX,
+        X86_RBX,
+        X86_RBP,
+        X86_R8,
+        X86_R9,
+        X86_R10,
+        X86_R11,
+        X86_R12,
+        X86_R13,
+        X86_R14,
+        X86_R15,
+        X86_CS_BASE,
+        X86_SS_BASE,
+        X86_DS_BASE,
+        X86_ES_BASE,
+        X86_FS_BASE,
+        X86_GS_BASE,
     };
     CHECK_RETHROW_VERBOSE(init_unused_regs(emu, unused_regs, ARRAY_SIZE(unused_regs)));
 
@@ -90,19 +91,18 @@ cleanup:
 static err_t prepare_mips32(pis_emu_t* emu, const shellcode_args_t* args) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &MIPS_REG_RA, SHELLCODE_FINISH_ADDR));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &MIPS_REG_SP, INITIAL_STACK_POINTER_VALUE));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &MIPS_REG_A0, args->arg1));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &MIPS_REG_A1, args->arg2));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &MIPS_REG_A2, args->arg3));
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &MIPS_REG_A3, args->arg4));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_reg(emu, MIPS_REG_RA, SHELLCODE_FINISH_ADDR));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_reg(emu, MIPS_REG_SP, INITIAL_STACK_POINTER_VALUE));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_reg(emu, MIPS_REG_A0, args->arg1));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_reg(emu, MIPS_REG_A1, args->arg2));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_reg(emu, MIPS_REG_A2, args->arg3));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_reg(emu, MIPS_REG_A3, args->arg4));
 
-    const pis_operand_t* unused_regs[] = {
-        &MIPS_REG_ZERO, &MIPS_REG_AT, &MIPS_REG_V0, &MIPS_REG_V1, &MIPS_REG_T0, &MIPS_REG_T1,
-        &MIPS_REG_T2,   &MIPS_REG_T3, &MIPS_REG_T4, &MIPS_REG_T5, &MIPS_REG_T6, &MIPS_REG_T7,
-        &MIPS_REG_S0,   &MIPS_REG_S1, &MIPS_REG_S2, &MIPS_REG_S3, &MIPS_REG_S4, &MIPS_REG_S5,
-        &MIPS_REG_S6,   &MIPS_REG_S7, &MIPS_REG_T8, &MIPS_REG_T9, &MIPS_REG_K0, &MIPS_REG_K1,
-        &MIPS_REG_GP,   &MIPS_REG_FP,
+    const pis_reg_t unused_regs[] = {
+        MIPS_REG_ZERO, MIPS_REG_AT, MIPS_REG_V0, MIPS_REG_V1, MIPS_REG_T0, MIPS_REG_T1, MIPS_REG_T2,
+        MIPS_REG_T3,   MIPS_REG_T4, MIPS_REG_T5, MIPS_REG_T6, MIPS_REG_T7, MIPS_REG_S0, MIPS_REG_S1,
+        MIPS_REG_S2,   MIPS_REG_S3, MIPS_REG_S4, MIPS_REG_S5, MIPS_REG_S6, MIPS_REG_S7, MIPS_REG_T8,
+        MIPS_REG_T9,   MIPS_REG_K0, MIPS_REG_K1, MIPS_REG_GP, MIPS_REG_FP,
     };
     CHECK_RETHROW_VERBOSE(init_unused_regs(emu, unused_regs, ARRAY_SIZE(unused_regs)));
 
@@ -130,22 +130,22 @@ static err_t prepare_i686(pis_emu_t* emu, const shellcode_args_t* args) {
     CHECK_RETHROW_VERBOSE(pis_emu_write_mem_value(emu, sp, SHELLCODE_FINISH_ADDR, PIS_SIZE_4));
 
     // initialize the stack pointer
-    CHECK_RETHROW_VERBOSE(pis_emu_write_operand(emu, &X86_ESP, sp));
+    CHECK_RETHROW_VERBOSE(pis_emu_write_reg(emu, X86_ESP, sp));
 
-    const pis_operand_t* unused_regs[] = {
-        &X86_EAX,
-        &X86_EBX,
-        &X86_ECX,
-        &X86_EDX,
-        &X86_ESI,
-        &X86_EDI,
-        &X86_EBP,
-        &X86_CS_BASE,
-        &X86_SS_BASE,
-        &X86_DS_BASE,
-        &X86_ES_BASE,
-        &X86_FS_BASE,
-        &X86_GS_BASE,
+    const pis_reg_t unused_regs[] = {
+        X86_EAX,
+        X86_EBX,
+        X86_ECX,
+        X86_EDX,
+        X86_ESI,
+        X86_EDI,
+        X86_EBP,
+        X86_CS_BASE,
+        X86_SS_BASE,
+        X86_DS_BASE,
+        X86_ES_BASE,
+        X86_FS_BASE,
+        X86_GS_BASE,
     };
     CHECK_RETHROW_VERBOSE(init_unused_regs(emu, unused_regs, ARRAY_SIZE(unused_regs)));
 
@@ -250,10 +250,10 @@ static err_t check_arch_specific_shellcode_result(
     CHECK_RETHROW_VERBOSE(run_arch_specific_shellcode(&g_emu, shellcode, arch->lift));
 
     u64 return_value = 0;
-    CHECK_RETHROW_VERBOSE(pis_emu_read_operand(&g_emu, arch->result_operand, &return_value));
+    CHECK_RETHROW_VERBOSE(pis_emu_read_reg(&g_emu, *arch->result_operand, &return_value));
 
     u64 truncated_expected_return_value =
-        expected_return_value & pis_size_max_unsigned_value(arch->result_operand->size);
+        expected_return_value & pis_size_max_unsigned_value(arch->result_operand->region.size);
 
     CHECK_TRACE(
         return_value == truncated_expected_return_value,

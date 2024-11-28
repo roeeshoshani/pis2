@@ -10,4 +10,4 @@
 ///
 /// otherwise, if the instruction doesn't have a segment override prefix, returns `false` and the
 /// segment base output parameter is unmodified.
-bool insn_has_segment_override(ctx_t* ctx, pis_operand_t* segment_base);
+bool insn_has_segment_override(ctx_t* ctx, pis_op_t* segment_base);

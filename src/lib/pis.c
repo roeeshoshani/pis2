@@ -2,12 +2,21 @@
 #include "errors.h"
 #include "except.h"
 #include "size.h"
+#include "space.h"
 #include "trace.h"
 #include <limits.h>
 
 STR_ENUM_IMPL(pis_opcode, PIS_OPCODE);
 STR_ENUM_IMPL(pis_var_space, PIS_VAR_SPACE);
 STR_ENUM_IMPL(pis_op_kind, PIS_OP_KIND);
+
+void pis_var_addr_dump(pis_var_addr_t addr) {
+    TRACE_NO_NEWLINE("%s[0x%x]", pis_var_space_to_str(addr.space), addr.offset);
+}
+
+bool pis_var_addrs_equal(pis_var_addr_t a, pis_var_addr_t b) {
+    return a.space == b.space && a.offset == b.offset;
+}
 
 void pis_var_dump(pis_var_t var) {
     TRACE_NO_NEWLINE(
@@ -18,25 +27,53 @@ void pis_var_dump(pis_var_t var) {
     );
 }
 
-bool pis_var_equals(pis_var_t a, pis_var_t b) {
+bool pis_var_contains(pis_var_t var, pis_var_t sub_var) {
+    if (var.space != sub_var.space) {
+        return false;
+    }
+    return pis_region_contains(pis_var_region(var), pis_var_region(sub_var));
+}
+
+bool pis_vars_equal(pis_var_t a, pis_var_t b) {
     return a.space == b.space && a.offset == b.offset && a.size == b.size;
 }
 
-void pis_op_dump(const pis_op_t* operand) {
-    switch (operand->kind) {
+bool pis_vars_intersect(pis_var_t a, pis_var_t b) {
+    if (a.space != b.space) {
+        return false;
+    }
+    return pis_regions_intersect(pis_var_region(a), pis_var_region(b));
+}
+
+pis_region_t pis_var_region(pis_var_t var) {
+    return (pis_region_t) {
+        .offset = var.offset,
+        .size = var.size,
+    };
+}
+
+pis_var_addr_t pis_var_addr(pis_var_t var) {
+    return (pis_var_addr_t) {
+        .space = var.space,
+        .offset = var.offset,
+    };
+}
+
+void pis_op_dump(const pis_op_t* op) {
+    switch (op->kind) {
         case PIS_OP_KIND_IMM:
-            TRACE_NO_NEWLINE("0x%lx", operand->v.imm.value);
+            TRACE_NO_NEWLINE("0x%lx", op->v.imm.value);
             break;
         case PIS_OP_KIND_VAR:
-            pis_var_dump(operand->v.var);
+            pis_var_dump(pis_op_var(op));
             break;
         case PIS_OP_KIND_RAM:
-            TRACE_NO_NEWLINE("RAM[0x%lx]", operand->v.ram.addr);
+            TRACE_NO_NEWLINE("RAM[0x%lx]", op->v.ram.addr);
             break;
     }
 }
 
-bool pis_operand_equals(const pis_op_t* a, const pis_op_t* b) {
+bool pis_ops_equal(const pis_op_t* a, const pis_op_t* b) {
     if (a->kind != b->kind) {
         return false;
     }
@@ -44,12 +81,20 @@ bool pis_operand_equals(const pis_op_t* a, const pis_op_t* b) {
         case PIS_OP_KIND_IMM:
             return a->v.imm.value == b->v.imm.value;
         case PIS_OP_KIND_VAR:
-            return pis_var_equals(a->v.var, b->v.var);
+            return pis_vars_equal(pis_op_var(a), pis_op_var(b));
         case PIS_OP_KIND_RAM:
             return a->v.ram.addr == b->v.ram.addr;
         default:
             return false;
     }
+}
+
+pis_var_t pis_op_var(const pis_op_t* op) {
+    return (pis_var_t) {
+        .offset = op->v.var.addr.offset,
+        .space = op->v.var.addr.space,
+        .size = op->size,
+    };
 }
 
 void pis_insn_dump(const pis_insn_t* insn) {
@@ -74,7 +119,7 @@ bool pis_insn_equals(const pis_insn_t* a, const pis_insn_t* b) {
     }
     size_t operands_amount = MIN(a->operands_amount, PIS_INSN_MAX_OPERANDS_AMOUNT);
     for (size_t i = 0; i < operands_amount; i++) {
-        if (!pis_operand_equals(&a->operands[i], &b->operands[i])) {
+        if (!pis_ops_equal(&a->operands[i], &b->operands[i])) {
             return false;
         }
     }
@@ -153,33 +198,4 @@ bool pis_opcode_is_jmp(pis_opcode_t opcode) {
         default:
             return false;
     }
-}
-
-/// checks if the given var fully contains the given sub-var.
-bool pis_var_contains(pis_var_t var, pis_var_t sub_var) {
-    if (var.space != sub_var.space) {
-        return false;
-    }
-    pis_var_off_t var_start = var.offset;
-    pis_var_off_t var_end = var_start + pis_size_to_bytes(var.size);
-
-    pis_var_off_t sub_var_start = sub_var.offset;
-    pis_var_off_t sub_var_end = sub_var_start + pis_size_to_bytes(sub_var.size);
-
-    return sub_var_start >= var_start && sub_var_end <= var_end;
-}
-
-/// checks if the given 2 operands intersect. that is, there is at least one byte of operand space
-/// which is included in both operands.
-bool pis_vars_intersect(pis_var_t var_a, pis_var_t var_b) {
-    if (var_a.space != var_b.space) {
-        return false;
-    }
-    pis_var_off_t var_a_start = var_a.offset;
-    pis_var_off_t var_a_end = var_a_start + pis_size_to_bytes(var_a.size);
-
-    pis_var_off_t var_b_start = var_b.offset;
-    pis_var_off_t var_b_end = var_b_start + pis_size_to_bytes(var_b.size);
-
-    return var_a_start < var_b_end && var_b_start < var_a_end;
 }

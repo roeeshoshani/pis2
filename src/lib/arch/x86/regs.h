@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../pis.h"
+#include "../../reg.h"
 #include "ctx.h"
 #include "prefixes.h"
 
@@ -104,10 +104,10 @@ DECLARE_REG_OPERANDS(
 
 DECLARE_REG_OPERANDS(X86_CS_BASE, X86_SS_BASE, X86_DS_BASE, X86_ES_BASE, X86_FS_BASE, X86_GS_BASE);
 
-pis_operand_t reg_get_operand(u8 reg_encoding, pis_size_t operand_size, const prefixes_t* prefixes);
+pis_op_t reg_get_operand(u8 reg_encoding, pis_size_t operand_size, const prefixes_t* prefixes);
 
-pis_operand_t reg_largest_enclosing(const pis_operand_t* reg, pis_x86_cpumode_t cpumode);
+pis_op_t reg_largest_enclosing(const pis_op_t* reg, pis_x86_cpumode_t cpumode);
 
-err_t write_gpr(ctx_t* ctx, const pis_operand_t* gpr, const pis_operand_t* value);
+err_t write_gpr(ctx_t* ctx, const pis_op_t* gpr, const pis_op_t* value);
 
-err_t read_gpr(ctx_t* ctx, const pis_operand_t* gpr, pis_operand_t* out_value);
+err_t read_gpr(ctx_t* ctx, const pis_op_t* gpr, pis_op_t* out_value);

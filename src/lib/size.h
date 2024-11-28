@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "utils.h"
 
 typedef enum {
     /// 1 byte
@@ -11,7 +12,7 @@ typedef enum {
     PIS_SIZE_4 = 4,
     /// 8 bytes
     PIS_SIZE_8 = 8,
-} pis_size_t;
+} PACKED pis_size_t;
 
 u32 pis_size_to_bytes(pis_size_t operand_size);
 

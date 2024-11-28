@@ -11,7 +11,7 @@ typedef struct {
     tmp_allocator_t tmp_allocator;
     pis_size_t addr_size;
     pis_size_t stack_addr_size;
-    pis_operand_t sp;
+    pis_op_t sp;
     bool has_modrm;
     uint8_t modrm_byte;
 } ctx_t;
