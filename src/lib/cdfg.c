@@ -995,7 +995,7 @@ static err_t merge_predecessor_op_state(
         if (slot->value_node_id.id == CDFG_ITEM_ID_INVALID) {
             // this slot is vacant.
         }
-        if (slot->var.space == PIS_VAR_SPACE_REG) {
+        if (slot->var.space == PIS_VAR_SPACE_TMP) {
             // tmp operands don't need to be merged. only registers should be merged.
             continue;
         }
