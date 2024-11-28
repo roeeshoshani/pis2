@@ -323,7 +323,7 @@ static err_t calc_zero_flag_into(ctx_t* ctx, const pis_op_t* value, const pis_op
 
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_EQUALS, *result, *value, PIS_OPERAND_CONST(0, value->size))
+        PIS_INSN3(PIS_OPCODE_EQUALS, *result, *value, PIS_OPERAND_IMM(0, value->size))
     );
 
 cleanup:
@@ -356,7 +356,7 @@ static err_t
     pis_op_t tmp = TMP_ALLOC(&ctx->tmp_allocator, value->size);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, tmp, *value, PIS_OPERAND_CONST(shift_amount, value->size))
+        PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, tmp, *value, PIS_OPERAND_IMM(shift_amount, value->size))
     );
 
     // resize and write the result into the result operand
@@ -381,7 +381,7 @@ static err_t
 
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_AND, *result, least_significant_byte, PIS_OPERAND_CONST(1, PIS_SIZE_1))
+        PIS_INSN3(PIS_OPCODE_AND, *result, least_significant_byte, PIS_OPERAND_IMM(1, PIS_SIZE_1))
     );
 
 cleanup:
@@ -645,7 +645,7 @@ static err_t unary_op_dec(ctx_t* ctx, const pis_op_t* operand, pis_op_t* result)
 
     pis_size_t operand_size = operand->size;
 
-    pis_op_t one = PIS_OPERAND_CONST(1, operand_size);
+    pis_op_t one = PIS_OPERAND_IMM(1, operand_size);
 
     // overflow flag
     pis_op_t of = pis_reg_to_op(X86_FLAGS_OF);
@@ -670,7 +670,7 @@ static err_t unary_op_inc(ctx_t* ctx, const pis_op_t* operand, pis_op_t* result)
 
     pis_size_t operand_size = operand->size;
 
-    pis_op_t one = PIS_OPERAND_CONST(1, operand_size);
+    pis_op_t one = PIS_OPERAND_IMM(1, operand_size);
 
     // overflow flag
     PIS_EMIT(
@@ -697,7 +697,7 @@ static err_t unary_op_neg(ctx_t* ctx, const pis_op_t* operand, pis_op_t* result)
 
     pis_size_t operand_size = operand->size;
 
-    pis_op_t zero = PIS_OPERAND_CONST(0, operand_size);
+    pis_op_t zero = PIS_OPERAND_IMM(0, operand_size);
 
     // carry flag
     pis_op_t equals_zero = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
@@ -749,11 +749,11 @@ static err_t binop_and(ctx_t* ctx, const pis_op_t* a, const pis_op_t* b, pis_op_
     // set CF and OF to zero
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN2(PIS_OPCODE_MOVE, pis_reg_to_op(X86_FLAGS_CF), PIS_OPERAND_CONST(0, PIS_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, pis_reg_to_op(X86_FLAGS_CF), PIS_OPERAND_IMM(0, PIS_SIZE_1))
     );
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN2(PIS_OPCODE_MOVE, pis_reg_to_op(X86_FLAGS_OF), PIS_OPERAND_CONST(0, PIS_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, pis_reg_to_op(X86_FLAGS_OF), PIS_OPERAND_IMM(0, PIS_SIZE_1))
     );
 
     // perform the actual bitwide and operation
@@ -810,13 +810,13 @@ static err_t binop_xor(ctx_t* ctx, const pis_op_t* a, const pis_op_t* b, pis_op_
     // carry flag
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN2(PIS_OPCODE_MOVE, pis_reg_to_op(X86_FLAGS_CF), PIS_OPERAND_CONST(0, PIS_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, pis_reg_to_op(X86_FLAGS_CF), PIS_OPERAND_IMM(0, PIS_SIZE_1))
     );
 
     // overflow flag
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN2(PIS_OPCODE_MOVE, pis_reg_to_op(X86_FLAGS_OF), PIS_OPERAND_CONST(0, PIS_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, pis_reg_to_op(X86_FLAGS_OF), PIS_OPERAND_IMM(0, PIS_SIZE_1))
     );
 
     // perform the actual xor operation
@@ -843,13 +843,13 @@ static err_t binop_or(ctx_t* ctx, const pis_op_t* a, const pis_op_t* b, pis_op_t
     // carry flag
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN2(PIS_OPCODE_MOVE, pis_reg_to_op(X86_FLAGS_CF), PIS_OPERAND_CONST(0, PIS_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, pis_reg_to_op(X86_FLAGS_CF), PIS_OPERAND_IMM(0, PIS_SIZE_1))
     );
 
     // overflow flag
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN2(PIS_OPCODE_MOVE, pis_reg_to_op(X86_FLAGS_OF), PIS_OPERAND_CONST(0, PIS_SIZE_1))
+        PIS_INSN2(PIS_OPCODE_MOVE, pis_reg_to_op(X86_FLAGS_OF), PIS_OPERAND_IMM(0, PIS_SIZE_1))
     );
 
     // perform the actual or operation
@@ -955,7 +955,7 @@ static err_t push(ctx_t* ctx, const pis_op_t* operand_to_push) {
     // subtract sp
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_ADD, sp, sp, PIS_OPERAND_CONST_NEG(operand_size_bytes, sp.size))
+        PIS_INSN3(PIS_OPCODE_ADD, sp, sp, PIS_OPERAND_IMM_NEG(operand_size_bytes, sp.size))
     );
 
     // write the memory
@@ -1010,7 +1010,7 @@ static err_t shl_calc_carry_flag(ctx_t* ctx, const pis_op_t* to_shift, const pis
         PIS_INSN3(
             PIS_OPCODE_SUB,
             right_shift_count,
-            PIS_OPERAND_CONST(pis_size_to_bits(operand_size), operand_size),
+            PIS_OPERAND_IMM(pis_size_to_bits(operand_size), operand_size),
             *count
         )
     );
@@ -1027,7 +1027,7 @@ static err_t shl_calc_carry_flag(ctx_t* ctx, const pis_op_t* to_shift, const pis
     pis_op_t is_count_0 = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_0, *count, PIS_OPERAND_CONST(0, operand_size))
+        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_0, *count, PIS_OPERAND_IMM(0, operand_size))
     );
 
     pis_op_t cf = pis_reg_to_op(X86_FLAGS_CF);
@@ -1051,7 +1051,7 @@ static err_t shr_calc_carry_flag(ctx_t* ctx, const pis_op_t* to_shift, const pis
     pis_op_t count_minus_1 = TMP_ALLOC(&ctx->tmp_allocator, operand_size);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_SUB, count_minus_1, *count, PIS_OPERAND_CONST(1, operand_size))
+        PIS_INSN3(PIS_OPCODE_SUB, count_minus_1, *count, PIS_OPERAND_IMM(1, operand_size))
     );
     pis_op_t shifted_by_count_minus_1 = TMP_ALLOC(&ctx->tmp_allocator, operand_size);
     PIS_EMIT(
@@ -1067,7 +1067,7 @@ static err_t shr_calc_carry_flag(ctx_t* ctx, const pis_op_t* to_shift, const pis
     pis_op_t is_count_0 = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_0, *count, PIS_OPERAND_CONST(0, operand_size))
+        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_0, *count, PIS_OPERAND_IMM(0, operand_size))
     );
 
     pis_op_t cf = pis_reg_to_op(X86_FLAGS_CF);
@@ -1105,7 +1105,7 @@ static err_t shl_calc_overflow_flag(
     pis_op_t is_count_1 = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_CONST(1, operand_size))
+        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_IMM(1, operand_size))
     );
 
     pis_op_t of = pis_reg_to_op(X86_FLAGS_OF);
@@ -1145,7 +1145,7 @@ static err_t shld_calc_overflow_flag(ctx_t* ctx, const pis_op_t* to_shift, const
     pis_op_t is_count_1 = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_CONST(1, operand_size))
+        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_IMM(1, operand_size))
     );
 
     pis_op_t of = pis_reg_to_op(X86_FLAGS_OF);
@@ -1170,7 +1170,7 @@ static err_t shift_calc_parity_zero_sign_flags(
     pis_op_t is_count_0 = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_0, *count, PIS_OPERAND_CONST(0, operand_size))
+        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_0, *count, PIS_OPERAND_IMM(0, operand_size))
     );
 
     pis_op_t new_pf = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
@@ -1202,12 +1202,7 @@ static err_t mask_shift_count(
     u64 count_mask = operand_size == PIS_SIZE_8 ? 0b111111 : 0b11111;
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(
-            PIS_OPCODE_AND,
-            *masked_count,
-            *count,
-            PIS_OPERAND_CONST(count_mask, operand_size)
-        )
+        PIS_INSN3(PIS_OPCODE_AND, *masked_count, *count, PIS_OPERAND_IMM(count_mask, operand_size))
     );
 cleanup:
     return err;
@@ -1278,7 +1273,7 @@ static err_t do_shld(
         PIS_INSN3(
             PIS_OPCODE_SUB,
             src_shift_count,
-            PIS_OPERAND_CONST(pis_size_to_bytes(operand_size), operand_size),
+            PIS_OPERAND_IMM(pis_size_to_bytes(operand_size), operand_size),
             count
         )
     );
@@ -1328,7 +1323,7 @@ static err_t shrd_calc_overflow_flag(
     pis_op_t is_count_1 = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_CONST(1, operand_size))
+        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_IMM(1, operand_size))
     );
 
     pis_op_t of = pis_reg_to_op(X86_FLAGS_OF);
@@ -1370,7 +1365,7 @@ static err_t do_shrd(
         PIS_INSN3(
             PIS_OPCODE_SUB,
             src_shift_count,
-            PIS_OPERAND_CONST(pis_size_to_bytes(operand_size), operand_size),
+            PIS_OPERAND_IMM(pis_size_to_bytes(operand_size), operand_size),
             count
         )
     );
@@ -1412,7 +1407,7 @@ static err_t shr_calc_overflow_flag(ctx_t* ctx, const pis_op_t* to_shift, const 
     pis_op_t is_count_1 = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_CONST(1, operand_size))
+        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_IMM(1, operand_size))
     );
 
     pis_op_t of = pis_reg_to_op(X86_FLAGS_OF);
@@ -1432,14 +1427,14 @@ static err_t sar_calc_overflow_flag(ctx_t* ctx, const pis_op_t* to_shift, const 
     pis_size_t operand_size = to_shift->size;
 
     // the overflow flag is set to 0 if the count is 1
-    pis_op_t new_overflow_flag_value = PIS_OPERAND_CONST(0, PIS_SIZE_1);
+    pis_op_t new_overflow_flag_value = PIS_OPERAND_IMM(0, PIS_SIZE_1);
 
     // we only want to set the overflow flag if the count is 1, otherwise we want to use
     // the original OF value.
     pis_op_t is_count_1 = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_CONST(1, operand_size))
+        PIS_INSN3(PIS_OPCODE_EQUALS, is_count_1, *count, PIS_OPERAND_IMM(1, operand_size))
     );
 
     pis_op_t of = pis_reg_to_op(X86_FLAGS_OF);
@@ -1530,7 +1525,7 @@ static err_t binop_rol(ctx_t* ctx, const pis_op_t* a, const pis_op_t* b, pis_op_
         PIS_INSN3(
             PIS_OPCODE_SUB,
             right_shift_count,
-            PIS_OPERAND_CONST(pis_size_to_bits(operand_size), operand_size),
+            PIS_OPERAND_IMM(pis_size_to_bits(operand_size), operand_size),
             count
         )
     );
@@ -1548,7 +1543,7 @@ static err_t binop_rol(ctx_t* ctx, const pis_op_t* a, const pis_op_t* b, pis_op_
     pis_op_t last_extracted_bit = TMP_ALLOC(&ctx->tmp_allocator, operand_size);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_AND, last_extracted_bit, res_tmp, PIS_OPERAND_CONST(1, operand_size))
+        PIS_INSN3(PIS_OPCODE_AND, last_extracted_bit, res_tmp, PIS_OPERAND_IMM(1, operand_size))
     );
     pis_op_t cf = pis_reg_to_op(X86_FLAGS_CF);
     CHECK_RETHROW(write_resize_zext(ctx, &cf, &last_extracted_bit));
@@ -1571,7 +1566,7 @@ static err_t push_ip(ctx_t* ctx) {
     u64 cur_insn_end_addr = ctx->args->machine_code_addr + cursor_index(&ctx->args->machine_code);
     u64 push_value = rel_jmp_mask_ip_value(ctx, cur_insn_end_addr);
     CHECK_RETHROW(
-        push(ctx, &PIS_OPERAND_CONST(push_value, near_branch_operand_default_operand_size(ctx)))
+        push(ctx, &PIS_OPERAND_IMM(push_value, near_branch_operand_default_operand_size(ctx)))
     );
 cleanup:
     return err;
@@ -1638,7 +1633,7 @@ static err_t do_div_ax_dx(ctx_t* ctx, const pis_op_t* divisor, bool is_signed) {
                 PIS_OPCODE_SHIFT_LEFT,
                 zext_dx,
                 zext_dx,
-                PIS_OPERAND_CONST(pis_size_to_bits(operand_size), double_operand_size)
+                PIS_OPERAND_IMM(pis_size_to_bits(operand_size), double_operand_size)
             )
         );
 
@@ -1753,7 +1748,7 @@ static err_t do_mul_ax(ctx_t* ctx, const pis_op_t* factor) {
                     PIS_OPCODE_SHIFT_RIGHT,
                     shifted_multiplication_result,
                     multiplication_result,
-                    PIS_OPERAND_CONST(pis_size_to_bits(operand_size), double_operand_size)
+                    PIS_OPERAND_IMM(pis_size_to_bits(operand_size), double_operand_size)
                 )
             );
 
@@ -1772,7 +1767,7 @@ static err_t do_mul_ax(ctx_t* ctx, const pis_op_t* factor) {
     pis_op_t is_high_zero = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_EQUALS, is_high_zero, result_high, PIS_OPERAND_CONST(0, operand_size))
+        PIS_INSN3(PIS_OPCODE_EQUALS, is_high_zero, result_high, PIS_OPERAND_IMM(0, operand_size))
     );
 
     PIS_EMIT(
@@ -1804,7 +1799,7 @@ static err_t do_bt_memory(ctx_t* ctx, const pis_op_t* bit_base_addr, const pis_o
             PIS_OPCODE_SHIFT_RIGHT_SIGNED,
             byte_offset,
             resized_bit_offset,
-            PIS_OPERAND_CONST(3, ctx->addr_size)
+            PIS_OPERAND_IMM(3, ctx->addr_size)
         )
     );
 
@@ -1825,7 +1820,7 @@ static err_t do_bt_memory(ctx_t* ctx, const pis_op_t* bit_base_addr, const pis_o
             PIS_OPCODE_AND,
             in_byte_bit_offset,
             in_byte_bit_offset,
-            PIS_OPERAND_CONST(7, PIS_SIZE_1)
+            PIS_OPERAND_IMM(7, PIS_SIZE_1)
         )
     );
 
@@ -1896,21 +1891,21 @@ static err_t rep_begin(ctx_t* ctx, rep_ctx_t* rep_ctx) {
     pis_op_t cx_equals_zero = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_EQUALS, cx_equals_zero, cx, PIS_OPERAND_CONST(0, ctx->addr_size))
+        PIS_INSN3(PIS_OPCODE_EQUALS, cx_equals_zero, cx, PIS_OPERAND_IMM(0, ctx->addr_size))
     );
 
     // emit a jump which should skip over the entire code. the offset is currently 0 since we
     // don't know the size of the code, but it will be filled with the correct value later on.
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN2(PIS_OPCODE_JMP_COND, PIS_OPERAND_CONST(0, PIS_SIZE_1), cx_equals_zero)
+        PIS_INSN2(PIS_OPCODE_JMP_COND, PIS_OPERAND_IMM(0, PIS_SIZE_1), cx_equals_zero)
     );
     CHECK_RETHROW(pis_lift_res_get_last_emitted_insn(&ctx->args->result, &rep_ctx->jmp_end_insn));
 
     // now that we know that `cx` is not zero, decrement it.
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_SUB, cx, cx, PIS_OPERAND_CONST(1, ctx->addr_size))
+        PIS_INSN3(PIS_OPCODE_SUB, cx, cx, PIS_OPERAND_IMM(1, ctx->addr_size))
     );
 
 cleanup:
@@ -1931,13 +1926,13 @@ static err_t rep_end(ctx_t* ctx, const rep_ctx_t* rep_ctx) {
     // now jump back to the start of the loop, for the next iteration of the loop.
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN1(PIS_OPCODE_JMP, PIS_OPERAND_CONST(rep_ctx->insn_index_at_loop_start, PIS_SIZE_1))
+        PIS_INSN1(PIS_OPCODE_JMP, PIS_OPERAND_IMM(rep_ctx->insn_index_at_loop_start, PIS_SIZE_1))
     );
 
     // now that we finished emitting the code, update the offset of the jmp instruction at the start
     // of the loop which should jump to the end of the instruction.
     rep_ctx->jmp_end_insn->operands[0] =
-        PIS_OPERAND_CONST(ctx->args->result.insns_amount, PIS_SIZE_1);
+        PIS_OPERAND_IMM(ctx->args->result.insns_amount, PIS_SIZE_1);
 
 cleanup:
     return err;
@@ -2031,7 +2026,7 @@ static err_t
 
             *lifted_operand = (lifted_op_t) {
                 .kind = LIFTED_OP_KIND_VALUE,
-                .value = PIS_OPERAND_CONST(imm, op_size_to_pis_operand_size(extended_size)),
+                .value = PIS_OPERAND_IMM(imm, op_size_to_pis_operand_size(extended_size)),
             };
 
             break;
@@ -2051,7 +2046,7 @@ static err_t
             op_size_t size = calc_size(ctx, op_info->specific_imm.operand_size_info_index);
             *lifted_operand = (lifted_op_t) {
                 .kind = LIFTED_OP_KIND_VALUE,
-                .value = PIS_OPERAND_CONST(imm, op_size_to_pis_operand_size(size)),
+                .value = PIS_OPERAND_IMM(imm, op_size_to_pis_operand_size(size)),
             };
 
             break;
@@ -2180,7 +2175,7 @@ static err_t
 
             *lifted_operand = (lifted_op_t) {
                 .kind = LIFTED_OP_KIND_MEM,
-                .value = PIS_OPERAND_CONST(addr, ctx->addr_size),
+                .value = PIS_OPERAND_IMM(addr, ctx->addr_size),
             };
 
             break;
@@ -2764,7 +2759,7 @@ static err_t pop(ctx_t* ctx, pis_size_t pop_size, pis_op_t* result) {
 
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_ADD, sp, sp, PIS_OPERAND_CONST(operand_size_bytes, sp.size))
+        PIS_INSN3(PIS_OPCODE_ADD, sp, sp, PIS_OPERAND_IMM(operand_size_bytes, sp.size))
     );
 
     *result = tmp;
@@ -2831,7 +2826,7 @@ static err_t handle_mnemonic_stos(ctx_t* ctx, const lifted_op_t* ops, size_t ops
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_STORE, di, ax));
 
     // increment di
-    pis_op_t increment = PIS_OPERAND_CONST(pis_size_to_bytes(operand_size), ctx->addr_size);
+    pis_op_t increment = PIS_OPERAND_IMM(pis_size_to_bytes(operand_size), ctx->addr_size);
     PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, di, di, increment));
 
     CHECK_RETHROW(rep_end(ctx, &rep_ctx));
@@ -2860,7 +2855,7 @@ static err_t handle_mnemonic_movs(ctx_t* ctx, const lifted_op_t* ops, size_t ops
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_STORE, di, byte_tmp));
 
     // increment si and di
-    pis_op_t increment = PIS_OPERAND_CONST(pis_size_to_bytes(operand_size), ctx->addr_size);
+    pis_op_t increment = PIS_OPERAND_IMM(pis_size_to_bytes(operand_size), ctx->addr_size);
     PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, si, si, increment));
     PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_ADD, di, di, increment));
 

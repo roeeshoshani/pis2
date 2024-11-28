@@ -84,7 +84,7 @@
 
 #define PIS_OPERAND_REG(OFFSET, SIZE) (PIS_OPERAND_VAR(PIS_VAR_SPACE_REG, OFFSET, SIZE))
 
-#define PIS_OPERAND_CONST(VALUE, SIZE)                                                             \
+#define PIS_OPERAND_IMM(VALUE, SIZE)                                                             \
     ((pis_op_t) {                                                                                  \
         .kind = PIS_OP_KIND_IMM,                                                                   \
         .size = SIZE,                                                                              \
@@ -97,8 +97,8 @@
             },                                                                                     \
     })
 
-#define PIS_OPERAND_CONST_NEG(ABS_VALUE, SIZE)                                                     \
-    (PIS_OPERAND_CONST(pis_const_negate(ABS_VALUE, SIZE), SIZE))
+#define PIS_OPERAND_IMM_NEG(ABS_VALUE, SIZE)                                                     \
+    (PIS_OPERAND_IMM(pis_const_negate(ABS_VALUE, SIZE), SIZE))
 
 #define PIS_EMIT(LIFT_RES, INSN) CHECK_RETHROW(pis_lift_res_emit((LIFT_RES), &(INSN)))
 

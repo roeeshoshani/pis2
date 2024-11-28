@@ -177,7 +177,7 @@ err_t write_gpr(ctx_t* ctx, const pis_op_t* gpr, const pis_op_t* value) {
         shifted_value = zext_value;
     } else {
         // shift needed, shift the value accordingly
-        pis_op_t shift_bits_operand = PIS_OPERAND_CONST(shift_bits, container_size);
+        pis_op_t shift_bits_operand = PIS_OPERAND_IMM(shift_bits, container_size);
         shifted_value = TMP_ALLOC(&ctx->tmp_allocator, container_size);
         PIS_EMIT(
             &ctx->args->result,
@@ -191,7 +191,7 @@ err_t write_gpr(ctx_t* ctx, const pis_op_t* gpr, const pis_op_t* value) {
     u64 mask = (~value_bits_mask) & pis_size_max_unsigned_value(container_size);
 
     // mask the container GPR.
-    pis_op_t mask_operand = PIS_OPERAND_CONST(mask, container_size);
+    pis_op_t mask_operand = PIS_OPERAND_IMM(mask, container_size);
     pis_op_t masked_container_gpr = TMP_ALLOC(&ctx->tmp_allocator, container_size);
     PIS_EMIT(
         &ctx->args->result,
@@ -230,7 +230,7 @@ err_t read_gpr(ctx_t* ctx, const pis_op_t* gpr, pis_op_t* out_value) {
         shifted_value = container_gpr;
     } else {
         // shift needed, shift the value accordingly
-        pis_op_t shift_bits_operand = PIS_OPERAND_CONST(shift_bits, container_size);
+        pis_op_t shift_bits_operand = PIS_OPERAND_IMM(shift_bits, container_size);
         shifted_value = TMP_ALLOC(&ctx->tmp_allocator, container_size);
         PIS_EMIT(
             &ctx->args->result,

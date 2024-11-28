@@ -34,7 +34,7 @@ typedef enum {
 static pis_op_t reg_get_operand(u8 reg_encoding, reg_access_kind_t access_kind) {
     if (access_kind == REG_ACCESS_KIND_READ && reg_encoding == 0) {
         // reading register 0 always returns 0
-        return PIS_OPERAND_CONST(0, PIS_SIZE_4);
+        return PIS_OPERAND_IMM(0, PIS_SIZE_4);
     } else {
         return PIS_OPERAND_REG(reg_encoding * 4, PIS_SIZE_4);
     }
@@ -107,7 +107,7 @@ static u32 calc_branch_ret_addr(ctx_t* ctx) {
 }
 
 static pis_op_t calc_branch_ret_addr_op(ctx_t* ctx) {
-    return PIS_OPERAND_CONST(calc_branch_ret_addr(ctx), PIS_SIZE_4);
+    return PIS_OPERAND_IMM(calc_branch_ret_addr(ctx), PIS_SIZE_4);
 }
 
 static err_t do_shift_imm(ctx_t* ctx, pis_opcode_t shift_opcode) {
@@ -117,7 +117,7 @@ static err_t do_shift_imm(ctx_t* ctx, pis_opcode_t shift_opcode) {
 
     pis_op_t rt = reg_get_operand(insn_field_rt(ctx->insn), REG_ACCESS_KIND_READ);
     pis_op_t rd = reg_get_operand(insn_field_rd(ctx->insn), REG_ACCESS_KIND_WRITE);
-    pis_op_t sa = PIS_OPERAND_CONST(insn_field_sa(ctx->insn), PIS_SIZE_4);
+    pis_op_t sa = PIS_OPERAND_IMM(insn_field_sa(ctx->insn), PIS_SIZE_4);
 
     PIS_EMIT(&ctx->args->result, PIS_INSN3(shift_opcode, rd, rt, sa));
 
@@ -170,7 +170,7 @@ static err_t do_shift_reg(ctx_t* ctx, pis_opcode_t shift_opcode) {
     pis_op_t shift_amount = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_AND, shift_amount, rs, PIS_OPERAND_CONST(0b11111, PIS_SIZE_4))
+        PIS_INSN3(PIS_OPCODE_AND, shift_amount, rs, PIS_OPERAND_IMM(0b11111, PIS_SIZE_4))
     );
 
     PIS_EMIT(&ctx->args->result, PIS_INSN3(shift_opcode, rd, rt, shift_amount));
@@ -374,7 +374,7 @@ static err_t do_mul(ctx_t* ctx, pis_opcode_t reg_extend_opcode, pis_opcode_t mul
     // calculate HI
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, mult_res, mult_res, PIS_OPERAND_CONST(32, PIS_SIZE_8))
+        PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, mult_res, mult_res, PIS_OPERAND_IMM(32, PIS_SIZE_8))
     );
     PIS_EMIT(
         &ctx->args->result,
@@ -929,7 +929,7 @@ static err_t do_binop_imm(ctx_t* ctx, pis_opcode_t opcode, imm_ext_kind_t ext_ki
     pis_op_t rt = reg_get_operand(insn_field_rt(ctx->insn), REG_ACCESS_KIND_WRITE);
     u32 imm = insn_field_imm_ext(ctx->insn, ext_kind);
 
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(opcode, rt, rs, PIS_OPERAND_CONST(imm, PIS_SIZE_4)));
+    PIS_EMIT(&ctx->args->result, PIS_INSN3(opcode, rt, rs, PIS_OPERAND_IMM(imm, PIS_SIZE_4)));
 
 cleanup:
     return err;
@@ -970,7 +970,7 @@ static err_t opcode_handler_0a(ctx_t* ctx) {
     pis_op_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_SIGNED_LESS_THAN, cond, rs, PIS_OPERAND_CONST(imm, PIS_SIZE_4))
+        PIS_INSN3(PIS_OPCODE_SIGNED_LESS_THAN, cond, rs, PIS_OPERAND_IMM(imm, PIS_SIZE_4))
     );
 
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, rt, cond));
@@ -991,7 +991,7 @@ static err_t opcode_handler_0b(ctx_t* ctx) {
     pis_op_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_UNSIGNED_LESS_THAN, cond, rs, PIS_OPERAND_CONST(imm, PIS_SIZE_4))
+        PIS_INSN3(PIS_OPCODE_UNSIGNED_LESS_THAN, cond, rs, PIS_OPERAND_IMM(imm, PIS_SIZE_4))
     );
 
     PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, rt, cond));
@@ -1045,7 +1045,7 @@ static err_t opcode_handler_0f(ctx_t* ctx) {
 
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN2(PIS_OPCODE_MOVE, rt, PIS_OPERAND_CONST(value, PIS_SIZE_4))
+        PIS_INSN2(PIS_OPCODE_MOVE, rt, PIS_OPERAND_IMM(value, PIS_SIZE_4))
     );
 
 cleanup:
@@ -1080,7 +1080,7 @@ static err_t
     pis_op_t addr = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_ADD, addr, *base, PIS_OPERAND_CONST(offset, PIS_SIZE_4))
+        PIS_INSN3(PIS_OPCODE_ADD, addr, *base, PIS_OPERAND_IMM(offset, PIS_SIZE_4))
     );
 
     *calculated_addr = addr;
@@ -1215,13 +1215,13 @@ static err_t do_load_store_unaligned(
     pis_op_t aligned_addr = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_AND, aligned_addr, addr, PIS_OPERAND_CONST(0xfffffffc, PIS_SIZE_4))
+        PIS_INSN3(PIS_OPCODE_AND, aligned_addr, addr, PIS_OPERAND_IMM(0xfffffffc, PIS_SIZE_4))
     );
 
     pis_op_t offset_in_word = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
     PIS_EMIT(
         &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_AND, offset_in_word, addr, PIS_OPERAND_CONST(0x3, PIS_SIZE_4))
+        PIS_INSN3(PIS_OPCODE_AND, offset_in_word, addr, PIS_OPERAND_IMM(0x3, PIS_SIZE_4))
     );
 
     pis_op_t bit_offset_in_word = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_4);
@@ -1231,7 +1231,7 @@ static err_t do_load_store_unaligned(
             PIS_OPCODE_UNSIGNED_MUL,
             bit_offset_in_word,
             offset_in_word,
-            PIS_OPERAND_CONST(8, PIS_SIZE_4)
+            PIS_OPERAND_IMM(8, PIS_SIZE_4)
         )
     );
 
@@ -1241,7 +1241,7 @@ static err_t do_load_store_unaligned(
         PIS_INSN3(
             PIS_OPCODE_SUB,
             inverse_bit_offset_in_word,
-            PIS_OPERAND_CONST(32, PIS_SIZE_4),
+            PIS_OPERAND_IMM(32, PIS_SIZE_4),
             bit_offset_in_word
         )
     );
@@ -1309,7 +1309,7 @@ static err_t do_load_store_unaligned(
         PIS_INSN3(
             orig_val_mask_shift_opcode,
             orig_val_mask,
-            PIS_OPERAND_CONST(0xffffffff, PIS_SIZE_4),
+            PIS_OPERAND_IMM(0xffffffff, PIS_SIZE_4),
             orig_val_mask_shift_amount
         )
     );

@@ -38,7 +38,7 @@ static err_t build_sib_addr_into(ctx_t* ctx, const modrm_t* modrm, const pis_op_
         CHECK_RETHROW(cursor_next_4(&ctx->args->machine_code, &disp, PIS_ENDIANNESS_LITTLE));
         PIS_EMIT(
             &ctx->args->result,
-            PIS_INSN2(PIS_OPCODE_MOVE, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
+            PIS_INSN2(PIS_OPCODE_MOVE, *into, PIS_OPERAND_IMM(disp, ctx->addr_size))
         );
     } else {
         pis_op_t base_reg_operand = reg_get_operand(
@@ -65,7 +65,7 @@ static err_t build_sib_addr_into(ctx_t* ctx, const modrm_t* modrm, const pis_op_
                 PIS_OPCODE_UNSIGNED_MUL,
                 sib_tmp,
                 sib_tmp,
-                PIS_OPERAND_CONST(1 << sib.scale, ctx->addr_size)
+                PIS_OPERAND_IMM(1 << sib.scale, ctx->addr_size)
             )
         );
 
@@ -86,7 +86,7 @@ static err_t
         CHECK_RETHROW(cursor_next_2(&ctx->args->machine_code, &disp, PIS_ENDIANNESS_LITTLE));
         PIS_EMIT(
             &ctx->args->result,
-            PIS_INSN2(PIS_OPCODE_MOVE, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
+            PIS_INSN2(PIS_OPCODE_MOVE, *into, PIS_OPERAND_IMM(disp, ctx->addr_size))
         );
     } else {
         // handle the base regs
@@ -175,7 +175,7 @@ static err_t
                 ));
                 PIS_EMIT(
                     &ctx->args->result,
-                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
+                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_IMM(disp, ctx->addr_size))
                 );
                 break;
             }
@@ -186,7 +186,7 @@ static err_t
                 );
                 PIS_EMIT(
                     &ctx->args->result,
-                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
+                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_IMM(disp, ctx->addr_size))
                 );
                 break;
             }
@@ -207,7 +207,7 @@ static err_t build_modrm_rm_addr_32_into(ctx_t* ctx, const modrm_t* modrm, const
         CHECK_RETHROW(cursor_next_4(&ctx->args->machine_code, &disp, PIS_ENDIANNESS_LITTLE));
         PIS_EMIT(
             &ctx->args->result,
-            PIS_INSN2(PIS_OPCODE_MOVE, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
+            PIS_INSN2(PIS_OPCODE_MOVE, *into, PIS_OPERAND_IMM(disp, ctx->addr_size))
         );
     } else {
         if (modrm->rm == 0b100) {
@@ -236,7 +236,7 @@ static err_t build_modrm_rm_addr_32_into(ctx_t* ctx, const modrm_t* modrm, const
                 ));
                 PIS_EMIT(
                     &ctx->args->result,
-                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp, PIS_SIZE_4))
+                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_IMM(disp, PIS_SIZE_4))
                 );
                 break;
             }
@@ -247,7 +247,7 @@ static err_t build_modrm_rm_addr_32_into(ctx_t* ctx, const modrm_t* modrm, const
                 );
                 PIS_EMIT(
                     &ctx->args->result,
-                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
+                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_IMM(disp, ctx->addr_size))
                 );
                 break;
             }
@@ -281,7 +281,7 @@ static err_t build_modrm_rm_addr_64_into(ctx_t* ctx, const modrm_t* modrm, const
 
         PIS_EMIT(
             &ctx->args->result,
-            PIS_INSN2(PIS_OPCODE_MOVE, *into, PIS_OPERAND_CONST(mem_addr, ctx->addr_size))
+            PIS_INSN2(PIS_OPCODE_MOVE, *into, PIS_OPERAND_IMM(mem_addr, ctx->addr_size))
         );
     } else {
         if (modrm->rm == 0b100) {
@@ -314,7 +314,7 @@ static err_t build_modrm_rm_addr_64_into(ctx_t* ctx, const modrm_t* modrm, const
                 ));
                 PIS_EMIT(
                     &ctx->args->result,
-                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
+                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_IMM(disp, ctx->addr_size))
                 );
                 break;
             }
@@ -331,7 +331,7 @@ static err_t build_modrm_rm_addr_64_into(ctx_t* ctx, const modrm_t* modrm, const
                 ));
                 PIS_EMIT(
                     &ctx->args->result,
-                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_CONST(disp, ctx->addr_size))
+                    PIS_INSN3(PIS_OPCODE_ADD, *into, *into, PIS_OPERAND_IMM(disp, ctx->addr_size))
                 );
                 break;
             }
