@@ -31,6 +31,7 @@
     _(CDFG_CALCULATION_UNSIGNED_MUL, )                                                             \
     _(CDFG_CALCULATION_SIGNED_LESS_THAN, )                                                         \
     _(CDFG_CALCULATION_NEG, )                                                                      \
+    _(CDFG_CALCULATION_NOT, )                                                                      \
     _(CDFG_CALCULATION_COND_NEGATE, )                                                              \
     _(CDFG_CALCULATION_EQUALS, )
 
@@ -53,8 +54,9 @@ STR_ENUM(cdfg_calculation, CDFG_CALCULATION, PACKED);
 /// the kind of a CDFG node.
 STR_ENUM(cdfg_node_kind, CDFG_NODE_KIND, PACKED);
 
-/// a type used to represent IDs of items in the CDFG. the IDs are indexes into storage arrays. we are very limited by memory usage,
-/// so our arrays will be very small, and 16-bit indexes should be more than enough for all of them.
+/// a type used to represent IDs of items in the CDFG. the IDs are indexes into storage arrays. we
+/// are very limited by memory usage, so our arrays will be very small, and 16-bit indexes should be
+/// more than enough for all of them.
 typedef u16 cdfg_item_id_t;
 
 /// the id of a CDFG node
