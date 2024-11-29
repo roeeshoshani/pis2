@@ -39,8 +39,8 @@ build/%.elf:
 # example binaries support
 include makefiles/examples.mk
 
-# test shellcode support
-include makefiles/test_shellcodes.mk
+# emulation tests shellcode support
+include makefiles/emu_test_shellcodes.mk
 
 # tests support
 include makefiles/tests.mk

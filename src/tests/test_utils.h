@@ -53,4 +53,10 @@ typedef struct {
 #define MAGIC64_2 (0xaabbccddaabbccddULL)
 #define MAGIC64_3 (0x1a2b3c4d1a2b3c4dULL)
 
+#define EACH_ARCH(_, ...)                                                                          \
+    _(i686, ##__VA_ARGS__)                                                                         \
+    _(x86_64, ##__VA_ARGS__)                                                                       \
+    _(mipsbe32r1, ##__VA_ARGS__)                                                                   \
+    _(mipsel32r1, ##__VA_ARGS__)
+
 extern pis_emu_t g_emu;
