@@ -1958,15 +1958,12 @@ cleanup:
     return err;
 }
 
-static err_t find_node_input_by_predicate(
+static cdfg_node_id_t find_node_input_by_predicate(
     const cdfg_t* cdfg,
     cdfg_node_id_t node_id,
     cdfg_edge_kind_t edge_kind,
-    node_predicate_t predicate,
-    cdfg_node_id_t* out_found_node_id
+    node_predicate_t predicate
 ) {
-    err_t err = SUCCESS;
-
     cdfg_node_id_t found_node_id = {.id = CDFG_ITEM_ID_INVALID};
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* edge = &cdfg->edge_storage[i];
@@ -1985,16 +1982,15 @@ static err_t find_node_input_by_predicate(
             continue;
         }
 
-        // make sure that we only found one such item.
-        CHECK(found_node_id.id == CDFG_ITEM_ID_INVALID);
+        if (found_node_id.id != CDFG_ITEM_ID_INVALID) {
+            // if we found more than one match, return as if there was no match at all
+            found_node_id.id = CDFG_ITEM_ID_INVALID;
+            break;
+        }
 
         found_node_id = edge->from_node;
     }
-
-    *out_found_node_id = found_node_id;
-
-cleanup:
-    return err;
+    return found_node_id;
 }
 
 static bool node_is_zero_imm(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
@@ -2029,27 +2025,19 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
         // the current node is an equals node.
 
         // we need one of the inputs to be a zero immediate operand.
-        cdfg_node_id_t zero_imm_node_id = {.id = CDFG_ITEM_ID_INVALID};
-        CHECK_RETHROW(find_node_input_by_predicate(
+        cdfg_node_id_t zero_imm_node_id = find_node_input_by_predicate(
             cdfg,
             cur_node_id,
             CDFG_EDGE_KIND_DATA_FLOW,
-            node_is_zero_imm,
-            &zero_imm_node_id
-        ));
+            node_is_zero_imm
+        );
         if (zero_imm_node_id.id == CDFG_ITEM_ID_INVALID) {
             continue;
         }
 
         // we need another one of the inputs to be a sub operation.
-        cdfg_node_id_t sub_node_id = {.id = CDFG_ITEM_ID_INVALID};
-        CHECK_RETHROW(find_node_input_by_predicate(
-            cdfg,
-            cur_node_id,
-            CDFG_EDGE_KIND_DATA_FLOW,
-            node_is_sub,
-            &sub_node_id
-        ));
+        cdfg_node_id_t sub_node_id =
+            find_node_input_by_predicate(cdfg, cur_node_id, CDFG_EDGE_KIND_DATA_FLOW, node_is_sub);
         if (sub_node_id.id == CDFG_ITEM_ID_INVALID) {
             continue;
         }
