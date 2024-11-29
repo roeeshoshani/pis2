@@ -1691,15 +1691,23 @@ static err_t cdfg_finalize_intermediate_nodes(cdfg_builder_t* builder) {
     err_t err = SUCCESS;
 
     // replace intermediate nodes with their final representation.
+
+    // first do block variables
+    for (size_t i = 0; i < builder->cdfg.nodes_amount; i++) {
+        cdfg_node_id_t node_id = {.id = i};
+        cdfg_node_t* node = &builder->cdfg.node_storage[i];
+        if (node->kind == CDFG_NODE_KIND_BLOCK_VAR) {
+            CHECK_RETHROW(cdfg_finalize_block_var(builder, node_id, node));
+        }
+    }
+
+    // then do block entry and finish nodes
     for (size_t i = 0; i < builder->cdfg.nodes_amount; i++) {
         cdfg_node_id_t node_id = {.id = i};
         cdfg_node_t* node = &builder->cdfg.node_storage[i];
         switch (node->kind) {
             case CDFG_NODE_KIND_BLOCK_ENTRY:
                 cdfg_finalize_block_entry(node);
-                break;
-            case CDFG_NODE_KIND_BLOCK_VAR:
-                CHECK_RETHROW(cdfg_finalize_block_var(builder, node_id, node));
                 break;
             case CDFG_NODE_KIND_BLOCK_FINAL_VALUE:
                 CHECK_RETHROW(cdfg_finalize_block_final_value(builder, node_id, node));
