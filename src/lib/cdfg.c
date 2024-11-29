@@ -549,16 +549,12 @@ cleanup:
 }
 
 static err_t make_block_var_node(
-    cdfg_t* cdfg, cfg_item_id_t block_id, pis_var_t var, cdfg_node_id_t* out_node_id
+    cdfg_t* cdfg, cfg_item_id_t block_id, pis_region_t reg_region, cdfg_node_id_t* out_node_id
 ) {
     err_t err = SUCCESS;
 
-    // block var nodes are only for register operands
-    CHECK(var.space == PIS_VAR_SPACE_REG);
-
-    pis_region_t region = pis_var_region(var);
     cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
-    CHECK_RETHROW(find_block_var_node(cdfg, block_id, region, &node_id));
+    CHECK_RETHROW(find_block_var_node(cdfg, block_id, reg_region, &node_id));
 
     if (node_id.id == CDFG_ITEM_ID_INVALID) {
         // no existing node, create a new one.
@@ -570,7 +566,7 @@ static err_t make_block_var_node(
                     .block_var =
                         {
                             .block_id = block_id,
-                            .reg_region = region,
+                            .reg_region = reg_region,
                         },
                 },
         };
@@ -593,13 +589,16 @@ static err_t
 
         // only register operands are allowed to be read when uninitialized.
         CHECK(var.space == PIS_VAR_SPACE_REG);
+        pis_region_t reg_region = pis_var_region(var);
 
         // initialize it to a new variable node.
 
         // first, create the block var node
         cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
         CHECK(builder->cur_block_id != CFG_ITEM_ID_INVALID);
-        CHECK_RETHROW(make_block_var_node(&builder->cdfg, builder->cur_block_id, var, &node_id));
+        CHECK_RETHROW(
+            make_block_var_node(&builder->cdfg, builder->cur_block_id, reg_region, &node_id)
+        );
 
         // now add a slot in the op state to point to it
         CHECK_RETHROW(make_op_state_slot(&builder->op_state, var, node_id));
@@ -1381,6 +1380,49 @@ cleanup:
     return err;
 }
 
+static err_t inherit_predecessor_final_value(
+    cdfg_builder_t* builder, cdfg_node_t* final_value_node, cfg_item_id_t block_id
+) {
+    err_t err = SUCCESS;
+
+    pis_region_t reg_region = final_value_node->content.block_final_value.reg_region;
+
+    cdfg_node_id_t block_var_node_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(find_block_var_node(&builder->cdfg, block_id, reg_region, &block_var_node_id));
+
+    if (block_var_node_id.id != CDFG_ITEM_ID_INVALID) {
+        // the block already has a variable for this register.
+        SUCCESS_CLEANUP();
+    }
+
+    // if this block doesn't have a variable for this register, we want to create it so that we can
+    // later point it to the value inherited from the predecessors. this is useful because even if
+    // this block doesn't use this register, one of its successors may use it, and it needs to
+    // inherit the value from the predecessors.
+
+    CHECK_RETHROW(make_block_var_node(&builder->cdfg, block_id, reg_region, &block_var_node_id));
+
+cleanup:
+    return err;
+}
+
+static err_t inherit_predecessor_final_values(
+    cdfg_builder_t* builder, cfg_item_id_t block_id, cfg_item_id_t predecessor_block_id
+) {
+    err_t err = SUCCESS;
+
+    for (size_t i = 0; i < builder->cdfg.nodes_amount; i++) {
+        cdfg_node_t* node = &builder->cdfg.node_storage[i];
+        if (node->kind == CDFG_NODE_KIND_BLOCK_FINAL_VALUE &&
+            node->content.block_final_value.block_id == predecessor_block_id) {
+            // found a node which represents the final value of a register in the predecessor.
+            CHECK_RETHROW(inherit_predecessor_final_value(builder, node, block_id));
+        }
+    }
+
+cleanup:
+    return err;
+}
 static err_t integrate_predecessor(
     cdfg_builder_t* builder,
     cfg_item_id_t block_id,
@@ -2068,6 +2110,27 @@ err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg) {
 
         // process the block
         CHECK_RETHROW(process_block(builder, i));
+    }
+
+    // inherit final values from predecessors in all blocks
+    for (size_t block = 0; block < cfg->blocks_amount; block++) {
+        for (size_t predecessor = 0; predecessor < builder->cfg->blocks_amount; predecessor++) {
+            if (block == predecessor) {
+                // skip the block itself
+                continue;
+            }
+
+            bool is_direct_predecessor = false;
+            CHECK_RETHROW(cfg_block_is_direct_predecessor(
+                builder->cfg,
+                predecessor,
+                block,
+                &is_direct_predecessor
+            ));
+            if (is_direct_predecessor) {
+                CHECK_RETHROW(inherit_predecessor_final_values(builder, block, predecessor));
+            }
+        }
     }
 
     // now we need to integrate all blocks with each other
