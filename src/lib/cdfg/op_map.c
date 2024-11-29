@@ -159,6 +159,7 @@ cleanup:
     return err;
 }
 
+/// updates the operands map according to an access to some operand in it.
 err_t cdfg_op_map_update(cdfg_op_map_t* map, pis_region_t accessed_region) {
     err_t err = SUCCESS;
 
@@ -194,6 +195,51 @@ err_t cdfg_op_map_update(cdfg_op_map_t* map, pis_region_t accessed_region) {
             CHECK_RETHROW(map_add_region(map, accessed_region));
             break;
     }
+cleanup:
+    return err;
+}
+
+/// finds the largest enclosing region of the given region in the operand map.
+err_t cdfg_op_map_largest_enclosing(
+    const cdfg_op_map_t* map, pis_region_t region, bool* out_found, pis_region_t* out_region
+) {
+    err_t err = SUCCESS;
+
+    search_res_t search_res = {};
+    CHECK_RETHROW(search_region(map, region, &search_res));
+
+    switch (search_res.kind) {
+        case SEARCH_RES_KIND_PARTIALLY_OVERLAPPING:
+            // no container region for partially overlapping regions
+            *out_found = false;
+            break;
+        case SEARCH_RES_KIND_FOUND_EXACT_MATCH_SLOT:
+            // found an exact match. the container region is the region itself.
+            *out_found = true;
+            *out_region = region;
+            break;
+        case SEARCH_RES_KIND_FOUND_CONTAINER_SLOT: {
+            // found a slot which contains this region.
+            const cdfg_op_map_slot_t* slot = &map->slots[search_res.container_slot_index];
+            *out_region = (pis_region_t) {
+                .offset = slot->offset,
+
+                // assuming that the slot is valid, its size should be a valid pis size
+                .size = (pis_size_t) slot->size,
+            };
+            break;
+        }
+        case SEARCH_RES_KIND_FOUND_CONTAINED_SLOTS:
+            // the provided region contains multiple slots. assuming that we have previously
+            // iterated over all of the code and processed all operand accesses, this should never
+            // happen.
+            CHECK_FAIL();
+        case SEARCH_RES_KIND_NO_MATCH:
+            // no such region in the map.
+            *out_found = false;
+            break;
+    }
+
 cleanup:
     return err;
 }

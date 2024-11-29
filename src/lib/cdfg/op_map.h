@@ -33,5 +33,11 @@ typedef struct {
 
 void cdfg_op_map_reset(cdfg_op_map_t* map);
 
-/// updates the operands map according to an access to some operand in it.
 err_t cdfg_op_map_update(cdfg_op_map_t* map, pis_region_t accessed_region);
+
+err_t cdfg_op_map_largest_enclosing(
+    const cdfg_op_map_t* map,
+    pis_region_t region,
+    bool* found_container_region,
+    pis_region_t* container_region
+);

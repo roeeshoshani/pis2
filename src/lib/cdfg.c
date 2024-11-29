@@ -122,8 +122,7 @@ static err_t op_state_find_slot(
             continue;
         }
         if (pis_vars_intersect(var, slot->var)) {
-            // partially initialized nodes are not allowed in the CDFG. the lifter implementations
-            // must make sure to not emit intersection GPR accesses to make this ok.
+            // partially initialized nodes are not allowed in the CDFG.
             CHECK(pis_vars_equal(var, slot->var));
 
             out_slot_id->id = i;
@@ -572,7 +571,7 @@ cleanup:
 }
 
 static err_t
-    write_var_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_node_id_t value_node_id) {
+    write_var_operand_direct(cdfg_builder_t* builder, pis_var_t var, cdfg_node_id_t value_node_id) {
     err_t err = SUCCESS;
 
     cdfg_op_state_slot_id_t existing_slot_id = {.id = CDFG_ITEM_ID_INVALID};
@@ -582,9 +581,120 @@ static err_t
         // found existing slot. overwrite its value with the new value.
         builder->op_state.slots[existing_slot_id.id].value_node_id = value_node_id;
     } else {
-        // operand isuninitialized. just add a new slot which contains the new value for this
+        // operand is uninitialized. just add a new slot which contains the new value for this
         // operand.
         CHECK_RETHROW(make_op_state_slot(&builder->op_state, var, value_node_id));
+    }
+
+cleanup:
+    return err;
+}
+
+static err_t
+    write_reg_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_node_id_t value_node_id) {
+    err_t err = SUCCESS;
+
+    // register operands are allowed to perform accesses on using operand sizes and offsets, even
+    // inside of a single register. so, we must do write merging manually according to the operand
+    // map that we built before processing the code.
+
+    // find the container region of this register in the register operand map. all reads and writes
+    // must be performed using that container region.
+    pis_region_t region = pis_var_region(var);
+    pis_region_t enclosing_region = {};
+    bool found_enclosing_region = false;
+    CHECK_RETHROW(cdfg_op_map_largest_enclosing(
+        &builder->reg_op_map,
+        region,
+        &found_enclosing_region,
+        &enclosing_region
+    ));
+
+    // all registers should be in the register operand map.
+    CHECK(found_enclosing_region);
+
+    if (pis_regions_equal(region, enclosing_region)) {
+        // the region is standalone. write to it directly.
+        CHECK_RETHROW(write_var_operand_direct(builder, var, value_node_id));
+        SUCCESS_CLEANUP();
+    }
+
+    // read the enclosing region value
+    pis_var_t enclosing_var = {
+        .offset = enclosing_region.offset,
+        .size = enclosing_region.size,
+        .space = PIS_VAR_SPACE_REG,
+    };
+    cdfg_node_id_t enclosing_value_node = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(read_var_operand(builder, enclosing_var, &enclosing_value_node));
+
+    // shift the value to put it at the right offset in the GPR
+    size_t shift_bytes = region.offset - enclosing_region.offset;
+    size_t shift_bits = shift_bytes * 8;
+    cdfg_node_id_t shifted_value_node;
+    if (shift_bytes == 0) {
+        // no shift needed, use the unshifted value
+        shifted_value_node = value_node_id;
+    } else {
+        // shift needed, shift the value accordingly
+        cdfg_node_id_t shift_bits_node = {.id = CDFG_ITEM_ID_INVALID};
+        CHECK_RETHROW(make_imm_node(&builder->cdfg, shift_bits, &shift_bits_node));
+
+        CHECK_RETHROW(make_binop_node(
+            &builder->cdfg,
+            CDFG_CALCULATION_SHIFT_LEFT,
+            value_node_id,
+            shift_bits_node,
+            &shifted_value_node
+        ));
+    }
+
+    // calculate the mask to be used on the enclosing value to remove the relevant bits that will be
+    // set by the shifted value.
+    u64 value_bits_mask = pis_size_max_unsigned_value(region.size) << shift_bits;
+    u64 mask = (~value_bits_mask) & pis_size_max_unsigned_value(enclosing_region.size);
+
+    // mask the enclosing value.
+    cdfg_node_id_t mask_node = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(make_imm_node(&builder->cdfg, mask, &mask_node));
+
+    cdfg_node_id_t masked_enclosing_value_node = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(make_binop_node(
+        &builder->cdfg,
+        CDFG_CALCULATION_AND,
+        enclosing_value_node,
+        mask_node,
+        &masked_enclosing_value_node
+    ));
+
+    // OR the shifted value into the masked enclosing value to get the final result
+    cdfg_node_id_t final_value_node = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(make_binop_node(
+        &builder->cdfg,
+        CDFG_CALCULATION_OR,
+        masked_enclosing_value_node,
+        shifted_value_node,
+        &final_value_node
+    ));
+
+    // write the final value to the enclosing var
+    CHECK_RETHROW(write_var_operand_direct(builder, enclosing_var, final_value_node));
+
+cleanup:
+    return err;
+}
+
+static err_t
+    write_var_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_node_id_t value_node_id) {
+    err_t err = SUCCESS;
+
+    switch (var.space) {
+        case PIS_VAR_SPACE_REG:
+            CHECK_RETHROW(write_reg_operand(builder, var, value_node_id));
+            break;
+        case PIS_VAR_SPACE_TMP:
+            CHECK_RETHROW(write_var_operand_direct(builder, var, value_node_id));
+            break;
     }
 
 cleanup:
