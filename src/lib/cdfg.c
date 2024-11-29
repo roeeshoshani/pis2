@@ -2253,6 +2253,8 @@ err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg) {
     // finalize the intermediate nodes in our CFG
     CHECK_RETHROW(cdfg_finalize_intermediate_nodes(builder));
 
+    CHECK_RETHROW(cdfg_optimize(&builder->cdfg));
+
 cleanup:
     return err;
 }
