@@ -1536,11 +1536,11 @@ cleanup:
     return err;
 }
 
-static err_t cdfg_finalize_block_var(cdfg_builder_t* builder, cdfg_node_t* node) {
+static err_t
+    cdfg_finalize_block_var(cdfg_builder_t* builder, cdfg_node_id_t node_id, cdfg_node_t* node) {
     err_t err = SUCCESS;
 
     u16 inputs_amount = node->content.block_var.predecessor_values_amount;
-    pis_region_t reg_region = node->content.block_var.reg_region;
 
     if (inputs_amount == 0) {
         // if this block variable did not have a previous value, then it is an actual variable
@@ -1550,7 +1550,7 @@ static err_t cdfg_finalize_block_var(cdfg_builder_t* builder, cdfg_node_t* node)
                 {
                     .var =
                         {
-                            .reg_region = reg_region,
+                            .reg_region = node->content.block_var.reg_region,
                         },
                 },
         };
@@ -1566,6 +1566,14 @@ static err_t cdfg_finalize_block_var(cdfg_builder_t* builder, cdfg_node_t* node)
                         },
                 },
         };
+
+        // connect it to this block's entry CF node
+        cdfg_node_id_t entry_node_id =
+            builder->block_infos[node->content.block_var.block_id].entry_node;
+        CHECK(entry_node_id.id != CDFG_ITEM_ID_INVALID);
+        CHECK_RETHROW(
+            make_edge(&builder->cdfg, CDFG_EDGE_KIND_CONTROL_FLOW, entry_node_id, node_id, 0)
+        );
     }
 
 cleanup:
@@ -1606,7 +1614,7 @@ static err_t cdfg_finalize(cdfg_builder_t* builder) {
                 CHECK_RETHROW(cdfg_finalize_block_entry(builder, node));
                 break;
             case CDFG_NODE_KIND_BLOCK_VAR:
-                CHECK_RETHROW(cdfg_finalize_block_var(builder, node));
+                CHECK_RETHROW(cdfg_finalize_block_var(builder, node_id, node));
                 break;
             case CDFG_NODE_KIND_BLOCK_FINAL_VALUE:
                 CHECK_RETHROW(cdfg_finalize_block_final_value(builder, node_id, node));
