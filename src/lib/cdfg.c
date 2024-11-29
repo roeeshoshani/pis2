@@ -19,7 +19,7 @@ void cdfg_reset(cdfg_t* cdfg) {
     memset(cdfg, 0, sizeof(*cdfg));
 }
 
-static err_t node_find_inputs(
+static err_t find_node_inputs(
     const cdfg_t* cdfg,
     cdfg_node_id_t node_id,
     cdfg_edge_kind_t edge_kind,
@@ -171,21 +171,6 @@ static cdfg_node_id_t find_var_node(const cdfg_t* cdfg, pis_region_t region) {
             continue;
         }
         if (pis_regions_equal(node->content.var.reg_region, region)) {
-            return (cdfg_node_id_t) {.id = i};
-        }
-    }
-    return (cdfg_node_id_t) {.id = CDFG_ITEM_ID_INVALID};
-}
-
-static cdfg_node_id_t
-    find_block_var_node(const cdfg_t* cdfg, cdfg_item_id_t block_id, pis_region_t region) {
-    for (size_t i = 0; i < cdfg->nodes_amount; i++) {
-        const cdfg_node_t* node = &cdfg->node_storage[i];
-        if (node->kind != CDFG_NODE_KIND_BLOCK_VAR) {
-            continue;
-        }
-        if (pis_regions_equal(node->content.block_var.reg_region, region) &&
-            node->content.block_var.block_id == block_id) {
             return (cdfg_node_id_t) {.id = i};
         }
     }
@@ -406,10 +391,22 @@ cleanup:
     return err;
 }
 
-static err_t make_block_entry_node(cdfg_t* cdfg, cdfg_node_id_t* out_node_id) {
+static err_t
+    make_block_entry_node(cdfg_t* cdfg, cfg_item_id_t block_id, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_BLOCK_ENTRY, out_node_id));
+    cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(next_node_id(cdfg, &node_id));
+
+    cdfg->node_storage[node_id.id] = (cdfg_node_t) {
+        .kind = CDFG_NODE_KIND_BLOCK_ENTRY,
+        .content =
+            {
+                .block_entry = {.block_id = block_id},
+            },
+    };
+
+    *out_node_id = node_id;
 
 cleanup:
     return err;
@@ -448,7 +445,7 @@ static err_t find_existing_binop_node(
         }
 
         cdfg_node_id_t inputs[2] = {{.id = CDFG_ITEM_ID_INVALID}, {.id = CDFG_ITEM_ID_INVALID}};
-        CHECK_RETHROW(node_find_inputs(cdfg, cur_node_id, CDFG_EDGE_KIND_DATA_FLOW, inputs, 2));
+        CHECK_RETHROW(find_node_inputs(cdfg, cur_node_id, CDFG_EDGE_KIND_DATA_FLOW, inputs, 2));
 
         if ((inputs[0].id == lhs_node_id.id && inputs[1].id == rhs_node_id.id) ||
             (inputs[1].id == lhs_node_id.id && inputs[0].id == rhs_node_id.id)) {
@@ -511,7 +508,7 @@ cleanup:
     return err;
 }
 
-static err_t make_block_final_value_node(
+static err_t mark_block_final_value(
     cdfg_t* cdfg, cfg_item_id_t block_id, pis_var_t var, cdfg_node_id_t final_value
 ) {
     err_t err = SUCCESS;
@@ -566,16 +563,44 @@ cleanup:
     return err;
 }
 
-static err_t make_unknown_node(
+static err_t find_block_var_node(
+    const cdfg_t* cdfg, cfg_item_id_t block_id, pis_region_t region, cdfg_node_id_t* out_node_id
+) {
+    err_t err = SUCCESS;
+
+    cdfg_node_id_t found_node_id = {.id = CDFG_ITEM_ID_INVALID};
+
+    for (size_t i = 0; i < cdfg->nodes_amount; i++) {
+        const cdfg_node_t* node = &cdfg->node_storage[i];
+        if (node->kind != CDFG_NODE_KIND_BLOCK_VAR) {
+            continue;
+        }
+        if (node->content.block_var.block_id == block_id &&
+            pis_regions_intersect(node->content.block_var.reg_region, region)) {
+            CHECK(pis_regions_equal(node->content.block_var.reg_region, region));
+
+            CHECK(found_node_id.id == CDFG_ITEM_ID_INVALID);
+            found_node_id.id = i;
+        }
+    }
+
+    *out_node_id = found_node_id;
+
+cleanup:
+    return err;
+}
+
+static err_t make_block_var_node(
     cdfg_t* cdfg, cfg_item_id_t block_id, pis_var_t var, cdfg_node_id_t* out_node_id
 ) {
     err_t err = SUCCESS;
 
-    // unknown nodes are only for register operands
+    // block var nodes are only for register operands
     CHECK(var.space == PIS_VAR_SPACE_REG);
 
     pis_region_t region = pis_var_region(var);
-    cdfg_node_id_t node_id = find_block_var_node(cdfg, block_id, region);
+    cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(find_block_var_node(cdfg, block_id, region, &node_id));
 
     if (node_id.id == CDFG_ITEM_ID_INVALID) {
         // no existing node, create a new one.
@@ -613,10 +638,10 @@ static err_t
 
         // initialize it to a new variable node.
 
-        // first, create the unknown node
+        // first, create the block var node
         cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
         CHECK(builder->cur_block_id != CFG_ITEM_ID_INVALID);
-        CHECK_RETHROW(make_unknown_node(&builder->cdfg, builder->cur_block_id, var, &node_id));
+        CHECK_RETHROW(make_block_var_node(&builder->cdfg, builder->cur_block_id, var, &node_id));
 
         // now add a slot in the op state to point to it
         CHECK_RETHROW(make_op_state_slot(&builder->op_state, var, node_id));
@@ -1340,9 +1365,161 @@ static err_t process_block(cdfg_builder_t* builder, cfg_item_id_t block_id) {
             continue;
         }
         CHECK_RETHROW(
-            make_block_final_value_node(&builder->cdfg, block_id, slot->var, slot->value_node_id)
+            mark_block_final_value(&builder->cdfg, block_id, slot->var, slot->value_node_id)
         );
     }
+
+    // remember the last cf node of this block
+    builder->block_infos[block_id].last_cf_node = builder->op_state.last_cf_node_id;
+
+cleanup:
+    return err;
+}
+
+static err_t integrate_root_block(cdfg_builder_t* builder, cfg_item_id_t block_id) {
+    err_t err = SUCCESS;
+
+    // TODO: convert block entry to entry, block finish to finish, block var to var.
+
+cleanup:
+    return err;
+}
+
+static err_t integrate_predecessor_final_value(
+    cdfg_builder_t* builder,
+    cdfg_node_id_t final_value_node_id,
+    cfg_item_id_t block_id,
+    cfg_item_id_t predecessor_block_id,
+    size_t predecessor_index
+) {
+    err_t err = SUCCESS;
+
+    cdfg_node_t* final_value_node = &builder->cdfg.node_storage[final_value_node_id.id];
+    CHECK(final_value_node->kind == CDFG_NODE_KIND_BLOCK_FINAL_VALUE);
+
+    // find the block variable that matches the register for which the value was provided.
+    cdfg_node_id_t block_var_node_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(find_block_var_node(
+        &builder->cdfg,
+        block_id,
+        final_value_node->content.block_final_value.reg_region,
+        &block_var_node_id
+    ));
+
+    CHECK_RETHROW(make_edge(
+        &builder->cdfg,
+        CDFG_EDGE_KIND_DATA_FLOW,
+        final_value_node_id,
+        block_var_node_id,
+        predecessor_index
+    ));
+
+    cdfg_node_t* block_var_node = &builder->cdfg.node_storage[block_var_node_id.id];
+    CHECK(block_var_node->kind == CDFG_NODE_KIND_BLOCK_VAR);
+    block_var_node->content.block_var.predecessor_values_amount++;
+
+cleanup:
+    return err;
+}
+
+static err_t integrate_predecessor(
+    cdfg_builder_t* builder,
+    cfg_item_id_t block_id,
+    cfg_item_id_t predecessor_block_id,
+    size_t predecessor_index
+) {
+    err_t err = SUCCESS;
+
+    // first, connect the predecessor's last cf node into the entry node of this block.
+    cdfg_node_id_t entry_node_id = builder->block_infos[block_id].entry_node;
+    CHECK(entry_node_id.id != CDFG_ITEM_ID_INVALID);
+
+    cdfg_node_id_t predecessor_last_cf_node_id =
+        builder->block_infos[predecessor_block_id].last_cf_node;
+    CHECK(predecessor_last_cf_node_id.id != CDFG_ITEM_ID_INVALID);
+
+    CHECK_RETHROW(make_edge(
+        &builder->cdfg,
+        CDFG_EDGE_KIND_CONTROL_FLOW,
+        predecessor_last_cf_node_id,
+        entry_node_id,
+        predecessor_index
+    ));
+
+    // now integrate the predecessor's final values.
+    for (size_t i = 0; i < builder->cdfg.nodes_amount; i++) {
+        cdfg_node_id_t node_id = {.id = i};
+        cdfg_node_t* node = &builder->cdfg.node_storage[i];
+        if (node->kind == CDFG_NODE_KIND_BLOCK_FINAL_VALUE &&
+            node->content.block_final_value.block_id == predecessor_block_id) {
+            // found a node which represents the final value of a register in the predecessor.
+            CHECK_RETHROW(integrate_predecessor_final_value(
+                builder,
+                node_id,
+                block_id,
+                predecessor_block_id,
+                predecessor_index
+            ));
+        }
+    }
+
+cleanup:
+    return err;
+}
+
+static err_t integrate_block(cdfg_builder_t* builder, cfg_item_id_t block_id) {
+    err_t err = SUCCESS;
+
+    size_t found_predecessors_amount = 0;
+
+    // we want to merge the final states of all direct predecessors of this block
+    for (size_t i = 0; i < builder->cfg->blocks_amount; i++) {
+        if (i == block_id) {
+            // skip the block itself
+            continue;
+        }
+
+        bool is_direct_predecessor = false;
+        CHECK_RETHROW(
+            cfg_block_is_direct_predecessor(builder->cfg, i, block_id, &is_direct_predecessor)
+        );
+        if (is_direct_predecessor) {
+            // the current block is a direct predecessor of the prepared block, so we should use all
+            // its op state.
+            CHECK_RETHROW(integrate_predecessor(builder, block_id, i, found_predecessors_amount));
+            found_predecessors_amount++;
+        }
+    }
+
+    // make sure that we found any predecessors. only the first block is allowed to have no
+    // predecessors.
+    if (found_predecessors_amount == 0) {
+        CHECK_RETHROW(integrate_root_block(builder, block_id));
+    } else {
+        // our op state should now represent a merged state of all predecessors. all values are
+        // merged using phi nodes.
+        // in some cases, one of the predecessors might initialize a register while another
+        // predecessor does not. in this case, we will have partially initialized phi nodes, which
+        // only have some of their inputs connected. in those cases, we want to treat the register
+        // as uninitialized, since safe code should not use potentially uninitialized registers.
+        for (size_t i = 0; i < builder->op_state.used_slots_amount; i++) {
+            cdfg_op_state_slot_t* slot = &builder->op_state.slots[i];
+            if (slot->value_node_id.id == CDFG_ITEM_ID_INVALID) {
+                // this slot is vacant.
+                continue;
+            }
+            cdfg_node_id_t phi_node_id = slot->value_node_id;
+            cdfg_node_t* phi_node = &builder->cdfg.node_storage[phi_node_id.id];
+            if (phi_node->content.phi.inputs_amount != found_predecessors_amount) {
+                // sanity
+                CHECK(phi_node->content.phi.inputs_amount < found_predecessors_amount);
+
+                // invalidate this slot to make this register uninitialized
+                slot->value_node_id.id = CDFG_ITEM_ID_INVALID;
+            }
+        }
+    }
+
 
 cleanup:
     return err;
@@ -1547,7 +1724,7 @@ cleanup:
 //     return err;
 // }
 
-static err_t prepare_block_initial_op_state(cdfg_builder_t* builder) {
+static err_t prepare_block_initial_op_state(cdfg_builder_t* builder, cfg_item_id_t block_id) {
     err_t err = SUCCESS;
 
     // reset the op state.
@@ -1555,7 +1732,10 @@ static err_t prepare_block_initial_op_state(cdfg_builder_t* builder) {
     builder->op_state.last_cf_node_id.id = CDFG_ITEM_ID_INVALID;
 
     // create a block entry node which will be the root of control flow.
-    CHECK_RETHROW(make_block_entry_node(&builder->cdfg, &builder->op_state.last_cf_node_id));
+    cdfg_node_id_t entry_node_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(make_block_entry_node(&builder->cdfg, block_id, &entry_node_id));
+    builder->block_infos[block_id].entry_node = entry_node_id;
+    builder->op_state.last_cf_node_id = entry_node_id;
 cleanup:
     return err;
 }
@@ -1747,7 +1927,7 @@ static err_t binop_node_find_data_inputs(
 ) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(node_find_inputs(cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW, input_node_ids, 2));
+    CHECK_RETHROW(find_node_inputs(cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW, input_node_ids, 2));
 
 cleanup:
     return err;
@@ -1927,12 +2107,18 @@ err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg) {
     // build the register operand map
     CHECK_RETHROW(cdfg_build_reg_op_map(builder, cfg));
 
+    // process all blocks
     for (size_t i = 0; i < cfg->blocks_amount; i++) {
         // prepare the initial op state for the block
-        CHECK_RETHROW(prepare_block_initial_op_state(builder));
+        CHECK_RETHROW(prepare_block_initial_op_state(builder, i));
 
         // process the block
         CHECK_RETHROW(process_block(builder, i));
+    }
+
+    // now we need to integrate all blocks with each other
+    for (size_t i = 0; i < cfg->blocks_amount; i++) {
+        CHECK_RETHROW(integrate_block(builder, i));
     }
 
 cleanup:
@@ -1980,7 +2166,6 @@ static void cdfg_dump_node_desciption(const cdfg_node_t* node) {
             break;
         case CDFG_NODE_KIND_BLOCK_VAR:
         case CDFG_NODE_KIND_BLOCK_ENTRY:
-        case CDFG_NODE_KIND_BLOCK_FINISH:
         case CDFG_NODE_KIND_BLOCK_FINAL_VALUE:
             // these nodes should never appear in the final form of the cdfg.
             TRACE_NO_NEWLINE("error");
