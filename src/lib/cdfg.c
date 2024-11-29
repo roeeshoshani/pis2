@@ -50,6 +50,17 @@ cleanup:
     return err;
 }
 
+/// replaces all usages of the given node as a the "from" node of an edge with the given other node.
+static void substitute(
+    cdfg_t* cdfg, cdfg_node_id_t node_id_to_replace, cdfg_node_id_t replace_with_node_id
+) {
+    for (size_t i = 0; i < cdfg->edges_amount; i++) {
+        if (cdfg->edge_storage[i].from_node.id == node_id_to_replace.id) {
+            cdfg->edge_storage[i].from_node = replace_with_node_id;
+        }
+    }
+}
+
 static err_t next_id(size_t* items_amount, size_t max, cdfg_item_id_t* id) {
     err_t err = SUCCESS;
 
@@ -1561,11 +1572,34 @@ cleanup:
     return err;
 }
 
+static err_t cdfg_finalize_block_final_value(
+    cdfg_builder_t* builder, cdfg_node_id_t node_id, cdfg_node_t* node
+) {
+    err_t err = SUCCESS;
+
+    // block final values are only needed while building the graph, and are no longer
+    // needed here.
+    // so, substitute them with their input, which represents the actual value.
+
+    cdfg_node_id_t input_node_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(
+        find_node_inputs(&builder->cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW, &input_node_id, 1)
+    );
+
+    substitute(&builder->cdfg, node_id, input_node_id);
+
+    node->kind = CDFG_NODE_KIND_INVALID;
+
+cleanup:
+    return err;
+}
+
 static err_t cdfg_finalize(cdfg_builder_t* builder) {
     err_t err = SUCCESS;
 
     // replace intermediate nodes with their final representation.
     for (size_t i = 0; i < builder->cdfg.nodes_amount; i++) {
+        cdfg_node_id_t node_id = {.id = i};
         cdfg_node_t* node = &builder->cdfg.node_storage[i];
         switch (node->kind) {
             case CDFG_NODE_KIND_BLOCK_ENTRY:
@@ -1575,9 +1609,7 @@ static err_t cdfg_finalize(cdfg_builder_t* builder) {
                 CHECK_RETHROW(cdfg_finalize_block_var(builder, node));
                 break;
             case CDFG_NODE_KIND_BLOCK_FINAL_VALUE:
-                // block final values are only needed while building the graph, and are no longer
-                // needed here.
-                node->kind = CDFG_NODE_KIND_INVALID;
+                CHECK_RETHROW(cdfg_finalize_block_final_value(builder, node_id, node));
                 break;
             default:
                 // other node kinds are irrelevant
@@ -1900,17 +1932,6 @@ static err_t node_find_single_input_edge(
     out_found_item_id->id = found_id;
 cleanup:
     return err;
-}
-
-/// replaces all usages of the given node as a the "from" node of an edge with the given other node.
-static void substitute(
-    cdfg_t* cdfg, cdfg_node_id_t node_id_to_replace, cdfg_node_id_t replace_with_node_id
-) {
-    for (size_t i = 0; i < cdfg->edges_amount; i++) {
-        if (cdfg->edge_storage[i].from_node.id == node_id_to_replace.id) {
-            cdfg->edge_storage[i].from_node = replace_with_node_id;
-        }
-    }
 }
 
 static err_t remove_single_input_region_phi_nodes(cdfg_t* cdfg, bool* did_anything) {
