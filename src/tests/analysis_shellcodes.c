@@ -21,15 +21,16 @@ static err_t verify_analysis_arch(
     size_t shellcode_len = shellcode->code_end - shellcode->code;
 
     cfg_builder_t cfg_builder = {};
-    CHECK_RETHROW(cfg_build(&cfg_builder, arch, shellcode->code, shellcode_len, SHELLCODE_BASE_ADDR)
+    CHECK_RETHROW_VERBOSE(
+        cfg_build(&cfg_builder, arch, shellcode->code, shellcode_len, SHELLCODE_BASE_ADDR)
     );
 
     cdfg_builder_t cdfg_builder = {};
-    CHECK_RETHROW(cdfg_build(&cdfg_builder, &cfg_builder.cfg));
+    CHECK_RETHROW_VERBOSE(cdfg_build(&cdfg_builder, &cfg_builder.cfg));
 
-    CHECK_RETHROW(cdfg_optimize(&cdfg_builder.cdfg));
+    CHECK_RETHROW_VERBOSE(cdfg_optimize(&cdfg_builder.cdfg));
 
-    CHECK_RETHROW(verification(&cdfg_builder.cdfg));
+    CHECK_RETHROW_VERBOSE(verification(&cdfg_builder.cdfg));
 
 cleanup:
     return err;
@@ -40,12 +41,14 @@ static err_t verify_analysis(
 ) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(verify_analysis_arch(&pis_arch_def_x86_64, &shellcode->x86_64, verification));
-    CHECK_RETHROW(verify_analysis_arch(&pis_arch_def_i686, &shellcode->i686, verification));
-    CHECK_RETHROW(
+    CHECK_RETHROW_VERBOSE(
+        verify_analysis_arch(&pis_arch_def_x86_64, &shellcode->x86_64, verification)
+    );
+    CHECK_RETHROW_VERBOSE(verify_analysis_arch(&pis_arch_def_i686, &shellcode->i686, verification));
+    CHECK_RETHROW_VERBOSE(
         verify_analysis_arch(&pis_arch_def_mipsbe32r1, &shellcode->mipsbe32r1, verification)
     );
-    CHECK_RETHROW(
+    CHECK_RETHROW_VERBOSE(
         verify_analysis_arch(&pis_arch_def_mipsel32r1, &shellcode->mipsel32r1, verification)
     );
 
@@ -66,7 +69,7 @@ cleanup:
 DEFINE_TEST(test_analysis_struct_size) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(verify_analysis(&shellcode_struct_size, verify_struct_size_analysis));
+    CHECK_RETHROW_VERBOSE(verify_analysis(&shellcode_struct_size, verify_struct_size_analysis));
 
 cleanup:
     return err;
