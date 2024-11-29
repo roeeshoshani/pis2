@@ -2169,11 +2169,10 @@ static void cdfg_dump_node_desciption(const cdfg_node_t* node) {
             break;
         case CDFG_NODE_KIND_BLOCK_VAR:
             TRACE_NO_NEWLINE(
-                "block %u var REG[0x%x]:%u, %u inputs",
+                "block %u var REG[0x%x]:%u",
                 node->content.block_var.block_id,
                 node->content.block_var.reg_region.offset,
-                pis_size_to_bytes(node->content.block_var.reg_region.size),
-                node->content.block_var.predecessor_values_amount
+                pis_size_to_bytes(node->content.block_var.reg_region.size)
             );
             break;
         case CDFG_NODE_KIND_BLOCK_ENTRY:
