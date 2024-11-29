@@ -50,6 +50,19 @@ cleanup:
     return err;
 }
 
+static cdfg_edge_id_t find_node_input_with_index(
+    const cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_edge_kind_t edge_kind, size_t input_index
+) {
+    for (size_t i = 0; i < cdfg->edges_amount; i++) {
+        const cdfg_edge_t* edge = &cdfg->edge_storage[i];
+        if (edge->to_node.id == node_id.id && edge->kind == edge_kind &&
+            edge->to_node_input_index == input_index) {
+            return (cdfg_edge_id_t) {.id = i};
+        }
+    }
+
+    return (cdfg_edge_id_t) {.id = CDFG_ITEM_ID_INVALID};
+}
 /// replaces all usages of the given node as a the "from" node of an edge with the given other node.
 static void substitute(
     cdfg_t* cdfg, cdfg_node_id_t node_id_to_replace, cdfg_node_id_t replace_with_node_id
@@ -169,19 +182,6 @@ static cdfg_node_id_t find_imm_node(const cdfg_t* cdfg, u64 value) {
             continue;
         }
         if (node->content.imm.value == value) {
-            return (cdfg_node_id_t) {.id = i};
-        }
-    }
-    return (cdfg_node_id_t) {.id = CDFG_ITEM_ID_INVALID};
-}
-
-static cdfg_node_id_t find_var_node(const cdfg_t* cdfg, pis_region_t region) {
-    for (size_t i = 0; i < cdfg->nodes_amount; i++) {
-        const cdfg_node_t* node = &cdfg->node_storage[i];
-        if (node->kind != CDFG_NODE_KIND_VAR) {
-            continue;
-        }
-        if (pis_regions_equal(node->content.var.reg_region, region)) {
             return (cdfg_node_id_t) {.id = i};
         }
     }
@@ -548,6 +548,30 @@ cleanup:
     return err;
 }
 
+static err_t find_var_node(const cdfg_t* cdfg, pis_region_t region, cdfg_node_id_t* out_node_id) {
+    err_t err = SUCCESS;
+
+    cdfg_node_id_t found_node_id = {.id = CDFG_ITEM_ID_INVALID};
+
+    for (size_t i = 0; i < cdfg->nodes_amount; i++) {
+        const cdfg_node_t* node = &cdfg->node_storage[i];
+        if (node->kind != CDFG_NODE_KIND_VAR) {
+            continue;
+        }
+        if (pis_regions_intersect(node->content.var.reg_region, region)) {
+            CHECK(pis_regions_equal(node->content.var.reg_region, region));
+
+            CHECK(found_node_id.id == CDFG_ITEM_ID_INVALID);
+            found_node_id.id = i;
+        }
+    }
+
+    *out_node_id = found_node_id;
+
+cleanup:
+    return err;
+}
+
 static err_t make_block_var_node(
     cdfg_t* cdfg, cfg_item_id_t block_id, pis_region_t reg_region, cdfg_node_id_t* out_node_id
 ) {
@@ -566,6 +590,32 @@ static err_t make_block_var_node(
                     .block_var =
                         {
                             .block_id = block_id,
+                            .reg_region = reg_region,
+                        },
+                },
+        };
+    }
+
+    *out_node_id = node_id;
+cleanup:
+    return err;
+}
+
+static err_t make_var_node(cdfg_t* cdfg, pis_region_t reg_region, cdfg_node_id_t* out_node_id) {
+    err_t err = SUCCESS;
+
+    cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(find_var_node(cdfg, reg_region, &node_id));
+
+    if (node_id.id == CDFG_ITEM_ID_INVALID) {
+        // no existing node, create a new one.
+        CHECK_RETHROW(next_node_id(cdfg, &node_id));
+        cdfg->node_storage[node_id.id] = (cdfg_node_t) {
+            .kind = CDFG_NODE_KIND_VAR,
+            .content =
+                {
+                    .var =
+                        {
                             .reg_region = reg_region,
                         },
                 },
@@ -1522,10 +1572,22 @@ static err_t
 
     u16 inputs_amount = node->content.block_var.predecessor_values_amount;
 
+    cfg_item_id_t block_id = node->content.block_var.block_id;
+
+    cdfg_node_id_t entry_node_id = builder->block_infos[block_id].entry_node;
+    CHECK(entry_node_id.id != CDFG_ITEM_ID_INVALID);
+
+    cdfg_node_t* entry_node = &builder->cdfg.node_storage[entry_node_id.id];
+
+    size_t predecessors_amount = entry_node->content.block_entry.predecessors_amount;
+
+    pis_region_t reg_region = node->content.block_var.reg_region;
+
     if (inputs_amount == 0) {
         // if this block variable did not have a previous value, then it is an actual variable
-        pis_region_t reg_region = node->content.block_var.reg_region;
-        cdfg_node_id_t existing_var_node_id = find_var_node(&builder->cdfg, reg_region);
+        cdfg_node_id_t existing_var_node_id = {.id = CDFG_ITEM_ID_INVALID};
+        CHECK_RETHROW(find_var_node(&builder->cdfg, reg_region, &existing_var_node_id));
+
         if (existing_var_node_id.id != CDFG_ITEM_ID_INVALID) {
             // found an existing var node, substitute it instead of this node.
             substitute(&builder->cdfg, node_id, existing_var_node_id);
@@ -1547,6 +1609,7 @@ static err_t
         }
     } else {
         // the block variable had some values in the previous blocks. convert it to a phi node.
+
         *node = (cdfg_node_t) {
             .kind = CDFG_NODE_KIND_PHI,
             .content =
@@ -1559,12 +1622,43 @@ static err_t
         };
 
         // connect it to this block's entry CF node
-        cdfg_node_id_t entry_node_id =
-            builder->block_infos[node->content.block_var.block_id].entry_node;
-        CHECK(entry_node_id.id != CDFG_ITEM_ID_INVALID);
         CHECK_RETHROW(
             make_edge(&builder->cdfg, CDFG_EDGE_KIND_CONTROL_FLOW, entry_node_id, node_id, 0)
         );
+
+        if (inputs_amount != predecessors_amount) {
+            CHECK(inputs_amount < predecessors_amount);
+
+            // if not all predecessors provided a value for this register, then in some cases we
+            // need to use its initial "variable" value.
+            // fill in those gaps in the phi node.
+            for (size_t i = 0; i < predecessors_amount; i++) {
+                // check if there is an input from this predecessor, and if not, create a var node
+                // and use it instead.
+                cdfg_edge_id_t edge_id = find_node_input_with_index(
+                    &builder->cdfg,
+                    node_id,
+                    CDFG_EDGE_KIND_DATA_FLOW,
+                    i
+                );
+
+                if (edge_id.id != CDFG_ITEM_ID_INVALID) {
+                    // this predecessor already provided a value for this register, so no need to do
+                    // anything.
+                    continue;
+                }
+
+                // the predecessor did not provide a value for this register, so create a variable
+                // for it.
+                cdfg_node_id_t var_node_id = {.id = CDFG_ITEM_ID_INVALID};
+                CHECK_RETHROW(make_var_node(&builder->cdfg, reg_region, &var_node_id));
+
+                // connect the variable to this missing slot in the phi node.
+                CHECK_RETHROW(
+                    make_edge(&builder->cdfg, CDFG_EDGE_KIND_DATA_FLOW, var_node_id, node_id, i)
+                );
+            }
+        }
     }
 
 cleanup:
@@ -1593,7 +1687,7 @@ cleanup:
     return err;
 }
 
-static err_t cdfg_finalize(cdfg_builder_t* builder) {
+static err_t cdfg_finalize_intermediate_nodes(cdfg_builder_t* builder) {
     err_t err = SUCCESS;
 
     // replace intermediate nodes with their final representation.
@@ -2138,7 +2232,8 @@ err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg) {
         CHECK_RETHROW(integrate_block(builder, i));
     }
 
-    CHECK_RETHROW(cdfg_finalize(builder));
+    // finalize the intermediate nodes in our CFG
+    CHECK_RETHROW(cdfg_finalize_intermediate_nodes(builder));
 
 cleanup:
     return err;
