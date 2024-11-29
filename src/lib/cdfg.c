@@ -1118,6 +1118,18 @@ cleanup:
     return err;
 }
 
+static bool is_node_used_as_input_of_kind(
+    const cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_edge_kind_t edge_kind
+) {
+    for (size_t i = 0; i < cdfg->edges_amount; i++) {
+        const cdfg_edge_t* edge = &cdfg->edge_storage[i];
+        if (edge->from_node.id == node_id.id && edge->kind == edge_kind) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool is_node_used_as_input(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         if (cdfg->edge_storage[i].from_node.id == node_id.id) {
@@ -1127,7 +1139,7 @@ static bool is_node_used_as_input(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
     return false;
 }
 
-static bool does_node_use_cf(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
+static bool does_node_have_cf_input(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* edge = &cdfg->edge_storage[i];
         if (edge->kind == CDFG_EDGE_KIND_CONTROL_FLOW && edge->to_node.id == node_id.id) {
@@ -1149,7 +1161,7 @@ static bool remove_unused_nodes_and_edges(cdfg_t* cdfg) {
         }
 
         bool is_node_required = is_node_used_as_input(cdfg, node_id) ||
-                                does_node_use_cf(cdfg, node_id) ||
+                                does_node_have_cf_input(cdfg, node_id) ||
                                 node->kind == CDFG_NODE_KIND_FINISH;
         if (!is_node_required) {
             // if the node's value is not used anywhere, and it is not a finish node (which by
@@ -1271,6 +1283,22 @@ cleanup:
     return err;
 }
 
+static size_t
+    node_count_inputs(const cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_edge_kind_t edge_kind) {
+    size_t amount = 0;
+
+    for (size_t i = 0; i < cdfg->edges_amount; i++) {
+        const cdfg_edge_t* edge = &cdfg->edge_storage[i];
+
+        if (edge->to_node.id != node_id.id || edge->kind != edge_kind) {
+            continue;
+        }
+
+        amount++;
+    }
+
+    return amount;
+}
 static err_t node_find_inputs(
     const cdfg_t* cdfg,
     cdfg_node_id_t node_id,
@@ -1490,7 +1518,7 @@ cleanup:
     return err;
 }
 
-static void cdfg_dump_node_desc(const cdfg_node_t* node) {
+static void cdfg_dump_node_desciption(const cdfg_node_t* node) {
     switch (node->kind) {
         case CDFG_NODE_KIND_ENTRY:
             TRACE_NO_NEWLINE("entry");
@@ -1500,16 +1528,16 @@ static void cdfg_dump_node_desc(const cdfg_node_t* node) {
             break;
         case CDFG_NODE_KIND_VAR:
             TRACE_NO_NEWLINE(
-                "var_off_0x%x_sz_%u",
+                "REG[0x%x]:%u",
                 node->content.var.reg_region.offset,
                 pis_size_to_bytes(node->content.var.reg_region.size)
             );
             break;
         case CDFG_NODE_KIND_IMM:
-            TRACE_NO_NEWLINE("imm_0x%lx", node->content.imm.value);
+            TRACE_NO_NEWLINE("0x%lx", node->content.imm.value);
             break;
         case CDFG_NODE_KIND_CALC:
-            TRACE_NO_NEWLINE("calc_%s", cdfg_calculation_to_str(node->content.calc.calculation));
+            TRACE_NO_NEWLINE("%s", cdfg_calculation_to_str(node->content.calc.calculation));
             break;
         case CDFG_NODE_KIND_STORE:
             TRACE_NO_NEWLINE("store");
@@ -1532,14 +1560,69 @@ static void cdfg_dump_node_desc(const cdfg_node_t* node) {
     }
 }
 
+static void cdfg_dump_node_ident(cdfg_node_id_t node_id) {
+    TRACE_NO_NEWLINE("id_%u", node_id.id);
+}
+
 static void cdfg_dump_node(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
-    TRACE_NO_NEWLINE("id_%u_", node_id.id);
-    cdfg_dump_node_desc(&cdfg->node_storage[node_id.id]);
+    cdfg_dump_node_ident(node_id);
+
+    bool has_cf_input = does_node_have_cf_input(cdfg, node_id);
+    size_t data_inputs_amount = node_count_inputs(cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW);
+
+    bool has_cf_output = is_node_used_as_input_of_kind(cdfg, node_id, CDFG_EDGE_KIND_CONTROL_FLOW);
+    bool has_df_output = is_node_used_as_input_of_kind(cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW);
+
+    TRACE_NO_NEWLINE(" [shape=record, label=\" ");
+
+    cdfg_dump_node_desciption(&cdfg->node_storage[node_id.id]);
+
+    TRACE_NO_NEWLINE(" | { ");
+
+    if (has_cf_input || data_inputs_amount > 0) {
+        TRACE_NO_NEWLINE("{");
+        if (does_node_have_cf_input(cdfg, node_id)) {
+            TRACE_NO_NEWLINE("<cfin> cfin ");
+            if (data_inputs_amount > 0) {
+                TRACE_NO_NEWLINE("| ");
+            }
+        }
+
+        size_t data_inputs_amount = node_count_inputs(cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW);
+        for (size_t i = 0; i < data_inputs_amount; i++) {
+            TRACE_NO_NEWLINE("<din%lu> din %lu ", (unsigned long) i, (unsigned long) i);
+            if (i + 1 < data_inputs_amount) {
+                TRACE_NO_NEWLINE("| ");
+            }
+        }
+        TRACE_NO_NEWLINE("} | ");
+    }
+
+    if (has_cf_output || has_df_output) {
+        TRACE_NO_NEWLINE("{ ");
+
+        if (has_cf_output) {
+            TRACE_NO_NEWLINE("<cfout> cfout");
+            if (has_df_output) {
+                TRACE_NO_NEWLINE("| ");
+            }
+        }
+
+        if (has_df_output) {
+            TRACE_NO_NEWLINE("<dout> dout");
+        }
+
+        TRACE_NO_NEWLINE("} ");
+    }
+    TRACE_NO_NEWLINE(" } \" ] ");
 }
 
 /// dumps a DOT representation of the CDFG to stdout.
 void cdfg_dump_dot(const cdfg_t* cdfg) {
     TRACE("digraph {");
+
+    // order the ports properly
+    TRACE("rankdir=TB;");
 
     // make it dark theme
     TRACE("bgcolor=\"#181818\"");
@@ -1554,15 +1637,51 @@ void cdfg_dump_dot(const cdfg_t* cdfg) {
     TRACE("fontcolor = \"#e6e6e6\"");
     TRACE("]");
 
+    for (size_t i = 0; i < cdfg->nodes_amount; i++) {
+        if (cdfg->node_storage[i].kind == CDFG_NODE_KIND_INVALID) {
+            // the node is vacant.
+            continue;
+        }
+
+        cdfg_node_id_t node_id = {.id = i};
+        cdfg_dump_node(cdfg, node_id);
+        TRACE();
+    }
+
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* edge = &cdfg->edge_storage[i];
         if (edge->from_node.id == CDFG_ITEM_ID_INVALID) {
             // the edge is vacant.
             continue;
         }
-        cdfg_dump_node(cdfg, edge->from_node);
+
+        cdfg_dump_node_ident(edge->from_node);
+        switch (edge->kind) {
+            case CDFG_EDGE_KIND_DATA_FLOW:
+                TRACE_NO_NEWLINE(":dout");
+                break;
+            case CDFG_EDGE_KIND_CONTROL_FLOW:
+                TRACE_NO_NEWLINE(":cfout");
+                break;
+        }
+
+
         TRACE_NO_NEWLINE(" -> ");
-        cdfg_dump_node(cdfg, edge->to_node);
+
+        cdfg_dump_node_ident(edge->to_node);
+        switch (edge->kind) {
+            case CDFG_EDGE_KIND_DATA_FLOW:
+                TRACE_NO_NEWLINE(":din%u", edge->to_node_input_index);
+                break;
+            case CDFG_EDGE_KIND_CONTROL_FLOW:
+                TRACE_NO_NEWLINE(":cfin");
+                break;
+        }
+
+        if (edge->kind == CDFG_EDGE_KIND_CONTROL_FLOW) {
+            TRACE_NO_NEWLINE(" [color=\"blue\"]");
+        }
+
         TRACE();
     }
     TRACE("}");
