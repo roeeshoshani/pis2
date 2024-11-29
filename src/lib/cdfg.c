@@ -1781,9 +1781,21 @@ static bool remove_unused_nodes_and_edges(cdfg_t* cdfg) {
             continue;
         }
 
-        bool is_node_required = is_node_used_as_input(cdfg, node_id) ||
-                                does_node_have_cf_input(cdfg, node_id) ||
-                                node->kind == CDFG_NODE_KIND_FINISH;
+        bool is_node_required = false;
+        if (node->kind == CDFG_NODE_KIND_FINISH) {
+            is_node_required = true;
+        } else if (is_node_used_as_input(cdfg, node_id)) {
+            is_node_required = true;
+        } else if (does_node_have_cf_input(cdfg, node_id)) {
+            // the node has CF input
+            if (node->kind == CDFG_NODE_KIND_PHI) {
+                // phi nodes use CF, but if their value is not used they are not required
+            } else {
+                // other nodes that use CF are required.
+                is_node_required = true;
+            }
+        }
+
         if (!is_node_required) {
             // if the node's value is not used anywhere, and it is not a finish node (which by
             // definition must be kept), remove it.
