@@ -2005,17 +2005,17 @@ static cdfg_node_id_t find_node_input_by_predicate(
     return found_node_id;
 }
 
-static bool node_is_zero_imm(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
+static bool is_node_imm_zero(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
     const cdfg_node_t* from_node = &cdfg->node_storage[node_id.id];
     return from_node->kind == CDFG_NODE_KIND_IMM && from_node->content.imm.value == 0;
 }
 
-static bool node_is_one_imm(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
+static bool is_node_imm_one(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
     const cdfg_node_t* from_node = &cdfg->node_storage[node_id.id];
     return from_node->kind == CDFG_NODE_KIND_IMM && from_node->content.imm.value == 1;
 }
 
-static bool node_is_sub(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
+static bool is_node_sub(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
     const cdfg_node_t* from_node = &cdfg->node_storage[node_id.id];
     return from_node->kind == CDFG_NODE_KIND_CALC &&
            from_node->content.calc.calculation == CDFG_CALCULATION_SUB;
@@ -2041,7 +2041,7 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
             cdfg,
             cur_node_id,
             CDFG_EDGE_KIND_DATA_FLOW,
-            node_is_zero_imm
+            is_node_imm_zero
         );
         if (zero_imm_node_id.id == CDFG_ITEM_ID_INVALID) {
             continue;
@@ -2049,7 +2049,7 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
 
         // we need another one of the inputs to be a sub operation.
         cdfg_node_id_t sub_node_id =
-            find_node_input_by_predicate(cdfg, cur_node_id, CDFG_EDGE_KIND_DATA_FLOW, node_is_sub);
+            find_node_input_by_predicate(cdfg, cur_node_id, CDFG_EDGE_KIND_DATA_FLOW, is_node_sub);
         if (sub_node_id.id == CDFG_ITEM_ID_INVALID) {
             continue;
         }
@@ -2107,7 +2107,12 @@ cleanup:
     return err;
 }
 
-static err_t optimize_mul_1(cdfg_t* cdfg, bool* did_anything) {
+static err_t optimize_nop_value(
+    cdfg_t* cdfg,
+    cdfg_calculation_t calc,
+    node_predicate_t identity_value_predicate,
+    bool* did_anything
+) {
     err_t err = SUCCESS;
 
     for (size_t cur_node_index = 0; cur_node_index < cdfg->nodes_amount; cur_node_index++) {
@@ -2117,9 +2122,7 @@ static err_t optimize_mul_1(cdfg_t* cdfg, bool* did_anything) {
             continue;
         }
 
-        bool is_mul = node->content.calc.calculation == CDFG_CALCULATION_UNSIGNED_MUL ||
-                      node->content.calc.calculation == CDFG_CALCULATION_SIGNED_MUL;
-        if (!is_mul) {
+        if (node->content.calc.calculation != calc) {
             continue;
         }
 
@@ -2127,7 +2130,7 @@ static err_t optimize_mul_1(cdfg_t* cdfg, bool* did_anything) {
         CHECK_RETHROW(find_binop_node_data_input_by_predicate(
             cdfg,
             cur_node_id,
-            node_is_one_imm,
+            identity_value_predicate,
             &match_result
         ));
         if (!match_result.found) {
@@ -2135,8 +2138,6 @@ static err_t optimize_mul_1(cdfg_t* cdfg, bool* did_anything) {
             continue;
         }
 
-        // if this is a multiplication by one, just simplify it to the operand that is being
-        // multiplied by 1.
         substitute(cdfg, cur_node_id, match_result.other_input);
 
         *did_anything = true;
@@ -2156,7 +2157,15 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
         CHECK_RETHROW(remove_single_input_region_phi_nodes(cdfg, &did_anything));
         CHECK_RETHROW(optimize_sub_equals_zero(cdfg, &did_anything));
         CHECK_RETHROW(optimize_xor_x_x(cdfg, &did_anything));
-        CHECK_RETHROW(optimize_mul_1(cdfg, &did_anything));
+        CHECK_RETHROW(
+            optimize_nop_value(cdfg, CDFG_CALCULATION_SIGNED_MUL, is_node_imm_one, &did_anything)
+        );
+        CHECK_RETHROW(
+            optimize_nop_value(cdfg, CDFG_CALCULATION_UNSIGNED_MUL, is_node_imm_one, &did_anything)
+        );
+        CHECK_RETHROW(
+            optimize_nop_value(cdfg, CDFG_CALCULATION_ADD, is_node_imm_zero, &did_anything)
+        );
     }
 cleanup:
     return err;
