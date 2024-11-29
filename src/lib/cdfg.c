@@ -164,8 +164,6 @@ static cdfg_node_id_t find_imm_node(const cdfg_t* cdfg, u64 value) {
     return (cdfg_node_id_t) {.id = CDFG_ITEM_ID_INVALID};
 }
 
-/// tries to find an existing variable node with the given parameters in the cdfg.
-/// returns the id of the found node, or `CDFG_ITEM_ID_INVALID` if no such node was found.
 static cdfg_node_id_t find_var_node(const cdfg_t* cdfg, pis_region_t region) {
     for (size_t i = 0; i < cdfg->nodes_amount; i++) {
         const cdfg_node_t* node = &cdfg->node_storage[i];
@@ -173,6 +171,21 @@ static cdfg_node_id_t find_var_node(const cdfg_t* cdfg, pis_region_t region) {
             continue;
         }
         if (pis_regions_equal(node->content.var.reg_region, region)) {
+            return (cdfg_node_id_t) {.id = i};
+        }
+    }
+    return (cdfg_node_id_t) {.id = CDFG_ITEM_ID_INVALID};
+}
+
+static cdfg_node_id_t
+    find_block_var_node(const cdfg_t* cdfg, cdfg_item_id_t block_id, pis_region_t region) {
+    for (size_t i = 0; i < cdfg->nodes_amount; i++) {
+        const cdfg_node_t* node = &cdfg->node_storage[i];
+        if (node->kind != CDFG_NODE_KIND_BLOCK_VAR) {
+            continue;
+        }
+        if (pis_regions_equal(node->content.block_var.reg_region, region) &&
+            node->content.block_var.block_id == block_id) {
             return (cdfg_node_id_t) {.id = i};
         }
     }
@@ -393,6 +406,15 @@ cleanup:
     return err;
 }
 
+static err_t make_block_entry_node(cdfg_t* cdfg, cdfg_node_id_t* out_node_id) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_BLOCK_ENTRY, out_node_id));
+
+cleanup:
+    return err;
+}
+
 static err_t make_finish_node(cdfg_t* cdfg, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
 
@@ -489,6 +511,35 @@ cleanup:
     return err;
 }
 
+static err_t make_block_final_value_node(
+    cdfg_t* cdfg, cfg_item_id_t block_id, pis_var_t var, cdfg_node_id_t final_value
+) {
+    err_t err = SUCCESS;
+
+    // only regs are allowed here
+    CHECK(var.space == PIS_VAR_SPACE_REG);
+
+    cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(next_node_id(cdfg, &node_id));
+
+    cdfg->node_storage[node_id.id] = (cdfg_node_t) {
+        .kind = CDFG_NODE_KIND_BLOCK_FINAL_VALUE,
+        .content =
+            {
+                .block_final_value =
+                    {
+                        .block_id = block_id,
+                        .reg_region = pis_var_region(var),
+                    },
+            },
+    };
+
+    CHECK_RETHROW(make_edge(cdfg, CDFG_EDGE_KIND_DATA_FLOW, final_value, node_id, 0));
+
+cleanup:
+    return err;
+}
+
 static err_t make_var_node(cdfg_t* cdfg, pis_var_t var, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
 
@@ -515,6 +566,38 @@ cleanup:
     return err;
 }
 
+static err_t make_unknown_node(
+    cdfg_t* cdfg, cfg_item_id_t block_id, pis_var_t var, cdfg_node_id_t* out_node_id
+) {
+    err_t err = SUCCESS;
+
+    // unknown nodes are only for register operands
+    CHECK(var.space == PIS_VAR_SPACE_REG);
+
+    pis_region_t region = pis_var_region(var);
+    cdfg_node_id_t node_id = find_block_var_node(cdfg, block_id, region);
+
+    if (node_id.id == CDFG_ITEM_ID_INVALID) {
+        // no existing node, create a new one.
+        CHECK_RETHROW(next_node_id(cdfg, &node_id));
+        cdfg->node_storage[node_id.id] = (cdfg_node_t) {
+            .kind = CDFG_NODE_KIND_BLOCK_VAR,
+            .content =
+                {
+                    .block_var =
+                        {
+                            .block_id = block_id,
+                            .reg_region = region,
+                        },
+                },
+        };
+    }
+
+    *out_node_id = node_id;
+cleanup:
+    return err;
+}
+
 static err_t
     read_var_operand_direct(cdfg_builder_t* builder, pis_var_t var, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
@@ -530,9 +613,10 @@ static err_t
 
         // initialize it to a new variable node.
 
-        // first, create the variable node
+        // first, create the unknown node
         cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
-        CHECK_RETHROW(make_var_node(&builder->cdfg, var, &node_id));
+        CHECK(builder->cur_block_id != CFG_ITEM_ID_INVALID);
+        CHECK_RETHROW(make_unknown_node(&builder->cdfg, builder->cur_block_id, var, &node_id));
 
         // now add a slot in the op state to point to it
         CHECK_RETHROW(make_op_state_slot(&builder->op_state, var, node_id));
@@ -1225,11 +1309,22 @@ static err_t process_block(cdfg_builder_t* builder, cfg_item_id_t block_id) {
         invalidate_tmps(&builder->op_state);
     }
 
-    // finished processing the block.
-    builder->block_states[block_id] = (cdfg_block_state_t) {
-        .was_processed = true,
-        .final_state = builder->op_state,
-    };
+    // finished processing all the code in the block. we now have the final state of the block.
+    // create nodes to represent each of the final values of the registers at the end of this block.
+    for (size_t i = 0; i > builder->op_state.used_slots_amount; i++) {
+        cdfg_op_state_slot_t* slot = &builder->op_state.slots[i];
+        if (slot->value_node_id.id == CDFG_ITEM_ID_INVALID) {
+            // slot is vacant.
+            continue;
+        }
+        if (slot->var.space != PIS_VAR_SPACE_REG) {
+            // only registers are relevant here. tmps are not preserved accross CFG blocks.
+            continue;
+        }
+        CHECK_RETHROW(
+            make_block_final_value_node(&builder->cdfg, block_id, slot->var, slot->value_node_id)
+        );
+    }
 
 cleanup:
     return err;
@@ -1302,155 +1397,147 @@ cleanup:
     return err;
 }
 
-/// mergess the op state of the given predecessor block into the current op state.
-static err_t merge_predecessor_op_state(
-    cdfg_builder_t* builder, cfg_item_id_t predecessor_block_id, size_t predecessor_index
-) {
+// /// mergess the op state of the given predecessor block into the current op state.
+// static err_t merge_predecessor_op_state(
+//     cdfg_builder_t* builder, cfg_item_id_t predecessor_block_id, size_t predecessor_index
+// ) {
+//     err_t err = SUCCESS;
+
+//     // first, merge the control flow into a region node
+
+//     if (builder->op_state.last_cf_node_id.id == CDFG_ITEM_ID_INVALID) {
+//         // no node yet, create a new empty region node.
+//         CHECK_RETHROW(make_region_node(&builder->cdfg, &builder->op_state.last_cf_node_id));
+//     }
+
+
+//     cdfg_node_id_t region_node_id = builder->op_state.last_cf_node_id;
+//     cdfg_node_t* region_node = &builder->cdfg.node_storage[region_node_id.id];
+
+//     // connect the control flow to the region node
+//     CHECK_RETHROW(make_edge(
+//         &builder->cdfg,
+//         CDFG_EDGE_KIND_CONTROL_FLOW,
+//         predecessor_block_final_state->last_cf_node_id,
+//         builder->op_state.last_cf_node_id,
+//         predecessor_index
+//     ));
+
+//     // increase the region inputs counter
+//     region_node->content.region.inputs_amount++;
+
+//     // now merge each of the operand values.
+//     for (size_t i = 0; i < predecessor_block_final_state->used_slots_amount; i++) {
+//         const cdfg_op_state_slot_t* slot = &predecessor_block_final_state->slots[i];
+//         if (slot->value_node_id.id == CDFG_ITEM_ID_INVALID) {
+//             // this slot is vacant.
+//         }
+//         if (slot->var.space == PIS_VAR_SPACE_TMP) {
+//             // tmp operands don't need to be merged. only registers should be merged.
+//             continue;
+//         }
+
+//         // merge the value
+//         CHECK_RETHROW(merge_predecessor_var_operand_value(
+//             builder,
+//             slot->var,
+//             slot->value_node_id,
+//             region_node_id,
+//             predecessor_index
+//         ));
+//     }
+
+// cleanup:
+//     return err;
+// }
+
+// static err_t prepare_non_first_block_initial_op_state(
+//     cdfg_builder_t* builder, cfg_item_id_t prepared_block_id, bool* can_process_block
+// ) {
+//     err_t err = SUCCESS;
+
+//     builder->op_state.used_slots_amount = 0;
+//     builder->op_state.last_cf_node_id.id = CDFG_ITEM_ID_INVALID;
+
+//     size_t found_predecessors_amount = 0;
+
+//     // we want to merge the op states of all direct predecessors of this block
+//     for (size_t i = 0; i < builder->cfg->blocks_amount; i++) {
+//         if (i == prepared_block_id) {
+//             // skip the block itself
+//             continue;
+//         }
+
+//         bool is_direct_predecessor = false;
+//         CHECK_RETHROW(cfg_block_is_direct_predecessor(
+//             builder->cfg,
+//             i,
+//             prepared_block_id,
+//             &is_direct_predecessor
+//         ));
+//         if (is_direct_predecessor) {
+//             // the current block is a direct predecessor of the prepared block, so we should use
+//             all
+//             // its op state.
+//             if (!builder->block_states[i].was_processed) {
+//                 // this block wasn't yet processed. for now we will ignore its exist
+//                 *can_process_block = false;
+//                 SUCCESS_CLEANUP();
+//             } else {
+//                 // the prepared block may have multiple predecessors, and we want to merge all of
+//                 // their op states into one.
+//                 CHECK_RETHROW(merge_predecessor_op_state(builder, i, found_predecessors_amount));
+
+//                 found_predecessors_amount++;
+//             }
+//         }
+//     }
+
+//     // make sure that we found any predecessors. only the first block is allowed to have no
+//     // predecessors.
+//     CHECK(found_predecessors_amount > 0);
+
+//     // our op state should now represent a merged state of all predecessors. all values are
+//     // merged using phi nodes.
+//     // in some cases, one of the predecessors might initialize a register while another
+//     predecessor
+//     // does not. in this case, we will have partially initialized phi nodes, which only have some
+//     of
+//     // their inputs connected.
+//     // in those cases, we want to treat the register as uninitialized, since safe code should not
+//     // use potentially uninitialized registers.
+//     for (size_t i = 0; i < builder->op_state.used_slots_amount; i++) {
+//         cdfg_op_state_slot_t* slot = &builder->op_state.slots[i];
+//         if (slot->value_node_id.id == CDFG_ITEM_ID_INVALID) {
+//             // this slot is vacant.
+//             continue;
+//         }
+//         cdfg_node_id_t phi_node_id = slot->value_node_id;
+//         cdfg_node_t* phi_node = &builder->cdfg.node_storage[phi_node_id.id];
+//         if (phi_node->content.phi.inputs_amount != found_predecessors_amount) {
+//             // sanity
+//             CHECK(phi_node->content.phi.inputs_amount < found_predecessors_amount);
+
+//             // invalidate this slot to make this register uninitialized
+//             slot->value_node_id.id = CDFG_ITEM_ID_INVALID;
+//         }
+//     }
+
+//     *can_process_block = true;
+
+// cleanup:
+//     return err;
+// }
+
+static err_t prepare_block_initial_op_state(cdfg_builder_t* builder) {
     err_t err = SUCCESS;
 
-    const cdfg_op_state_t* predecessor_block_final_state =
-        &builder->block_states[predecessor_block_id].final_state;
-
-    // first, merge the control flow into a region node
-
-    if (builder->op_state.last_cf_node_id.id == CDFG_ITEM_ID_INVALID) {
-        // no node yet, create a new empty region node.
-        CHECK_RETHROW(make_region_node(&builder->cdfg, &builder->op_state.last_cf_node_id));
-    }
-
-
-    cdfg_node_id_t region_node_id = builder->op_state.last_cf_node_id;
-    cdfg_node_t* region_node = &builder->cdfg.node_storage[region_node_id.id];
-
-    // connect the control flow to the region node
-    CHECK_RETHROW(make_edge(
-        &builder->cdfg,
-        CDFG_EDGE_KIND_CONTROL_FLOW,
-        predecessor_block_final_state->last_cf_node_id,
-        builder->op_state.last_cf_node_id,
-        predecessor_index
-    ));
-
-    // increase the region inputs counter
-    region_node->content.region.inputs_amount++;
-
-    // now merge each of the operand values.
-    for (size_t i = 0; i < predecessor_block_final_state->used_slots_amount; i++) {
-        const cdfg_op_state_slot_t* slot = &predecessor_block_final_state->slots[i];
-        if (slot->value_node_id.id == CDFG_ITEM_ID_INVALID) {
-            // this slot is vacant.
-        }
-        if (slot->var.space == PIS_VAR_SPACE_TMP) {
-            // tmp operands don't need to be merged. only registers should be merged.
-            continue;
-        }
-
-        // merge the value
-        CHECK_RETHROW(merge_predecessor_var_operand_value(
-            builder,
-            slot->var,
-            slot->value_node_id,
-            region_node_id,
-            predecessor_index
-        ));
-    }
-
-cleanup:
-    return err;
-}
-
-static err_t prepare_non_first_block_initial_op_state(
-    cdfg_builder_t* builder, cfg_item_id_t prepared_block_id, bool* can_process_block
-) {
-    err_t err = SUCCESS;
-
+    // reset the op state.
     builder->op_state.used_slots_amount = 0;
     builder->op_state.last_cf_node_id.id = CDFG_ITEM_ID_INVALID;
 
-    size_t found_predecessors_amount = 0;
-
-    // we want to merge the op states of all direct predecessors of this block
-    for (size_t i = 0; i < builder->cfg->blocks_amount; i++) {
-        if (i == prepared_block_id) {
-            // skip the block itself
-            continue;
-        }
-
-        bool is_direct_predecessor = false;
-        CHECK_RETHROW(cfg_block_is_direct_predecessor(
-            builder->cfg,
-            i,
-            prepared_block_id,
-            &is_direct_predecessor
-        ));
-        if (is_direct_predecessor) {
-            // the current block is a direct predecessor of the prepared block, so we should use all
-            // its op state.
-            if (!builder->block_states[i].was_processed) {
-                // this block wasn't yet processed, but is required to process the prepared block.
-                *can_process_block = false;
-                SUCCESS_CLEANUP();
-            }
-
-            // the prepared block may have multiple predecessors, and we want to merge all of
-            // their op states into one.
-            CHECK_RETHROW(merge_predecessor_op_state(builder, i, found_predecessors_amount));
-
-            found_predecessors_amount++;
-        }
-    }
-
-    // make sure that we found any predecessors. only the first block is allowed to have no
-    // predecessors.
-    CHECK(found_predecessors_amount > 0);
-
-    // our op state should now represent a merged state of all predecessors. all values are
-    // merged using phi nodes.
-    // in some cases, one of the predecessors might initialize a register while another predecessor
-    // does not. in this case, we will have partially initialized phi nodes, which only have some of
-    // their inputs connected.
-    // in those cases, we want to treat the register as uninitialized, since safe code should not
-    // use potentially uninitialized registers.
-    for (size_t i = 0; i < builder->op_state.used_slots_amount; i++) {
-        cdfg_op_state_slot_t* slot = &builder->op_state.slots[i];
-        if (slot->value_node_id.id == CDFG_ITEM_ID_INVALID) {
-            // this slot is vacant.
-            continue;
-        }
-        cdfg_node_id_t phi_node_id = slot->value_node_id;
-        cdfg_node_t* phi_node = &builder->cdfg.node_storage[phi_node_id.id];
-        if (phi_node->content.phi.inputs_amount != found_predecessors_amount) {
-            // sanity
-            CHECK(phi_node->content.phi.inputs_amount < found_predecessors_amount);
-
-            // invalidate this slot to make this register uninitialized
-            slot->value_node_id.id = CDFG_ITEM_ID_INVALID;
-        }
-    }
-
-    *can_process_block = true;
-
-cleanup:
-    return err;
-}
-
-static err_t prepare_block_initial_op_state(
-    cdfg_builder_t* builder, cfg_item_id_t block_id, bool* can_process_block
-) {
-    err_t err = SUCCESS;
-
-
-    if (block_id == 0) {
-        // for the first block, create an empty op state with a single initial entry node.
-        builder->op_state.used_slots_amount = 0;
-        builder->op_state.last_cf_node_id.id = CDFG_ITEM_ID_INVALID;
-        CHECK_RETHROW(make_entry_node(&builder->cdfg, &builder->op_state.last_cf_node_id));
-        *can_process_block = true;
-    } else {
-        // non-first blocks require some more complex logic
-        CHECK_RETHROW(prepare_non_first_block_initial_op_state(builder, block_id, can_process_block)
-        );
-    }
+    // create a block entry node which will be the root of control flow.
+    CHECK_RETHROW(make_block_entry_node(&builder->cdfg, &builder->op_state.last_cf_node_id));
 cleanup:
     return err;
 }
@@ -1554,7 +1641,7 @@ cleanup:
 }
 
 /// replaces all usages of the given node as a the "from" node of an edge with the given other node.
-static void node_replace_usages(
+static void substitute(
     cdfg_t* cdfg, cdfg_node_id_t node_id_to_replace, cdfg_node_id_t replace_with_node_id
 ) {
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
@@ -1608,7 +1695,7 @@ static err_t remove_single_input_region_phi_nodes(cdfg_t* cdfg, bool* did_anythi
         cdfg_node_id_t underlying_node_id = edge->from_node;
 
         // replace all usages of the phi/region node with the underlying node.
-        node_replace_usages(cdfg, node_id, underlying_node_id);
+        substitute(cdfg, node_id, underlying_node_id);
 
         // invalidate the current node. no need to remove the edges since they will be removed by
         // other optimization passes.
@@ -1755,7 +1842,7 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
             &optimized_eq_node_id
         ));
 
-        node_replace_usages(cdfg, cur_node_id, optimized_eq_node_id);
+        substitute(cdfg, cur_node_id, optimized_eq_node_id);
 
         *did_anything = true;
     }
@@ -1822,40 +1909,12 @@ err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg) {
     // build the register operand map
     CHECK_RETHROW(cdfg_build_reg_op_map(builder, cfg));
 
-    while (1) {
-        bool processed_any_blocks = false;
-        for (size_t i = 0; i < cfg->blocks_amount; i++) {
-            if (builder->block_states[i].was_processed) {
-                // this block was already processed.
-                continue;
-            }
-            // prepare the initial op state for the block
-            bool can_process_block = false;
-            CHECK_RETHROW(prepare_block_initial_op_state(builder, i, &can_process_block));
-
-            if (!can_process_block) {
-                // we can't yet process this block, since some of the blocks that are needed to
-                // process this one have not been processed yet, so skip it for now.
-                continue;
-            }
-
-            // process the block
-            CHECK_RETHROW(process_block(builder, i));
-            processed_any_blocks = true;
-        }
-
-        if (!processed_any_blocks) {
-            break;
-        }
-    }
-
-    // make sure that all blocks were properly processed
     for (size_t i = 0; i < cfg->blocks_amount; i++) {
-        CHECK_TRACE(
-            builder->block_states[i].was_processed,
-            "block %lu was not processed while building the CDFG",
-            i
-        );
+        // prepare the initial op state for the block
+        CHECK_RETHROW(prepare_block_initial_op_state(builder));
+
+        // process the block
+        CHECK_RETHROW(process_block(builder, i));
     }
 
 cleanup:
@@ -1900,6 +1959,13 @@ static void cdfg_dump_node_desciption(const cdfg_node_t* node) {
             break;
         case CDFG_NODE_KIND_INVALID:
             TRACE_NO_NEWLINE("invalid");
+            break;
+        case CDFG_NODE_KIND_BLOCK_VAR:
+        case CDFG_NODE_KIND_BLOCK_ENTRY:
+        case CDFG_NODE_KIND_BLOCK_FINISH:
+        case CDFG_NODE_KIND_BLOCK_FINAL_VALUE:
+            // these nodes should never appear in the final form of the cdfg.
+            TRACE_NO_NEWLINE("error");
             break;
     }
 }

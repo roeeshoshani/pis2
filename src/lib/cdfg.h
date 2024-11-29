@@ -50,6 +50,10 @@ STR_ENUM(cdfg_calculation, CDFG_CALCULATION, PACKED);
     _(CDFG_NODE_KIND_FINISH, )                                                                     \
     _(CDFG_NODE_KIND_IF, )                                                                         \
     _(CDFG_NODE_KIND_REGION, )                                                                     \
+    _(CDFG_NODE_KIND_BLOCK_VAR, )                                                              \
+    _(CDFG_NODE_KIND_BLOCK_ENTRY, )                                                                \
+    _(CDFG_NODE_KIND_BLOCK_FINISH, )                                                               \
+    _(CDFG_NODE_KIND_BLOCK_FINAL_VALUE, )                                                          \
     _(CDFG_NODE_KIND_PHI, )
 
 /// the kind of a CDFG node.
@@ -105,6 +109,28 @@ typedef struct {
     size_t inputs_amount;
 } PACKED cdfg_phi_node_t;
 
+/// a CDFG block variable node.
+///
+/// represents the unknown value of a register at the start of a block.
+typedef struct {
+    /// the id of the block which uses this variable.
+    cdfg_item_id_t block_id;
+
+    /// the region in the register space of the register access that this node represents.
+    pis_region_t reg_region;
+} PACKED cdfg_block_var_node_t;
+
+/// a CDFG block final value node.
+///
+/// represents the value of a register at the end of a block.
+typedef struct {
+    /// the id of the block which uses this variable.
+    cdfg_item_id_t block_id;
+
+    /// the region in the register space of the register access that this node represents.
+    pis_region_t reg_region;
+} PACKED cdfg_block_final_value_node_t;
+
 /// the content of a CDFG node.
 typedef union {
     cdfg_var_node_t var;
@@ -112,6 +138,8 @@ typedef union {
     cdfg_calc_node_t calc;
     cdfg_region_node_t region;
     cdfg_phi_node_t phi;
+    cdfg_block_var_node_t block_var;
+    cdfg_block_final_value_node_t block_final_value;
 } PACKED cdfg_node_content_t;
 
 /// represents a single node in the CDFG
@@ -167,15 +195,6 @@ typedef struct {
     cdfg_node_id_t last_cf_node_id;
 } cdfg_op_state_t;
 
-/// the state of a CFG block in the process of building the CDFG.
-typedef struct {
-    /// was this block already processed?
-    bool was_processed;
-
-    /// the op state at the end of this block.
-    cdfg_op_state_t final_state;
-} cdfg_block_state_t;
-
 /// a CDFG builder.
 typedef struct {
     /// the built CDFG.
@@ -184,14 +203,14 @@ typedef struct {
     /// the CFG that is used to build the CDFG.
     const cfg_t* cfg;
 
-    /// the state of each cfg block.
-    cdfg_block_state_t block_states[CFG_MAX_BLOCKS];
-
     /// the registers operand map.
     cdfg_op_map_t reg_op_map;
 
     /// the current operands state.
     cdfg_op_state_t op_state;
+
+    /// the currently processed block.
+    cdfg_item_id_t cur_block_id;
 } cdfg_builder_t;
 
 void cdfg_reset(cdfg_t* cdfg);
