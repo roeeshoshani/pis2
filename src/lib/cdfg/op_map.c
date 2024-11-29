@@ -219,8 +219,8 @@ err_t cdfg_op_map_largest_enclosing(
             break;
         case SEARCH_RES_KIND_FOUND_EXACT_MATCH_SLOT:
             // found an exact match. the container region is the region itself.
-            *out_found = true;
             *out_region = region;
+            *out_found = true;
             break;
         case SEARCH_RES_KIND_FOUND_CONTAINER_SLOT: {
             // found a slot which contains this region.
@@ -231,6 +231,7 @@ err_t cdfg_op_map_largest_enclosing(
                 // assuming that the slot is valid, its size should be a valid pis size
                 .size = (pis_size_t) slot->size,
             };
+            *out_found = true;
             break;
         }
         case SEARCH_RES_KIND_FOUND_CONTAINED_SLOTS:
