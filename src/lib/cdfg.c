@@ -1150,6 +1150,20 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_signed_carry(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW(opcode_handler_binop(builder, insn, CDFG_CALCULATION_SIGNED_CARRY));
+cleanup:
+    return err;
+}
+
+static err_t opcode_handler_unsigned_carry(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW(opcode_handler_binop(builder, insn, CDFG_CALCULATION_UNSIGNED_CARRY));
+cleanup:
+    return err;
+}
+
 static err_t opcode_handler_equals(cdfg_builder_t* builder, const pis_insn_t* insn) {
     err_t err = SUCCESS;
     CHECK_RETHROW(opcode_handler_binop(builder, insn, CDFG_CALCULATION_EQUALS));
@@ -1228,6 +1242,13 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_jmp(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    UNUSED(builder);
+    UNUSED(insn);
+
+    return SUCCESS;
+}
+
 static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
     [PIS_OPCODE_ADD] = opcode_handler_add,
     [PIS_OPCODE_AND] = opcode_handler_and,
@@ -1237,6 +1258,8 @@ static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
     [PIS_OPCODE_UNSIGNED_MUL] = opcode_handler_unsigned_mul,
     [PIS_OPCODE_SIGNED_MUL] = opcode_handler_signed_mul,
     [PIS_OPCODE_SIGNED_MUL_OVERFLOW] = opcode_handler_signed_mul_overflow,
+    [PIS_OPCODE_SIGNED_CARRY] = opcode_handler_signed_carry,
+    [PIS_OPCODE_UNSIGNED_CARRY] = opcode_handler_unsigned_carry,
     [PIS_OPCODE_SHIFT_RIGHT] = opcode_handler_shift_right,
     [PIS_OPCODE_SHIFT_RIGHT_SIGNED] = opcode_handler_shift_right_signed,
     [PIS_OPCODE_SHIFT_LEFT] = opcode_handler_shift_left,
@@ -1254,6 +1277,7 @@ static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
     [PIS_OPCODE_NOT] = opcode_handler_not,
     [PIS_OPCODE_COND_NEGATE] = opcode_handler_cond_negate,
     [PIS_OPCODE_JMP_RET] = opcode_handler_ret,
+    [PIS_OPCODE_JMP] = opcode_handler_jmp,
 };
 
 static err_t process_insn(cdfg_builder_t* builder, const pis_insn_t* insn) {

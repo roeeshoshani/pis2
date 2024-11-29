@@ -32,6 +32,8 @@
     _(CDFG_CALCULATION_UNSIGNED_MUL, )                                                             \
     _(CDFG_CALCULATION_SIGNED_MUL, )                                                               \
     _(CDFG_CALCULATION_SIGNED_MUL_OVERFLOW, )                                                      \
+    _(CDFG_CALCULATION_SIGNED_CARRY, )                                                             \
+    _(CDFG_CALCULATION_UNSIGNED_CARRY, )                                                             \
     _(CDFG_CALCULATION_SIGNED_LESS_THAN, )                                                         \
     _(CDFG_CALCULATION_NEG, )                                                                      \
     _(CDFG_CALCULATION_NOT, )                                                                      \
