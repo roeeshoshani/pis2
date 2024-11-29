@@ -1610,17 +1610,6 @@ static err_t
     } else {
         // the block variable had some values in the previous blocks. convert it to a phi node.
 
-        *node = (cdfg_node_t) {
-            .kind = CDFG_NODE_KIND_PHI,
-            .content =
-                {
-                    .phi =
-                        {
-                            .inputs_amount = inputs_amount,
-                        },
-                },
-        };
-
         // connect it to this block's entry CF node
         CHECK_RETHROW(
             make_edge(&builder->cdfg, CDFG_EDGE_KIND_CONTROL_FLOW, entry_node_id, node_id, 0)
@@ -1659,6 +1648,18 @@ static err_t
                 );
             }
         }
+
+        *node = (cdfg_node_t) {
+            .kind = CDFG_NODE_KIND_PHI,
+            .content =
+                {
+                    .phi =
+                        {
+                            // we filled all empty slots, so set it to the predecessors amount
+                            .inputs_amount = predecessors_amount,
+                        },
+                },
+        };
     }
 
 cleanup:
