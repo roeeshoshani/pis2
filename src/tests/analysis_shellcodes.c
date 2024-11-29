@@ -21,13 +21,8 @@ static err_t verify_analysis_arch(
     size_t shellcode_len = shellcode->code_end - shellcode->code;
 
     cfg_builder_t cfg_builder = {};
-    CHECK_RETHROW(cfg_build(
-        &cfg_builder,
-        &pis_arch_def_x86_64,
-        shellcode->code,
-        shellcode_len,
-        SHELLCODE_BASE_ADDR
-    ));
+    CHECK_RETHROW(cfg_build(&cfg_builder, arch, shellcode->code, shellcode_len, SHELLCODE_BASE_ADDR)
+    );
 
     cdfg_builder_t cdfg_builder = {};
     CHECK_RETHROW(cdfg_build(&cdfg_builder, &cfg_builder.cfg));
@@ -60,6 +55,10 @@ cleanup:
 
 static err_t verify_struct_size_analysis(const cdfg_t* cdfg) {
     err_t err = SUCCESS;
+
+    UNUSED(cdfg);
+    goto cleanup;
+
 cleanup:
     return err;
 }

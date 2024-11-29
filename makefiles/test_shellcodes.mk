@@ -2,6 +2,7 @@ SHELLCODE_ARCHS := x86_64 i686 mipsbe32r1 mipsel32r1
 
 SHELLCODE_SRCS :=
 SHELLCODE_SRCS += $(wildcard src/test_shellcodes/emu/*.c)
+SHELLCODE_SRCS += $(wildcard src/test_shellcodes/analysis/*.c)
 SHELLCODE_UTIL_SRCS := $(shell find src/test_shellcodes/utils/ -type f -name "*.c")
 
 SHELLCODE_CFLAGS ?=
