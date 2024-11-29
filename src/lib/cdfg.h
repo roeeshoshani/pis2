@@ -30,6 +30,8 @@
     _(CDFG_CALCULATION_SHIFT_LEFT, )                                                               \
     _(CDFG_CALCULATION_UNSIGNED_LESS_THAN, )                                                       \
     _(CDFG_CALCULATION_UNSIGNED_MUL, )                                                             \
+    _(CDFG_CALCULATION_SIGNED_MUL, )                                                               \
+    _(CDFG_CALCULATION_SIGNED_MUL_OVERFLOW, )                                                      \
     _(CDFG_CALCULATION_SIGNED_LESS_THAN, )                                                         \
     _(CDFG_CALCULATION_NEG, )                                                                      \
     _(CDFG_CALCULATION_NOT, )                                                                      \
@@ -50,7 +52,7 @@ STR_ENUM(cdfg_calculation, CDFG_CALCULATION, PACKED);
     _(CDFG_NODE_KIND_FINISH, )                                                                     \
     _(CDFG_NODE_KIND_IF, )                                                                         \
     _(CDFG_NODE_KIND_REGION, )                                                                     \
-    _(CDFG_NODE_KIND_BLOCK_VAR, )                                                              \
+    _(CDFG_NODE_KIND_BLOCK_VAR, )                                                                  \
     _(CDFG_NODE_KIND_BLOCK_ENTRY, )                                                                \
     _(CDFG_NODE_KIND_BLOCK_FINISH, )                                                               \
     _(CDFG_NODE_KIND_BLOCK_FINAL_VALUE, )                                                          \

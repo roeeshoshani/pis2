@@ -974,28 +974,6 @@ cleanup:
     return err;
 }
 
-static err_t opcode_handler_comparison(
-    cdfg_builder_t* builder, const pis_insn_t* insn, cdfg_calculation_t calculation
-) {
-    err_t err = SUCCESS;
-    CHECK_CODE(insn->operands_amount == 3, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
-
-    cdfg_node_id_t lhs_node_id = {.id = CDFG_ITEM_ID_INVALID};
-    CHECK_RETHROW(read_operand(builder, &insn->operands[1], &lhs_node_id));
-
-    cdfg_node_id_t rhs_node_id = {.id = CDFG_ITEM_ID_INVALID};
-    CHECK_RETHROW(read_operand(builder, &insn->operands[2], &rhs_node_id));
-
-    cdfg_node_id_t result_node_id = {.id = CDFG_ITEM_ID_INVALID};
-    CHECK_RETHROW(
-        make_binop_node(&builder->cdfg, calculation, lhs_node_id, rhs_node_id, &result_node_id)
-    );
-
-    CHECK_RETHROW(write_operand(builder, &insn->operands[0], result_node_id));
-cleanup:
-    return err;
-}
-
 /// perform a move instruction without checking the operands.
 static err_t do_move_nocheck(cdfg_builder_t* builder, const pis_insn_t* insn) {
     err_t err = SUCCESS;
@@ -1102,6 +1080,13 @@ cleanup:
     return err;
 }
 
+static err_t opcode_handler_signed_mul(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW(opcode_handler_binop(builder, insn, CDFG_CALCULATION_SIGNED_MUL));
+cleanup:
+    return err;
+}
+
 static err_t opcode_handler_sub(cdfg_builder_t* builder, const pis_insn_t* insn) {
     err_t err = SUCCESS;
     CHECK_RETHROW(opcode_handler_binop(builder, insn, CDFG_CALCULATION_SUB));
@@ -1153,21 +1138,28 @@ cleanup:
 
 static err_t opcode_handler_unsigned_less_than(cdfg_builder_t* builder, const pis_insn_t* insn) {
     err_t err = SUCCESS;
-    CHECK_RETHROW(opcode_handler_comparison(builder, insn, CDFG_CALCULATION_UNSIGNED_LESS_THAN));
+    CHECK_RETHROW(opcode_handler_binop(builder, insn, CDFG_CALCULATION_UNSIGNED_LESS_THAN));
+cleanup:
+    return err;
+}
+
+static err_t opcode_handler_signed_mul_overflow(cdfg_builder_t* builder, const pis_insn_t* insn) {
+    err_t err = SUCCESS;
+    CHECK_RETHROW(opcode_handler_binop(builder, insn, CDFG_CALCULATION_SIGNED_MUL_OVERFLOW));
 cleanup:
     return err;
 }
 
 static err_t opcode_handler_equals(cdfg_builder_t* builder, const pis_insn_t* insn) {
     err_t err = SUCCESS;
-    CHECK_RETHROW(opcode_handler_comparison(builder, insn, CDFG_CALCULATION_EQUALS));
+    CHECK_RETHROW(opcode_handler_binop(builder, insn, CDFG_CALCULATION_EQUALS));
 cleanup:
     return err;
 }
 
 static err_t opcode_handler_signed_less_than(cdfg_builder_t* builder, const pis_insn_t* insn) {
     err_t err = SUCCESS;
-    CHECK_RETHROW(opcode_handler_comparison(builder, insn, CDFG_CALCULATION_SIGNED_LESS_THAN));
+    CHECK_RETHROW(opcode_handler_binop(builder, insn, CDFG_CALCULATION_SIGNED_LESS_THAN));
 cleanup:
     return err;
 }
@@ -1243,6 +1235,8 @@ static opcode_handler_t g_opcode_handlers_table[PIS_OPCODES_AMOUNT] = {
     [PIS_OPCODE_XOR] = opcode_handler_xor,
     [PIS_OPCODE_OR] = opcode_handler_or,
     [PIS_OPCODE_UNSIGNED_MUL] = opcode_handler_unsigned_mul,
+    [PIS_OPCODE_SIGNED_MUL] = opcode_handler_signed_mul,
+    [PIS_OPCODE_SIGNED_MUL_OVERFLOW] = opcode_handler_signed_mul_overflow,
     [PIS_OPCODE_SHIFT_RIGHT] = opcode_handler_shift_right,
     [PIS_OPCODE_SHIFT_RIGHT_SIGNED] = opcode_handler_shift_right_signed,
     [PIS_OPCODE_SHIFT_LEFT] = opcode_handler_shift_left,
