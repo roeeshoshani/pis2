@@ -1337,6 +1337,9 @@ static void invalidate_tmps(cdfg_op_state_t* op_state) {
 static err_t process_block(cdfg_builder_t* builder, cfg_item_id_t block_id) {
     err_t err = SUCCESS;
 
+
+    builder->cur_block_id = block_id;
+
     const cfg_block_t* block = &builder->cfg->block_storage[block_id];
     CHECK(block->units_amount > 0);
 
@@ -2174,7 +2177,7 @@ static void cdfg_dump_node_desciption(const cdfg_node_t* node) {
             );
             break;
         case CDFG_NODE_KIND_BLOCK_ENTRY:
-            TRACE_NO_NEWLINE("block %u", node->content.block_entry.block_id);
+            TRACE_NO_NEWLINE("block %u entry", node->content.block_entry.block_id);
             break;
         case CDFG_NODE_KIND_BLOCK_FINAL_VALUE:
             TRACE_NO_NEWLINE(
