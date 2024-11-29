@@ -546,33 +546,14 @@ cleanup:
     return err;
 }
 
-static err_t read_reg_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_node_id_t* out_node_id) {
+static err_t read_reg_operand_sub_region(
+    cdfg_builder_t* builder,
+    pis_region_t region,
+    pis_region_t enclosing_region,
+    cdfg_node_id_t* out_node_id
+) {
     err_t err = SUCCESS;
 
-    // register operands are allowed to be accessed using different operand sizes and offsets,
-    // even inside of a single register. so, we must do read/write merging manually according to the
-    // operand map that we built before processing the code.
-
-    // find the container region of this register in the register operand map. all reads and writes
-    // must be performed using that container region.
-    pis_region_t region = pis_var_region(var);
-    pis_region_t enclosing_region = {};
-    bool found_enclosing_region = false;
-    CHECK_RETHROW(cdfg_op_map_largest_enclosing(
-        &builder->reg_op_map,
-        region,
-        &found_enclosing_region,
-        &enclosing_region
-    ));
-
-    // all registers should be in the register operand map.
-    CHECK(found_enclosing_region);
-
-    if (pis_regions_equal(region, enclosing_region)) {
-        // the region is standalone. read it directly.
-        CHECK_RETHROW(read_var_operand_direct(builder, var, out_node_id));
-        SUCCESS_CLEANUP();
-    }
 
     // read the enclosing region value
     pis_var_t enclosing_var = {
@@ -620,6 +601,40 @@ static err_t read_reg_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_node_
     ));
 
     *out_node_id = final_value_node;
+
+cleanup:
+    return err;
+}
+
+static err_t read_reg_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_node_id_t* out_node_id) {
+    err_t err = SUCCESS;
+
+    // register operands are allowed to be accessed using different operand sizes and offsets,
+    // even inside of a single register. so, we must do read/write merging manually according to the
+    // operand map that we built before processing the code.
+
+    // find the container region of this register in the register operand map. all reads and writes
+    // must be performed using that container region.
+    pis_region_t region = pis_var_region(var);
+    pis_region_t enclosing_region = {};
+    bool found_enclosing_region = false;
+    CHECK_RETHROW(cdfg_op_map_largest_enclosing(
+        &builder->reg_op_map,
+        region,
+        &found_enclosing_region,
+        &enclosing_region
+    ));
+
+    // all registers should be in the register operand map.
+    CHECK(found_enclosing_region);
+
+    if (pis_regions_equal(region, enclosing_region)) {
+        // the region is standalone. read it directly.
+        CHECK_RETHROW(read_var_operand_direct(builder, var, out_node_id));
+    } else {
+        // the region is a sub-region of a larger region
+        CHECK_RETHROW(read_reg_operand_sub_region(builder, region, enclosing_region, out_node_id));
+    }
 
 cleanup:
     return err;
@@ -686,34 +701,13 @@ cleanup:
     return err;
 }
 
-static err_t
-    write_reg_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_node_id_t value_node_id) {
+static err_t write_reg_operand_sub_region(
+    cdfg_builder_t* builder,
+    pis_region_t region,
+    pis_region_t enclosing_region,
+    cdfg_node_id_t value_node_id
+) {
     err_t err = SUCCESS;
-
-    // register operands are allowed to be accessed using different operand sizes and offsets,
-    // even inside of a single register. so, we must do read/write merging manually according to the
-    // operand map that we built before processing the code.
-
-    // find the container region of this register in the register operand map. all reads and writes
-    // must be performed using that container region.
-    pis_region_t region = pis_var_region(var);
-    pis_region_t enclosing_region = {};
-    bool found_enclosing_region = false;
-    CHECK_RETHROW(cdfg_op_map_largest_enclosing(
-        &builder->reg_op_map,
-        region,
-        &found_enclosing_region,
-        &enclosing_region
-    ));
-
-    // all registers should be in the register operand map.
-    CHECK(found_enclosing_region);
-
-    if (pis_regions_equal(region, enclosing_region)) {
-        // the region is standalone. write to it directly.
-        CHECK_RETHROW(write_var_operand_direct(builder, var, value_node_id));
-        SUCCESS_CLEANUP();
-    }
 
     // read the enclosing region value
     pis_var_t enclosing_var = {
@@ -775,6 +769,41 @@ static err_t
 
     // write the final value to the enclosing var
     CHECK_RETHROW(write_var_operand_direct(builder, enclosing_var, final_value_node));
+cleanup:
+    return err;
+}
+
+static err_t
+    write_reg_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_node_id_t value_node_id) {
+    err_t err = SUCCESS;
+
+    // register operands are allowed to be accessed using different operand sizes and offsets,
+    // even inside of a single register. so, we must do read/write merging manually according to the
+    // operand map that we built before processing the code.
+
+    // find the container region of this register in the register operand map. all reads and writes
+    // must be performed using that container region.
+    pis_region_t region = pis_var_region(var);
+    pis_region_t enclosing_region = {};
+    bool found_enclosing_region = false;
+    CHECK_RETHROW(cdfg_op_map_largest_enclosing(
+        &builder->reg_op_map,
+        region,
+        &found_enclosing_region,
+        &enclosing_region
+    ));
+
+    // all registers should be in the register operand map.
+    CHECK(found_enclosing_region);
+
+    if (pis_regions_equal(region, enclosing_region)) {
+        // the region is standalone. write to it directly.
+        CHECK_RETHROW(write_var_operand_direct(builder, var, value_node_id));
+    } else {
+        // the region is a sub-region of a larger region
+        CHECK_RETHROW(write_reg_operand_sub_region(builder, region, enclosing_region, value_node_id)
+        );
+    }
 
 cleanup:
     return err;
