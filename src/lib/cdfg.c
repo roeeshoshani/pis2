@@ -1537,7 +1537,7 @@ static void cdfg_dump_node_desciption(const cdfg_node_t* node) {
             TRACE_NO_NEWLINE("0x%lx", node->content.imm.value);
             break;
         case CDFG_NODE_KIND_CALC:
-            TRACE_NO_NEWLINE("%s", cdfg_calculation_to_short_str(node->content.calc.calculation));
+            TRACE_NO_NEWLINE("%s", cdfg_calculation_to_str(node->content.calc.calculation));
             break;
         case CDFG_NODE_KIND_STORE:
             TRACE_NO_NEWLINE("store");

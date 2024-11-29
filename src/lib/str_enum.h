@@ -6,21 +6,20 @@
     typedef enum ATTRS {                                                                           \
         FIELDS_FN(STR_ENUM_BODY_FIELDS_CALLBACK)                                                   \
     } NAME##_t;                                                                                    \
-    const char* NAME##_to_str(NAME##_t value);                                                     \
-    const char* NAME##_to_short_str(NAME##_t value)
+    const char* NAME##_to_str(NAME##_t value)
 
 #define STR_ENUM_BODY_FIELDS_CALLBACK(NAME, VALUE) NAME VALUE,
 
 #define STR_ENUM_IMPL(NAME, FIELDS_FN)                                                             \
-    const char* NAME##_to_str(NAME##_t value) {                                                    \
+    static const char* NAME##_to_long_str(NAME##_t value) {                                        \
         switch (value) {                                                                           \
             FIELDS_FN(STR_ENUM_IMPL_FIELDS_CALLBACK)                                               \
             default:                                                                               \
-                return "invalid " STRINGIFY(NAME##_t) " value>";                                   \
+                return STRINGIFY(FIELDS_FN) "_INVALID_VALUE";                                      \
         }                                                                                          \
     }                                                                                              \
-    const char* NAME##_to_short_str(NAME##_t value) {                                              \
-        const char* long_str = NAME##_to_str(value);                                               \
+    const char* NAME##_to_str(NAME##_t value) {                                                    \
+        const char* long_str = NAME##_to_long_str(value);                                          \
         return long_str + sizeof(STRINGIFY(FIELDS_FN));                                            \
     }
 
