@@ -97,6 +97,13 @@ pis_var_t pis_op_var(const pis_op_t* op) {
     };
 }
 
+pis_region_t pis_op_var_region(const pis_op_t* op) {
+    return (pis_region_t) {
+        .offset = op->v.var.addr.offset,
+        .size = op->size,
+    };
+}
+
 void pis_insn_dump(const pis_insn_t* insn) {
     TRACE_NO_NEWLINE("%s (", pis_opcode_to_str(insn->opcode));
     size_t operands_amount = MIN(insn->operands_amount, PIS_INSN_MAX_OPERANDS_AMOUNT);

@@ -1,4 +1,5 @@
 #include "cdfg.h"
+#include "cdfg/op_map.h"
 #include "cfg.h"
 #include "errors.h"
 #include "except.h"
@@ -1542,12 +1543,49 @@ cleanup:
     return err;
 }
 
+static err_t cdfg_build_reg_op_map(cdfg_builder_t* builder, const cfg_t* cfg) {
+    err_t err = SUCCESS;
+
+    // iterate over all code in the cfg and update the register operand map according to each
+    // register access.
+    for (size_t block_idx = 0; block_idx < cfg->blocks_amount; block_idx++) {
+        const cfg_block_t* block = &builder->cfg->block_storage[block_idx];
+        CHECK(block->units_amount > 0);
+
+        const cfg_unit_t* block_units = &builder->cfg->unit_storage[block->first_unit_id];
+        for (size_t unit_idx = 0; unit_idx < block->units_amount; unit_idx++) {
+            const cfg_unit_t* unit = &block_units[unit_idx];
+            const pis_insn_t* unit_insns = &builder->cfg->insn_storage[unit->first_insn_id];
+            for (size_t insn_idx = 0; insn_idx < unit->insns_amount; insn_idx++) {
+                const pis_insn_t* insn = &unit_insns[insn_idx];
+                for (size_t op_idx = 0; op_idx < insn->operands_amount; op_idx++) {
+                    const pis_op_t* op = &insn->operands[op_idx];
+                    if (op->kind != PIS_OP_KIND_VAR) {
+                        continue;
+                    }
+                    if (op->v.var.addr.space != PIS_VAR_SPACE_REG) {
+                        continue;
+                    }
+                    CHECK_RETHROW(cdfg_op_map_update(&builder->reg_op_map, pis_op_var_region(op)));
+                }
+            }
+        }
+    }
+
+cleanup:
+    return err;
+}
+
 err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg) {
     err_t err = SUCCESS;
 
     // initialize the builder
     builder->cfg = cfg;
     cdfg_reset(&builder->cdfg);
+    cdfg_op_map_reset(&builder->reg_op_map);
+
+    // build the register operand map
+    CHECK_RETHROW(cdfg_build_reg_op_map(builder, cfg));
 
     while (1) {
         bool processed_any_blocks = false;

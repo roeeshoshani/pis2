@@ -237,6 +237,8 @@ bool pis_ops_equal(const pis_op_t* a, const pis_op_t* b);
 
 pis_var_t pis_op_var(const pis_op_t* op);
 
+pis_region_t pis_op_var_region(const pis_op_t* op);
+
 void pis_insn_dump(const pis_insn_t* insn);
 
 bool pis_insn_equals(const pis_insn_t* a, const pis_insn_t* b);

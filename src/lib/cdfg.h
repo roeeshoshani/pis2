@@ -1,6 +1,7 @@
 #pragma once
 
 #include "arch_def.h"
+#include "cdfg/op_map.h"
 #include "cfg.h"
 #include "endianness.h"
 #include "except.h"
@@ -185,6 +186,9 @@ typedef struct {
 
     /// the state of each cfg block.
     cdfg_block_state_t block_states[CFG_MAX_BLOCKS];
+
+    /// the registers operand map.
+    cdfg_op_map_t reg_op_map;
 
     /// the current operands state.
     cdfg_op_state_t op_state;
