@@ -515,7 +515,8 @@ cleanup:
     return err;
 }
 
-static err_t read_var_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_node_id_t* out_node_id) {
+static err_t
+    read_var_operand_direct(cdfg_builder_t* builder, pis_var_t var, cdfg_node_id_t* out_node_id) {
     err_t err = SUCCESS;
 
     cdfg_node_id_t existing_node_id = {.id = CDFG_ITEM_ID_INVALID};
@@ -541,6 +542,101 @@ static err_t read_var_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_node_
         // the variable operand is initialized, use its value.
         *out_node_id = existing_node_id;
     }
+cleanup:
+    return err;
+}
+
+static err_t read_reg_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_node_id_t* out_node_id) {
+    err_t err = SUCCESS;
+
+    // register operands are allowed to be accessed using different operand sizes and offsets,
+    // even inside of a single register. so, we must do read/write merging manually according to the
+    // operand map that we built before processing the code.
+
+    // find the container region of this register in the register operand map. all reads and writes
+    // must be performed using that container region.
+    pis_region_t region = pis_var_region(var);
+    pis_region_t enclosing_region = {};
+    bool found_enclosing_region = false;
+    CHECK_RETHROW(cdfg_op_map_largest_enclosing(
+        &builder->reg_op_map,
+        region,
+        &found_enclosing_region,
+        &enclosing_region
+    ));
+
+    // all registers should be in the register operand map.
+    CHECK(found_enclosing_region);
+
+    if (pis_regions_equal(region, enclosing_region)) {
+        // the region is standalone. read it directly.
+        CHECK_RETHROW(read_var_operand_direct(builder, var, out_node_id));
+        SUCCESS_CLEANUP();
+    }
+
+    // read the enclosing region value
+    pis_var_t enclosing_var = {
+        .offset = enclosing_region.offset,
+        .size = enclosing_region.size,
+        .space = PIS_VAR_SPACE_REG,
+    };
+    cdfg_node_id_t enclosing_value_node = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(read_var_operand_direct(builder, enclosing_var, &enclosing_value_node));
+
+    // shift the value to put it at the right offset in the GPR
+    size_t shift_bytes = region.offset - enclosing_region.offset;
+    size_t shift_bits = shift_bytes * 8;
+    cdfg_node_id_t shifted_value_node;
+    if (shift_bytes == 0) {
+        // no shift needed, use the unshifted value
+        shifted_value_node = enclosing_value_node;
+    } else {
+        // shift needed, shift the value accordingly
+        cdfg_node_id_t shift_bits_node = {.id = CDFG_ITEM_ID_INVALID};
+        CHECK_RETHROW(make_imm_node(&builder->cdfg, shift_bits, &shift_bits_node));
+
+        CHECK_RETHROW(make_binop_node(
+            &builder->cdfg,
+            CDFG_CALCULATION_SHIFT_RIGHT,
+            enclosing_value_node,
+            shift_bits_node,
+            &shifted_value_node
+        ));
+    }
+
+    u64 mask = pis_size_max_unsigned_value(region.size);
+
+    // mask the shifted enclosing value.
+    cdfg_node_id_t mask_node = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(make_imm_node(&builder->cdfg, mask, &mask_node));
+
+    cdfg_node_id_t final_value_node = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(make_binop_node(
+        &builder->cdfg,
+        CDFG_CALCULATION_AND,
+        shifted_value_node,
+        mask_node,
+        &final_value_node
+    ));
+
+    *out_node_id = final_value_node;
+
+cleanup:
+    return err;
+}
+
+static err_t read_var_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_node_id_t* out_node_id) {
+    err_t err = SUCCESS;
+
+    switch (var.space) {
+        case PIS_VAR_SPACE_REG:
+            CHECK_RETHROW(read_reg_operand(builder, var, out_node_id));
+            break;
+        case PIS_VAR_SPACE_TMP:
+            CHECK_RETHROW(read_var_operand_direct(builder, var, out_node_id));
+            break;
+    }
+
 cleanup:
     return err;
 }
@@ -594,9 +690,9 @@ static err_t
     write_reg_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_node_id_t value_node_id) {
     err_t err = SUCCESS;
 
-    // register operands are allowed to perform accesses on using operand sizes and offsets, even
-    // inside of a single register. so, we must do write merging manually according to the operand
-    // map that we built before processing the code.
+    // register operands are allowed to be accessed using different operand sizes and offsets,
+    // even inside of a single register. so, we must do read/write merging manually according to the
+    // operand map that we built before processing the code.
 
     // find the container region of this register in the register operand map. all reads and writes
     // must be performed using that container region.
@@ -626,7 +722,7 @@ static err_t
         .space = PIS_VAR_SPACE_REG,
     };
     cdfg_node_id_t enclosing_value_node = {.id = CDFG_ITEM_ID_INVALID};
-    CHECK_RETHROW(read_var_operand(builder, enclosing_var, &enclosing_value_node));
+    CHECK_RETHROW(read_var_operand_direct(builder, enclosing_var, &enclosing_value_node));
 
     // shift the value to put it at the right offset in the GPR
     size_t shift_bytes = region.offset - enclosing_region.offset;
