@@ -234,6 +234,7 @@ err_t cdfg_op_map_largest_enclosing(
             // iterated over all of the code and processed all operand accesses, this should never
             // happen.
             CHECK_FAIL();
+            break;
         case SEARCH_RES_KIND_NO_MATCH:
             // no such region in the map.
             *out_found = false;
