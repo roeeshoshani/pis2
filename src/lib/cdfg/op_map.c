@@ -139,6 +139,10 @@ static err_t map_find_empty_slot(cdfg_op_map_t* map, size_t* out_slot_index) {
 
     CHECK(slot_index != (size_t) -1);
 
+    if (slot_index + 1 > map->used_slots_amount) {
+        map->used_slots_amount = slot_index + 1;
+    }
+
     *out_slot_index = slot_index;
 
 cleanup:
