@@ -122,7 +122,7 @@ typedef struct {
     pis_region_t reg_region;
 
     /// the amount of predecessors that provided a value for this node.
-    cdfg_item_id_t predecessor_values_amount;
+    u16 predecessor_values_amount;
 } PACKED cdfg_block_var_node_t;
 
 /// a CDFG block final value node.

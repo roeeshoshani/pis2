@@ -2165,10 +2165,24 @@ static void cdfg_dump_node_desciption(const cdfg_node_t* node) {
             TRACE_NO_NEWLINE("invalid");
             break;
         case CDFG_NODE_KIND_BLOCK_VAR:
+            TRACE_NO_NEWLINE(
+                "block %u var REG[0x%x]:%u, %u inputs",
+                node->content.block_var.block_id,
+                node->content.block_var.reg_region.offset,
+                pis_size_to_bytes(node->content.block_var.reg_region.size),
+                node->content.block_var.predecessor_values_amount
+            );
+            break;
         case CDFG_NODE_KIND_BLOCK_ENTRY:
+            TRACE_NO_NEWLINE("block %u", node->content.block_entry.block_id);
+            break;
         case CDFG_NODE_KIND_BLOCK_FINAL_VALUE:
-            // these nodes should never appear in the final form of the cdfg.
-            TRACE_NO_NEWLINE("error");
+            TRACE_NO_NEWLINE(
+                "block %u final value REG[0x%x]:%u",
+                node->content.block_final_value.block_id,
+                node->content.block_final_value.reg_region.offset,
+                pis_size_to_bytes(node->content.block_final_value.reg_region.size)
+            );
             break;
     }
 }
