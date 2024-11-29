@@ -2121,7 +2121,7 @@ static void cdfg_dump_node_ident(cdfg_node_id_t node_id) {
 static void cdfg_dump_node(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
     cdfg_dump_node_ident(node_id);
 
-    bool has_cf_input = does_node_have_cf_input(cdfg, node_id);
+    size_t cf_inputs_amount = node_count_inputs(cdfg, node_id, CDFG_EDGE_KIND_CONTROL_FLOW);
     size_t data_inputs_amount = node_count_inputs(cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW);
 
     bool has_cf_output = is_node_used_as_input_of_kind(cdfg, node_id, CDFG_EDGE_KIND_CONTROL_FLOW);
@@ -2130,7 +2130,7 @@ static void cdfg_dump_node(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
     TRACE_NO_NEWLINE(" [shape=record, label=\" ");
 
 
-    bool has_inputs = has_cf_input || data_inputs_amount > 0;
+    bool has_inputs = cf_inputs_amount > 0 || data_inputs_amount > 0;
 
     // special case for nodes with no inputs and only one dataflow output
     if (has_df_output && !has_inputs && !has_cf_output) {
@@ -2142,22 +2142,27 @@ static void cdfg_dump_node(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
 
         TRACE_NO_NEWLINE(" { ");
         if (has_inputs) {
-            TRACE_NO_NEWLINE("{");
-            if (does_node_have_cf_input(cdfg, node_id)) {
-                TRACE_NO_NEWLINE("<cfin> ");
-                if (data_inputs_amount > 0) {
-                    TRACE_NO_NEWLINE("| ");
+            if (cf_inputs_amount > 0) {
+                TRACE_NO_NEWLINE("{");
+                for (size_t i = 0; i < cf_inputs_amount; i++) {
+                    TRACE_NO_NEWLINE("<cfin%lu> ", (unsigned long) i);
+                    if (i + 1 < cf_inputs_amount) {
+                        TRACE_NO_NEWLINE("| ");
+                    }
                 }
+                TRACE_NO_NEWLINE("} |");
             }
 
-            size_t data_inputs_amount = node_count_inputs(cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW);
-            for (size_t i = 0; i < data_inputs_amount; i++) {
-                TRACE_NO_NEWLINE("<din%lu> ", (unsigned long) i);
-                if (i + 1 < data_inputs_amount) {
-                    TRACE_NO_NEWLINE("| ");
+            if (data_inputs_amount > 0) {
+                TRACE_NO_NEWLINE("{");
+                for (size_t i = 0; i < data_inputs_amount; i++) {
+                    TRACE_NO_NEWLINE("<din%lu> ", (unsigned long) i);
+                    if (i + 1 < data_inputs_amount) {
+                        TRACE_NO_NEWLINE("| ");
+                    }
                 }
+                TRACE_NO_NEWLINE("} |");
             }
-            TRACE_NO_NEWLINE("} | ");
         }
 
         cdfg_dump_node_desciption(&cdfg->node_storage[node_id.id]);
@@ -2241,7 +2246,7 @@ void cdfg_dump_dot(const cdfg_t* cdfg) {
                 TRACE_NO_NEWLINE(":din%u", edge->to_node_input_index);
                 break;
             case CDFG_EDGE_KIND_CONTROL_FLOW:
-                TRACE_NO_NEWLINE(":cfin");
+                TRACE_NO_NEWLINE(":cfin%u", edge->to_node_input_index);
                 break;
         }
 
