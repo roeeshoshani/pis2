@@ -2020,6 +2020,37 @@ cleanup:
     return err;
 }
 
+static err_t optimize_xor_x_x(cdfg_t* cdfg, bool* did_anything) {
+    err_t err = SUCCESS;
+
+    for (size_t cur_node_index = 0; cur_node_index < cdfg->nodes_amount; cur_node_index++) {
+        cdfg_node_id_t cur_node_id = {.id = cur_node_index};
+        cdfg_node_t* node = &cdfg->node_storage[cur_node_index];
+        if (node->kind != CDFG_NODE_KIND_CALC) {
+            continue;
+        }
+        if (node->content.calc.calculation != CDFG_CALCULATION_XOR) {
+            continue;
+        }
+
+        cdfg_node_id_t inputs[2] = {};
+        CHECK_RETHROW(find_node_inputs(cdfg, cur_node_id, CDFG_EDGE_KIND_DATA_FLOW, inputs, 2));
+        if (inputs[0].id != inputs[1].id) {
+            // xoring different values can't be optimized.
+            continue;
+        }
+
+        cdfg_node_id_t zero_node_id = {.id = CDFG_ITEM_ID_INVALID};
+        CHECK_RETHROW(make_imm_node(cdfg, 0, &zero_node_id));
+
+        substitute(cdfg, cur_node_id, zero_node_id);
+
+        *did_anything = true;
+    }
+cleanup:
+    return err;
+}
+
 err_t cdfg_optimize(cdfg_t* cdfg) {
     err_t err = SUCCESS;
 
@@ -2030,6 +2061,7 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
         did_anything |= remove_unused_nodes_and_edges(cdfg);
         CHECK_RETHROW(remove_single_input_region_phi_nodes(cdfg, &did_anything));
         CHECK_RETHROW(optimize_sub_equals_zero(cdfg, &did_anything));
+        CHECK_RETHROW(optimize_xor_x_x(cdfg, &did_anything));
     }
 cleanup:
     return err;
