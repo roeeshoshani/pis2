@@ -21,3 +21,4 @@ notes about stuff that needs to be done.
   predecessors and their requirements, so that you can delete its state.
   don't make it too complicated to keep the code sane.
 - don't use a unified item id type in cfg. use different types like i did in cdfg.
+- make slot allocation re-use invalidated slots in all slot allocation code that i have written.

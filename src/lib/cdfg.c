@@ -18,6 +18,37 @@ void cdfg_reset(cdfg_t* cdfg) {
     memset(cdfg, 0, sizeof(*cdfg));
 }
 
+static err_t node_find_inputs(
+    const cdfg_t* cdfg,
+    cdfg_node_id_t node_id,
+    cdfg_edge_kind_t edge_kind,
+    cdfg_node_id_t* input_node_ids,
+    size_t inputs_amount
+) {
+    err_t err = SUCCESS;
+    size_t cur_inputs_amount = 0;
+    for (size_t i = 0; i < cdfg->edges_amount; i++) {
+        const cdfg_edge_t* edge = &cdfg->edge_storage[i];
+        if (edge->to_node.id != node_id.id || edge->kind != edge_kind) {
+            continue;
+        }
+
+        CHECK(cur_inputs_amount < inputs_amount);
+        input_node_ids[cur_inputs_amount] = edge->from_node;
+        cur_inputs_amount++;
+    }
+
+    CHECK_TRACE(
+        cur_inputs_amount == inputs_amount,
+        "expected inputs amount %lu, instead got %lu",
+        inputs_amount,
+        cur_inputs_amount
+    );
+
+cleanup:
+    return err;
+}
+
 static err_t next_id(size_t* items_amount, size_t max, cdfg_item_id_t* id) {
     err_t err = SUCCESS;
 
@@ -371,6 +402,45 @@ cleanup:
     return err;
 }
 
+static err_t find_existing_binop_node(
+    cdfg_t* cdfg,
+    cdfg_calculation_t calculation,
+    cdfg_node_id_t lhs_node_id,
+    cdfg_node_id_t rhs_node_id,
+    cdfg_node_id_t* out_existing_binop_node_id
+) {
+    err_t err = SUCCESS;
+
+    cdfg_node_id_t existing_binop_node_id = {.id = CDFG_NODE_KIND_INVALID};
+
+    for (size_t i = 0; i < cdfg->nodes_amount; i++) {
+        cdfg_node_t* cur_node = &cdfg->node_storage[i];
+        cdfg_node_id_t cur_node_id = {.id = i};
+
+        if (cur_node->kind != CDFG_NODE_KIND_CALC) {
+            continue;
+        }
+
+        if (cur_node->content.calc.calculation != calculation) {
+            continue;
+        }
+
+        cdfg_node_id_t inputs[2] = {{.id = CDFG_ITEM_ID_INVALID}, {.id = CDFG_ITEM_ID_INVALID}};
+        CHECK_RETHROW(node_find_inputs(cdfg, cur_node_id, CDFG_EDGE_KIND_DATA_FLOW, inputs, 2));
+
+        if ((inputs[0].id == lhs_node_id.id && inputs[1].id == rhs_node_id.id) ||
+            (inputs[1].id == lhs_node_id.id && inputs[0].id == rhs_node_id.id)) {
+            // found an exact match
+            existing_binop_node_id.id = i;
+            break;
+        }
+    }
+
+    *out_existing_binop_node_id = existing_binop_node_id;
+cleanup:
+    return err;
+}
+
 static err_t make_binop_node(
     cdfg_t* cdfg,
     cdfg_calculation_t calculation,
@@ -379,6 +449,15 @@ static err_t make_binop_node(
     cdfg_node_id_t* out_binop_node_id
 ) {
     err_t err = SUCCESS;
+
+    cdfg_node_id_t existing_node_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(
+        find_existing_binop_node(cdfg, calculation, lhs_node_id, rhs_node_id, &existing_node_id)
+    );
+    if (existing_node_id.id != CDFG_ITEM_ID_INVALID) {
+        // found an existing node, use it.
+        return existing_node_id.id;
+    }
 
     cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(make_calc_node(cdfg, calculation, &node_id));
@@ -1319,36 +1398,6 @@ static size_t
     }
 
     return amount;
-}
-static err_t node_find_inputs(
-    const cdfg_t* cdfg,
-    cdfg_node_id_t node_id,
-    cdfg_edge_kind_t edge_kind,
-    cdfg_node_id_t* input_node_ids,
-    size_t inputs_amount
-) {
-    err_t err = SUCCESS;
-    size_t cur_inputs_amount = 0;
-    for (size_t i = 0; i < cdfg->edges_amount; i++) {
-        const cdfg_edge_t* edge = &cdfg->edge_storage[i];
-        if (edge->to_node.id != node_id.id || edge->kind != edge_kind) {
-            continue;
-        }
-
-        CHECK(cur_inputs_amount < inputs_amount);
-        input_node_ids[cur_inputs_amount] = edge->from_node;
-        cur_inputs_amount++;
-    }
-
-    CHECK_TRACE(
-        cur_inputs_amount == inputs_amount,
-        "expected inputs amount %lu, instead got %lu",
-        inputs_amount,
-        cur_inputs_amount
-    );
-
-cleanup:
-    return err;
 }
 
 static err_t binop_node_find_data_inputs(
