@@ -140,6 +140,9 @@ typedef struct {
 /// represents the control flow entrypoint of a block.
 typedef struct {
     cfg_item_id_t block_id;
+
+    /// the amount of predecessors of this block.
+    u16 predecessors_amount;
 } PACKED cdfg_block_entry_node_t;
 
 /// the content of a CDFG node.

@@ -1493,6 +1493,98 @@ static err_t integrate_block(cdfg_builder_t* builder, cfg_item_id_t block_id) {
         }
     }
 
+    cdfg_node_id_t entry_node_id = builder->block_infos[block_id].entry_node;
+    CHECK(entry_node_id.id != CDFG_ITEM_ID_INVALID);
+
+    cdfg_node_t* entry_node = &builder->cdfg.node_storage[entry_node_id.id];
+    entry_node->content.block_entry.predecessors_amount = found_predecessors_amount;
+
+cleanup:
+    return err;
+}
+
+static err_t cdfg_finalize_block_entry(cdfg_builder_t* builder, cdfg_node_t* node) {
+    err_t err = SUCCESS;
+
+    u16 predecessors_amount = node->content.block_entry.predecessors_amount;
+
+    if (predecessors_amount == 0) {
+        // if the block has no predecessors, it is an entrypoint for this function. replace its
+        // block entry node with an actual entry node.
+        node->kind = CDFG_NODE_KIND_ENTRY;
+    } else {
+        *node = (cdfg_node_t) {
+            .kind = CDFG_NODE_KIND_REGION,
+            .content =
+                {
+                    .region = {.inputs_amount = predecessors_amount},
+                },
+        };
+    }
+cleanup:
+    return err;
+}
+
+static err_t cdfg_finalize_block_var(cdfg_builder_t* builder, cdfg_node_t* node) {
+    err_t err = SUCCESS;
+
+    u16 inputs_amount = node->content.block_var.predecessor_values_amount;
+    pis_region_t reg_region = node->content.block_var.reg_region;
+
+    if (inputs_amount == 0) {
+        // if this block variable did not have a previous value, then it is an actual variable
+        *node = (cdfg_node_t) {
+            .kind = CDFG_NODE_KIND_VAR,
+            .content =
+                {
+                    .var =
+                        {
+                            .reg_region = reg_region,
+                        },
+                },
+        };
+    } else {
+        // the block variable had some values in the previous blocks. convert it to a phi node.
+        *node = (cdfg_node_t) {
+            .kind = CDFG_NODE_KIND_PHI,
+            .content =
+                {
+                    .phi =
+                        {
+                            .inputs_amount = inputs_amount,
+                        },
+                },
+        };
+    }
+
+cleanup:
+    return err;
+}
+
+static err_t cdfg_finalize(cdfg_builder_t* builder) {
+    err_t err = SUCCESS;
+
+    // replace intermediate nodes with their final representation.
+    for (size_t i = 0; i < builder->cdfg.nodes_amount; i++) {
+        cdfg_node_t* node = &builder->cdfg.node_storage[i];
+        switch (node->kind) {
+            case CDFG_NODE_KIND_BLOCK_ENTRY:
+                CHECK_RETHROW(cdfg_finalize_block_entry(builder, node));
+                break;
+            case CDFG_NODE_KIND_BLOCK_VAR:
+                CHECK_RETHROW(cdfg_finalize_block_var(builder, node));
+                break;
+            case CDFG_NODE_KIND_BLOCK_FINAL_VALUE:
+                // block final values are only needed while building the graph, and are no longer
+                // needed here.
+                node->kind = CDFG_NODE_KIND_INVALID;
+                break;
+            default:
+                // other node kinds are irrelevant
+                break;
+        }
+    }
+
 cleanup:
     return err;
 }
@@ -2124,6 +2216,8 @@ err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg) {
     for (size_t i = 0; i < cfg->blocks_amount; i++) {
         CHECK_RETHROW(integrate_block(builder, i));
     }
+
+    CHECK_RETHROW(cdfg_finalize(builder));
 
 cleanup:
     return err;
