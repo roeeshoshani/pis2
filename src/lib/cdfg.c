@@ -1575,46 +1575,58 @@ static void cdfg_dump_node(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
 
     TRACE_NO_NEWLINE(" [shape=record, label=\" ");
 
-    cdfg_dump_node_desciption(&cdfg->node_storage[node_id.id]);
 
-    TRACE_NO_NEWLINE(" | { ");
+    bool has_inputs = has_cf_input || data_inputs_amount > 0;
 
-    if (has_cf_input || data_inputs_amount > 0) {
-        TRACE_NO_NEWLINE("{");
-        if (does_node_have_cf_input(cdfg, node_id)) {
-            TRACE_NO_NEWLINE("<cfin> cfin ");
-            if (data_inputs_amount > 0) {
-                TRACE_NO_NEWLINE("| ");
+    // special case for nodes with no inputs and only one dataflow output
+    if (has_df_output && !has_inputs && !has_cf_output) {
+        // make the node only have a global label, and nothing else.
+        TRACE_NO_NEWLINE("<dout> ");
+        cdfg_dump_node_desciption(&cdfg->node_storage[node_id.id]);
+    } else {
+        // regular node output format
+
+        cdfg_dump_node_desciption(&cdfg->node_storage[node_id.id]);
+
+        TRACE_NO_NEWLINE(" | { ");
+        if (has_inputs) {
+            TRACE_NO_NEWLINE("{");
+            if (does_node_have_cf_input(cdfg, node_id)) {
+                TRACE_NO_NEWLINE("<cfin> ");
+                if (data_inputs_amount > 0) {
+                    TRACE_NO_NEWLINE("| ");
+                }
             }
+
+            size_t data_inputs_amount = node_count_inputs(cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW);
+            for (size_t i = 0; i < data_inputs_amount; i++) {
+                TRACE_NO_NEWLINE("<din%lu> ", (unsigned long) i);
+                if (i + 1 < data_inputs_amount) {
+                    TRACE_NO_NEWLINE("| ");
+                }
+            }
+            TRACE_NO_NEWLINE("} | ");
         }
 
-        size_t data_inputs_amount = node_count_inputs(cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW);
-        for (size_t i = 0; i < data_inputs_amount; i++) {
-            TRACE_NO_NEWLINE("<din%lu> din %lu ", (unsigned long) i, (unsigned long) i);
-            if (i + 1 < data_inputs_amount) {
-                TRACE_NO_NEWLINE("| ");
+        if (has_cf_output || has_df_output) {
+            TRACE_NO_NEWLINE("{ ");
+
+            if (has_cf_output) {
+                TRACE_NO_NEWLINE("<cfout> ");
+                if (has_df_output) {
+                    TRACE_NO_NEWLINE("| ");
+                }
             }
-        }
-        TRACE_NO_NEWLINE("} | ");
-    }
 
-    if (has_cf_output || has_df_output) {
-        TRACE_NO_NEWLINE("{ ");
-
-        if (has_cf_output) {
-            TRACE_NO_NEWLINE("<cfout> cfout");
             if (has_df_output) {
-                TRACE_NO_NEWLINE("| ");
+                TRACE_NO_NEWLINE("<dout> ");
             }
-        }
 
-        if (has_df_output) {
-            TRACE_NO_NEWLINE("<dout> dout");
+            TRACE_NO_NEWLINE("} ");
         }
-
-        TRACE_NO_NEWLINE("} ");
+        TRACE_NO_NEWLINE(" }");
     }
-    TRACE_NO_NEWLINE(" } \" ] ");
+    TRACE_NO_NEWLINE(" \" ] ");
 }
 
 /// dumps a DOT representation of the CDFG to stdout.
