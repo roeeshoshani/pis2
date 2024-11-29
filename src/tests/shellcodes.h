@@ -21,30 +21,22 @@ typedef struct {
     EACH_ARCH(_ARCH_DEFINE_SHELLCODE_FIELD);
 } per_arch_shellcode_t;
 
-#define _DECLARE_ARCH_SPECIFIC_SHELLCODE(ARCH, NAME)                                               \
-    extern u8 __start_shellcode_##NAME##_##ARCH[];                                                 \
-    extern u8 __end_shellcode_##NAME##_##ARCH[];
+#define _DECLARE_ARCH_SPECIFIC_SHELLCODE(ARCH, NAME, DIR)                                          \
+    extern u8 __start_shellcode_##DIR##_##NAME##_##ARCH[];                                         \
+    extern u8 __end_shellcode_##DIR##_##NAME##_##ARCH[];
 
-#define _ARCH_SPECIFIC_SHELLCODE(ARCH, NAME)                                                       \
+#define _ARCH_SPECIFIC_SHELLCODE(ARCH, NAME, DIR)                                                  \
     {                                                                                              \
-        .code = __start_shellcode_##NAME##_##ARCH, .code_end = __end_shellcode_##NAME##_##ARCH,    \
-        .name = STRINGIFY(NAME##_##ARCH)                                                           \
+        .code = __start_shellcode_##DIR##_##NAME##_##ARCH,                                         \
+        .code_end = __end_shellcode_##DIR##_##NAME##_##ARCH, .name = STRINGIFY(NAME##_##ARCH)      \
     }
 
-#define DECLARE_SHELLCODE(NAME) EACH_ARCH(_DECLARE_ARCH_SPECIFIC_SHELLCODE, NAME);
+#define DECLARE_SHELLCODE(NAME, DIR) EACH_ARCH(_DECLARE_ARCH_SPECIFIC_SHELLCODE, NAME, DIR);
 
-#define _ARCH_INIT_SHELLCODE_FIELD(ARCH, NAME) .ARCH = _ARCH_SPECIFIC_SHELLCODE(ARCH, NAME),
-#define DEFINE_SHELLCODE(NAME)                                                                     \
-    const per_arch_shellcode_t shellcode_##NAME = {EACH_ARCH(_ARCH_INIT_SHELLCODE_FIELD, NAME)};
+#define _ARCH_INIT_SHELLCODE_FIELD(ARCH, NAME, DIR)                                                \
+    .ARCH = _ARCH_SPECIFIC_SHELLCODE(ARCH, NAME, DIR),
+#define DEFINE_SHELLCODE(NAME, DIR)                                                                \
+    const per_arch_shellcode_t shellcode_##NAME = {                                                \
+        EACH_ARCH(_ARCH_INIT_SHELLCODE_FIELD, NAME, DIR)};
 
 #define SHELLCODE_BASE_ADDR 0x10000000
-
-#define EACH_SHELLCODE(_)                                                                          \
-    _(factorial)                                                                                   \
-    _(gcd)                                                                                         \
-    _(ackermann)                                                                                   \
-    _(json)                                                                                        \
-    _(regex)                                                                                       \
-    _(chacha20)
-
-EACH_SHELLCODE(DECLARE_SHELLCODE);

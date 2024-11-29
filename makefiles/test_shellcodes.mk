@@ -1,6 +1,7 @@
 SHELLCODE_ARCHS := x86_64 i686 mipsbe32r1 mipsel32r1
 
-SHELLCODE_SRCS := $(wildcard src/test_shellcodes/*.c)
+SHELLCODE_SRCS :=
+SHELLCODE_SRCS += $(wildcard src/test_shellcodes/emu/*.c)
 SHELLCODE_UTIL_SRCS := $(shell find src/test_shellcodes/utils/ -type f -name "*.c")
 
 SHELLCODE_CFLAGS ?=
@@ -34,7 +35,7 @@ build/test_shellcodes/%.bin.shellcode: build/test_shellcodes/%.elf.shellcode
 	$(OBJCOPY) -j .all -O binary $< $@
 
 build/test_shellcodes/%.bin.o.shellcode: build/test_shellcodes/%.bin.shellcode
-	$(CC) -c -DWRAP_FILENAME='"$<"' -DSHELLCODE_NAME=$* src/test_shellcodes/shellcode_wrapper.S -o $@
+	$(CC) -c -DWRAP_FILENAME='"$<"' -DSHELLCODE_NAME=$(subst /,_,$*) src/test_shellcodes/shellcode_wrapper.S -o $@
 
 SHELLCODE_ELFS :=
 

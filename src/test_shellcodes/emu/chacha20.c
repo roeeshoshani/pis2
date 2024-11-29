@@ -1,5 +1,5 @@
-#include "shellcode.h"
-#include "utils/my_std.h"
+#include "../shellcode.h"
+#include "../utils/my_std.h"
 
 // a shellcode which uses a chacha cipher. the implementation was copied from the internet.
 

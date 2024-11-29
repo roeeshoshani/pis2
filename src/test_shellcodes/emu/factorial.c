@@ -1,4 +1,4 @@
-#include "shellcode.h"
+#include "../shellcode.h"
 
 size_t SHELLCODE_ENTRY _start(size_t input) {
     size_t result = 1;
