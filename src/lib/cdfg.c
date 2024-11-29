@@ -324,24 +324,6 @@ cleanup:
     return err;
 }
 
-static err_t make_region_node(cdfg_t* cdfg, cdfg_node_id_t* out_node_id) {
-    err_t err = SUCCESS;
-
-    CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_REGION, out_node_id));
-
-cleanup:
-    return err;
-}
-
-static err_t make_phi_node(cdfg_t* cdfg, cdfg_node_id_t* out_node_id) {
-    err_t err = SUCCESS;
-
-    CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_PHI, out_node_id));
-
-cleanup:
-    return err;
-}
-
 static err_t do_if(cdfg_builder_t* builder, cdfg_node_id_t cond_node_id) {
     err_t err = SUCCESS;
 
@@ -388,15 +370,6 @@ static err_t do_load(
     CHECK_RETHROW(link_cf_node(builder, load_node_id));
 
     *out_loaded_val_node_id = load_node_id;
-
-cleanup:
-    return err;
-}
-
-static err_t make_entry_node(cdfg_t* cdfg, cdfg_node_id_t* out_node_id) {
-    err_t err = SUCCESS;
-
-    CHECK_RETHROW(make_empty_node_of_kind(cdfg, CDFG_NODE_KIND_ENTRY, out_node_id));
 
 cleanup:
     return err;
@@ -544,32 +517,6 @@ static err_t mark_block_final_value(
 
     CHECK_RETHROW(make_edge(cdfg, CDFG_EDGE_KIND_DATA_FLOW, final_value, node_id, 0));
 
-cleanup:
-    return err;
-}
-
-static err_t make_var_node(cdfg_t* cdfg, pis_var_t var, cdfg_node_id_t* out_node_id) {
-    err_t err = SUCCESS;
-
-    // variable nodes are only for register operands
-    CHECK(var.space == PIS_VAR_SPACE_REG);
-
-    pis_region_t region = pis_var_region(var);
-    cdfg_node_id_t node_id = find_var_node(cdfg, region);
-
-    if (node_id.id == CDFG_ITEM_ID_INVALID) {
-        // no existing node, create a new one.
-        CHECK_RETHROW(next_node_id(cdfg, &node_id));
-        cdfg->node_storage[node_id.id] = (cdfg_node_t) {
-            .kind = CDFG_NODE_KIND_VAR,
-            .content =
-                {
-                    .var = {.reg_region = region},
-                },
-        };
-    }
-
-    *out_node_id = node_id;
 cleanup:
     return err;
 }
@@ -1394,7 +1341,6 @@ static err_t integrate_predecessor_final_value(
     cdfg_builder_t* builder,
     cdfg_node_id_t final_value_node_id,
     cfg_item_id_t block_id,
-    cfg_item_id_t predecessor_block_id,
     size_t predecessor_index
 ) {
     err_t err = SUCCESS;
@@ -1466,13 +1412,9 @@ static err_t integrate_predecessor(
         if (node->kind == CDFG_NODE_KIND_BLOCK_FINAL_VALUE &&
             node->content.block_final_value.block_id == predecessor_block_id) {
             // found a node which represents the final value of a register in the predecessor.
-            CHECK_RETHROW(integrate_predecessor_final_value(
-                builder,
-                node_id,
-                block_id,
-                predecessor_block_id,
-                predecessor_index
-            ));
+            CHECK_RETHROW(
+                integrate_predecessor_final_value(builder, node_id, block_id, predecessor_index)
+            );
         }
     }
 
@@ -1514,9 +1456,7 @@ cleanup:
     return err;
 }
 
-static err_t cdfg_finalize_block_entry(cdfg_builder_t* builder, cdfg_node_t* node) {
-    err_t err = SUCCESS;
-
+static void cdfg_finalize_block_entry(cdfg_node_t* node) {
     u16 predecessors_amount = node->content.block_entry.predecessors_amount;
 
     if (predecessors_amount == 0) {
@@ -1532,8 +1472,6 @@ static err_t cdfg_finalize_block_entry(cdfg_builder_t* builder, cdfg_node_t* nod
                 },
         };
     }
-cleanup:
-    return err;
 }
 
 static err_t
@@ -1544,16 +1482,27 @@ static err_t
 
     if (inputs_amount == 0) {
         // if this block variable did not have a previous value, then it is an actual variable
-        *node = (cdfg_node_t) {
-            .kind = CDFG_NODE_KIND_VAR,
-            .content =
-                {
-                    .var =
-                        {
-                            .reg_region = node->content.block_var.reg_region,
-                        },
-                },
-        };
+        pis_region_t reg_region = node->content.block_var.reg_region;
+        cdfg_node_id_t existing_var_node_id = find_var_node(&builder->cdfg, reg_region);
+        if (existing_var_node_id.id != CDFG_ITEM_ID_INVALID) {
+            // found an existing var node, substitute it instead of this node.
+            substitute(&builder->cdfg, node_id, existing_var_node_id);
+
+            // invalidate this node
+            node->kind = CDFG_NODE_KIND_INVALID;
+        } else {
+            // no existing var node, convert this node into a var node
+            *node = (cdfg_node_t) {
+                .kind = CDFG_NODE_KIND_VAR,
+                .content =
+                    {
+                        .var =
+                            {
+                                .reg_region = reg_region,
+                            },
+                    },
+            };
+        }
     } else {
         // the block variable had some values in the previous blocks. convert it to a phi node.
         *node = (cdfg_node_t) {
@@ -1611,7 +1560,7 @@ static err_t cdfg_finalize(cdfg_builder_t* builder) {
         cdfg_node_t* node = &builder->cdfg.node_storage[i];
         switch (node->kind) {
             case CDFG_NODE_KIND_BLOCK_ENTRY:
-                CHECK_RETHROW(cdfg_finalize_block_entry(builder, node));
+                cdfg_finalize_block_entry(node);
                 break;
             case CDFG_NODE_KIND_BLOCK_VAR:
                 CHECK_RETHROW(cdfg_finalize_block_var(builder, node_id, node));
