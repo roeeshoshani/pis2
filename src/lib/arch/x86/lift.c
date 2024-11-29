@@ -2121,13 +2121,10 @@ static err_t
 
             pis_op_t reg_operand = decode_specific_reg(op_info->zext_specific_reg.reg, size);
 
-            pis_op_t reg_value = {};
-            CHECK_RETHROW(read_gpr(ctx, &reg_operand, &reg_value));
-
             pis_op_t extended_reg = {};
             CHECK_RETHROW(read_resize_zext(
                 ctx,
-                &reg_value,
+                &reg_operand,
                 op_size_to_pis_operand_size(extended_size),
                 &extended_reg
             ));
@@ -2236,9 +2233,7 @@ static err_t lifted_op_read(ctx_t* ctx, const lifted_op_t* op, pis_op_t* value) 
             *value = op->value;
             break;
         case LIFTED_OP_KIND_REG: {
-            pis_op_t tmp = {};
-            CHECK_RETHROW(read_gpr(ctx, &op->reg, &tmp));
-            *value = tmp;
+            *value = op->reg;
             break;
         }
         case LIFTED_OP_KIND_IMPLICIT:
@@ -2512,11 +2507,7 @@ static err_t handle_mnemonic_bt(ctx_t* ctx, const lifted_op_t* ops, size_t ops_a
             CHECK_RETHROW(do_bt_memory(ctx, &ops[0].mem.addr, &bit_offset));
             break;
         case LIFTED_OP_KIND_REG: {
-            pis_op_t tmp = {};
-            CHECK_RETHROW(read_gpr(ctx, &ops[0].reg, &tmp));
-
-            CHECK_RETHROW(do_bt_reg(ctx, &tmp, &bit_offset));
-
+            CHECK_RETHROW(do_bt_reg(ctx, &ops[0].reg, &bit_offset));
             break;
         }
         default:

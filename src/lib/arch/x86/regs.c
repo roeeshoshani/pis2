@@ -155,94 +155,15 @@ pis_op_t reg_largest_enclosing(const pis_op_t* reg, pis_x86_cpumode_t cpumode) {
 err_t write_gpr(ctx_t* ctx, const pis_op_t* gpr, const pis_op_t* value) {
     err_t err = SUCCESS;
 
-    // find the cpumode size GPR that contains the given GPR.
-    pis_op_t container_gpr = reg_largest_enclosing(gpr, ctx->cpumode);
-    pis_size_t container_size = container_gpr.size;
-
-    if (pis_ops_equal(gpr, &container_gpr)) {
-        // just overwrite the entire GPR
-        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, container_gpr, *value));
-        SUCCESS_CLEANUP();
-    }
-
-    pis_op_t zext_value = TMP_ALLOC(&ctx->tmp_allocator, container_size);
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, zext_value, *value));
-
-    // shift the value to put it at the right offset in the GPR
-    size_t shift_bytes = gpr->v.var.addr.offset - container_gpr.v.var.addr.offset;
-    size_t shift_bits = shift_bytes * 8;
-    pis_op_t shifted_value;
-    if (shift_bytes == 0) {
-        // no shift needed, use the unshifted value
-        shifted_value = zext_value;
+    if (gpr->size == PIS_SIZE_4 && ctx->cpumode == PIS_X86_CPUMODE_64_BIT) {
+        // in 64-bit mode, writes to 32-bit GPRs zero out the upper half of the register.
+        pis_op_t gpr64 = *gpr;
+        gpr64.size = PIS_SIZE_8;
+        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_ZERO_EXTEND, gpr64, *value));
     } else {
-        // shift needed, shift the value accordingly
-        pis_op_t shift_bits_operand = PIS_OPERAND_IMM(shift_bits, container_size);
-        shifted_value = TMP_ALLOC(&ctx->tmp_allocator, container_size);
-        PIS_EMIT(
-            &ctx->args->result,
-            PIS_INSN3(PIS_OPCODE_SHIFT_LEFT, shifted_value, zext_value, shift_bits_operand)
-        );
+        // regular write
+        PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_MOVE, *gpr, *value));
     }
-
-    // calculate the mask to be used on the container GPR to remove the relevant bits that will be
-    // set by the shifted value.
-    u64 value_bits_mask = pis_size_max_unsigned_value(gpr->size) << shift_bits;
-    u64 mask = (~value_bits_mask) & pis_size_max_unsigned_value(container_size);
-
-    // mask the container GPR.
-    pis_op_t mask_operand = PIS_OPERAND_IMM(mask, container_size);
-    pis_op_t masked_container_gpr = TMP_ALLOC(&ctx->tmp_allocator, container_size);
-    PIS_EMIT(
-        &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_AND, masked_container_gpr, container_gpr, mask_operand)
-    );
-
-    // OR the shifted value into the masked GPR to get the final result
-    PIS_EMIT(
-        &ctx->args->result,
-        PIS_INSN3(PIS_OPCODE_OR, container_gpr, masked_container_gpr, shifted_value)
-    );
-
-cleanup:
-    return err;
-}
-
-err_t read_gpr(ctx_t* ctx, const pis_op_t* gpr, pis_op_t* out_value) {
-    err_t err = SUCCESS;
-
-    // find the cpumode size GPR that contains the given GPR.
-    pis_op_t container_gpr = reg_largest_enclosing(gpr, ctx->cpumode);
-    pis_size_t container_size = container_gpr.size;
-
-    if (pis_ops_equal(gpr, &container_gpr)) {
-        // just read the entire GPR
-        *out_value = container_gpr;
-        SUCCESS_CLEANUP();
-    }
-
-    // shift the GPR's content to put the desired bits in the lsb.
-    size_t shift_bytes = gpr->v.var.addr.offset - container_gpr.v.var.addr.offset;
-    size_t shift_bits = shift_bytes * 8;
-    pis_op_t shifted_value;
-    if (shift_bytes == 0) {
-        // no shift needed, use the unshifted GPR value
-        shifted_value = container_gpr;
-    } else {
-        // shift needed, shift the value accordingly
-        pis_op_t shift_bits_operand = PIS_OPERAND_IMM(shift_bits, container_size);
-        shifted_value = TMP_ALLOC(&ctx->tmp_allocator, container_size);
-        PIS_EMIT(
-            &ctx->args->result,
-            PIS_INSN3(PIS_OPCODE_SHIFT_RIGHT, shifted_value, container_gpr, shift_bits_operand)
-        );
-    }
-
-    // get the lower bits of the shifted gpr
-    pis_op_t result = TMP_ALLOC(&ctx->tmp_allocator, gpr->size);
-    PIS_EMIT(&ctx->args->result, PIS_INSN2(PIS_OPCODE_GET_LOW_BITS, result, shifted_value));
-
-    *out_value = result;
 
 cleanup:
     return err;
