@@ -630,7 +630,28 @@ static err_t opcode_handler_get_low_bits(cdfg_builder_t* builder, const pis_insn
     err_t err = SUCCESS;
     CHECK_CODE(insn->operands_amount == 2, PIS_ERR_OPCODE_WRONG_OPERANDS_AMOUNT);
 
-    CHECK_RETHROW(do_move_nocheck(builder, insn));
+    // fetching the low bits of a value is like masking it
+
+    cdfg_node_id_t src_node_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(read_operand(builder, &insn->operands[1], &src_node_id));
+
+    cdfg_node_id_t mask_node_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(make_imm_node(
+        &builder->cdfg,
+        pis_size_max_unsigned_value(insn->operands[0].size),
+        &mask_node_id
+    ));
+
+    cdfg_node_id_t masked_src_node_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(make_binop_node(
+        &builder->cdfg,
+        CDFG_CALCULATION_AND,
+        src_node_id,
+        mask_node_id,
+        &masked_src_node_id
+    ));
+
+    CHECK_RETHROW(write_operand(builder, &insn->operands[0], masked_src_node_id));
 cleanup:
     return err;
 }
