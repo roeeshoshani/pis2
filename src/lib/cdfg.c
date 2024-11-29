@@ -1379,15 +1379,6 @@ cleanup:
     return err;
 }
 
-static err_t integrate_root_block(cdfg_builder_t* builder, cfg_item_id_t block_id) {
-    err_t err = SUCCESS;
-
-    // TODO: convert block entry to entry, block finish to finish, block var to var.
-
-cleanup:
-    return err;
-}
-
 static err_t integrate_predecessor_final_value(
     cdfg_builder_t* builder,
     cdfg_node_id_t final_value_node_id,
@@ -1408,6 +1399,14 @@ static err_t integrate_predecessor_final_value(
         final_value_node->content.block_final_value.reg_region,
         &block_var_node_id
     ));
+
+    if (block_var_node_id.id == CDFG_ITEM_ID_INVALID) {
+        // if there is no block variable node for this register, it means that the block doesn't use
+        // this register, so ignore it.
+        // TODO: is this really what we want to do here? what if one of the successors of this block
+        // uses this value?
+        SUCCESS_CLEANUP();
+    }
 
     CHECK_RETHROW(make_edge(
         &builder->cdfg,
@@ -1493,36 +1492,6 @@ static err_t integrate_block(cdfg_builder_t* builder, cfg_item_id_t block_id) {
             found_predecessors_amount++;
         }
     }
-
-    // make sure that we found any predecessors. only the first block is allowed to have no
-    // predecessors.
-    if (found_predecessors_amount == 0) {
-        CHECK_RETHROW(integrate_root_block(builder, block_id));
-    } else {
-        // our op state should now represent a merged state of all predecessors. all values are
-        // merged using phi nodes.
-        // in some cases, one of the predecessors might initialize a register while another
-        // predecessor does not. in this case, we will have partially initialized phi nodes, which
-        // only have some of their inputs connected. in those cases, we want to treat the register
-        // as uninitialized, since safe code should not use potentially uninitialized registers.
-        for (size_t i = 0; i < builder->op_state.used_slots_amount; i++) {
-            cdfg_op_state_slot_t* slot = &builder->op_state.slots[i];
-            if (slot->value_node_id.id == CDFG_ITEM_ID_INVALID) {
-                // this slot is vacant.
-                continue;
-            }
-            cdfg_node_id_t phi_node_id = slot->value_node_id;
-            cdfg_node_t* phi_node = &builder->cdfg.node_storage[phi_node_id.id];
-            if (phi_node->content.phi.inputs_amount != found_predecessors_amount) {
-                // sanity
-                CHECK(phi_node->content.phi.inputs_amount < found_predecessors_amount);
-
-                // invalidate this slot to make this register uninitialized
-                slot->value_node_id.id = CDFG_ITEM_ID_INVALID;
-            }
-        }
-    }
-
 
 cleanup:
     return err;
