@@ -1357,7 +1357,7 @@ static err_t process_block(cdfg_builder_t* builder, cfg_item_id_t block_id) {
 
     // finished processing all the code in the block. we now have the final state of the block.
     // create nodes to represent each of the final values of the registers at the end of this block.
-    for (size_t i = 0; i > builder->op_state.used_slots_amount; i++) {
+    for (size_t i = 0; i < builder->op_state.used_slots_amount; i++) {
         cdfg_op_state_slot_t* slot = &builder->op_state.slots[i];
         if (slot->value_node_id.id == CDFG_ITEM_ID_INVALID) {
             // slot is vacant.
