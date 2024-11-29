@@ -27,8 +27,6 @@ int main() {
     cdfg_builder_t cdfg_builder = {};
     CHECK_RETHROW(cdfg_build(&cdfg_builder, &cfg_builder.cfg));
 
-    CHECK_RETHROW(cdfg_optimize(&cdfg_builder.cdfg));
-
     cdfg_dump_dot(&cdfg_builder.cdfg);
 
 cleanup:
