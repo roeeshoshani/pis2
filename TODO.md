@@ -11,7 +11,6 @@ notes about stuff that needs to be done.
 - add stack data flow analysis
 - in my ret value detection, i ignore the fact that the return value may have a specific size. same for all
   register accesses.
-- optimize registers to use 16-bit offsets. this will make all structs much smaller.
 - handle inter-instruction jumps in CDFG.
 - when building CDFG node, instead of storing the final state of each block, which is very expensive, make it slot based and allow erasing
   the state of blocks that we finished processing. additionally, change the building strategy such that we need to keep the minimal amount
