@@ -1537,7 +1537,7 @@ static void cdfg_dump_node_desciption(const cdfg_node_t* node) {
             TRACE_NO_NEWLINE("0x%lx", node->content.imm.value);
             break;
         case CDFG_NODE_KIND_CALC:
-            TRACE_NO_NEWLINE("%s", cdfg_calculation_to_str(node->content.calc.calculation));
+            TRACE_NO_NEWLINE("%s", cdfg_calculation_to_short_str(node->content.calc.calculation));
             break;
         case CDFG_NODE_KIND_STORE:
             TRACE_NO_NEWLINE("store");
@@ -1586,9 +1586,7 @@ static void cdfg_dump_node(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
     } else {
         // regular node output format
 
-        cdfg_dump_node_desciption(&cdfg->node_storage[node_id.id]);
-
-        TRACE_NO_NEWLINE(" | { ");
+        TRACE_NO_NEWLINE(" { ");
         if (has_inputs) {
             TRACE_NO_NEWLINE("{");
             if (does_node_have_cf_input(cdfg, node_id)) {
@@ -1607,6 +1605,9 @@ static void cdfg_dump_node(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
             }
             TRACE_NO_NEWLINE("} | ");
         }
+
+        cdfg_dump_node_desciption(&cdfg->node_storage[node_id.id]);
+        TRACE_NO_NEWLINE(" | ");
 
         if (has_cf_output || has_df_output) {
             TRACE_NO_NEWLINE("{ ");
