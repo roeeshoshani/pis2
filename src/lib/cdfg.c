@@ -411,7 +411,7 @@ static err_t find_existing_binop_node(
 ) {
     err_t err = SUCCESS;
 
-    cdfg_node_id_t existing_binop_node_id = {.id = CDFG_NODE_KIND_INVALID};
+    cdfg_node_id_t existing_binop_node_id = {.id = CDFG_ITEM_ID_INVALID};
 
     for (size_t i = 0; i < cdfg->nodes_amount; i++) {
         cdfg_node_t* cur_node = &cdfg->node_storage[i];
@@ -456,7 +456,8 @@ static err_t make_binop_node(
     );
     if (existing_node_id.id != CDFG_ITEM_ID_INVALID) {
         // found an existing node, use it.
-        return existing_node_id.id;
+        *out_binop_node_id = existing_node_id;
+        SUCCESS_CLEANUP();
     }
 
     cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
