@@ -22,3 +22,4 @@ notes about stuff that needs to be done.
   don't make it too complicated to keep the code sane.
 - don't use a unified item id type in cfg. use different types like i did in cdfg.
 - make slot allocation re-use invalidated slots in all slot allocation code that i have written.
+- fix bug with lifting of result value of `struct_size` shellcode.
