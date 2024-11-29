@@ -1666,7 +1666,7 @@ static bool remove_unused_nodes_and_edges(cdfg_t* cdfg) {
 
 /// finds the single input edge of the given kind to the given node. makes sure that only one such
 /// edge exists, and that it does exist.
-static err_t node_find_single_input_edge(
+static err_t find_node_single_input_edge(
     const cdfg_t* cdfg,
     cdfg_edge_kind_t kind,
     cdfg_node_id_t node_id,
@@ -1724,7 +1724,7 @@ static err_t remove_single_input_region_phi_nodes(cdfg_t* cdfg, bool* did_anythi
         }
 
         cdfg_node_id_t input_edge_id = {.id = CDFG_ITEM_ID_INVALID};
-        CHECK_RETHROW(node_find_single_input_edge(cdfg, desired_edge_kind, node_id, &input_edge_id)
+        CHECK_RETHROW(find_node_single_input_edge(cdfg, desired_edge_kind, node_id, &input_edge_id)
         );
 
         cdfg_edge_t* edge = &cdfg->edge_storage[input_edge_id.id];
@@ -1765,7 +1765,7 @@ static size_t
     return amount;
 }
 
-static err_t binop_node_find_data_inputs(
+static err_t find_binop_node_data_inputs(
     const cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_node_id_t input_node_ids[2]
 ) {
     err_t err = SUCCESS;
@@ -1778,7 +1778,42 @@ cleanup:
 
 typedef bool (*node_predicate_t)(const cdfg_t* cdfg, cdfg_node_id_t node_id);
 
-static err_t node_find_input_by_predicate(
+typedef struct {
+    bool found;
+    cdfg_node_id_t matching_input;
+    cdfg_node_id_t other_input;
+} binop_data_input_by_predicate_res_t;
+
+static err_t find_binop_node_data_input_by_predicate(
+    const cdfg_t* cdfg,
+    cdfg_node_id_t node_id,
+    node_predicate_t predicate,
+    binop_data_input_by_predicate_res_t* result
+) {
+    err_t err = SUCCESS;
+
+    cdfg_node_id_t inputs[2] = {};
+    CHECK_RETHROW(find_binop_node_data_inputs(cdfg, node_id, inputs));
+
+    if (predicate(cdfg, inputs[0])) {
+        result->found = true;
+        result->matching_input = inputs[0];
+        result->other_input = inputs[1];
+    } else if (predicate(cdfg, inputs[1])) {
+        result->found = true;
+        result->matching_input = inputs[1];
+        result->other_input = inputs[0];
+    } else {
+        result->found = false;
+        result->matching_input.id = CDFG_ITEM_ID_INVALID;
+        result->other_input.id = CDFG_ITEM_ID_INVALID;
+    }
+
+cleanup:
+    return err;
+}
+
+static err_t find_node_input_by_predicate(
     const cdfg_t* cdfg,
     cdfg_node_id_t node_id,
     cdfg_edge_kind_t edge_kind,
@@ -1822,6 +1857,11 @@ static bool node_is_zero_imm(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
     return from_node->kind == CDFG_NODE_KIND_IMM && from_node->content.imm.value == 0;
 }
 
+static bool node_is_one_imm(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
+    const cdfg_node_t* from_node = &cdfg->node_storage[node_id.id];
+    return from_node->kind == CDFG_NODE_KIND_IMM && from_node->content.imm.value == 1;
+}
+
 static bool node_is_sub(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
     const cdfg_node_t* from_node = &cdfg->node_storage[node_id.id];
     return from_node->kind == CDFG_NODE_KIND_CALC &&
@@ -1845,7 +1885,7 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
 
         // we need one of the inputs to be a zero immediate operand.
         cdfg_node_id_t zero_imm_node_id = {.id = CDFG_ITEM_ID_INVALID};
-        CHECK_RETHROW(node_find_input_by_predicate(
+        CHECK_RETHROW(find_node_input_by_predicate(
             cdfg,
             cur_node_id,
             CDFG_EDGE_KIND_DATA_FLOW,
@@ -1858,7 +1898,7 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
 
         // we need another one of the inputs to be a sub operation.
         cdfg_node_id_t sub_node_id = {.id = CDFG_ITEM_ID_INVALID};
-        CHECK_RETHROW(node_find_input_by_predicate(
+        CHECK_RETHROW(find_node_input_by_predicate(
             cdfg,
             cur_node_id,
             CDFG_EDGE_KIND_DATA_FLOW,
@@ -1872,7 +1912,7 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
         // doing `x - y == 0` is like doing `x == y`, so we want to create an equals node with the
         // same operands as the sub node.
         cdfg_node_id_t sub_input_node_ids[2] = {};
-        CHECK_RETHROW(binop_node_find_data_inputs(cdfg, sub_node_id, sub_input_node_ids));
+        CHECK_RETHROW(find_binop_node_data_inputs(cdfg, sub_node_id, sub_input_node_ids));
 
         cdfg_node_id_t optimized_eq_node_id = {.id = CDFG_ITEM_ID_INVALID};
         CHECK_RETHROW(make_binop_node(
@@ -1905,7 +1945,7 @@ static err_t optimize_xor_x_x(cdfg_t* cdfg, bool* did_anything) {
         }
 
         cdfg_node_id_t inputs[2] = {};
-        CHECK_RETHROW(find_node_inputs(cdfg, cur_node_id, CDFG_EDGE_KIND_DATA_FLOW, inputs, 2));
+        CHECK_RETHROW(find_binop_node_data_inputs(cdfg, cur_node_id, inputs));
         if (inputs[0].id != inputs[1].id) {
             // xoring different values can't be optimized.
             continue;
@@ -1915,6 +1955,44 @@ static err_t optimize_xor_x_x(cdfg_t* cdfg, bool* did_anything) {
         CHECK_RETHROW(make_imm_node(cdfg, 0, &zero_node_id));
 
         substitute(cdfg, cur_node_id, zero_node_id);
+
+        *did_anything = true;
+    }
+cleanup:
+    return err;
+}
+
+static err_t optimize_mul_1(cdfg_t* cdfg, bool* did_anything) {
+    err_t err = SUCCESS;
+
+    for (size_t cur_node_index = 0; cur_node_index < cdfg->nodes_amount; cur_node_index++) {
+        cdfg_node_id_t cur_node_id = {.id = cur_node_index};
+        cdfg_node_t* node = &cdfg->node_storage[cur_node_index];
+        if (node->kind != CDFG_NODE_KIND_CALC) {
+            continue;
+        }
+
+        bool is_mul = node->content.calc.calculation == CDFG_CALCULATION_UNSIGNED_MUL ||
+                      node->content.calc.calculation == CDFG_CALCULATION_SIGNED_MUL;
+        if (!is_mul) {
+            continue;
+        }
+
+        binop_data_input_by_predicate_res_t match_result = {};
+        CHECK_RETHROW(find_binop_node_data_input_by_predicate(
+            cdfg,
+            cur_node_id,
+            node_is_one_imm,
+            &match_result
+        ));
+        if (!match_result.found) {
+            // no match
+            continue;
+        }
+
+        // if this is a multiplication by one, just simplify it to the operand that is being
+        // multiplied by 1.
+        substitute(cdfg, cur_node_id, match_result.other_input);
 
         *did_anything = true;
     }
@@ -1933,6 +2011,7 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
         CHECK_RETHROW(remove_single_input_region_phi_nodes(cdfg, &did_anything));
         CHECK_RETHROW(optimize_sub_equals_zero(cdfg, &did_anything));
         CHECK_RETHROW(optimize_xor_x_x(cdfg, &did_anything));
+        CHECK_RETHROW(optimize_mul_1(cdfg, &did_anything));
     }
 cleanup:
     return err;
