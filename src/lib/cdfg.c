@@ -50,6 +50,26 @@ cleanup:
     return err;
 }
 
+static cdfg_edge_id_t find_edge(
+    const cdfg_t* cdfg,
+    cdfg_edge_kind_t kind,
+    cdfg_node_id_t from_node_id,
+    cdfg_node_id_t to_node_id,
+    size_t to_node_input_index
+) {
+    cdfg_edge_id_t found_id = {.id = CDFG_ITEM_ID_INVALID};
+    for (size_t i = 0; i < cdfg->edges_amount; i++) {
+        const cdfg_edge_t* edge = &cdfg->edge_storage[i];
+        if (edge->to_node.id == to_node_id.id && edge->from_node.id == from_node_id.id &&
+            edge->kind == kind && edge->to_node_input_index == to_node_input_index) {
+            found_id.id = i;
+            break;
+        }
+    }
+
+    return found_id;
+}
+
 static cdfg_edge_id_t find_node_input_with_index(
     const cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_edge_kind_t edge_kind, size_t input_index
 ) {
@@ -1813,8 +1833,7 @@ static bool does_node_have_cf_input(const cdfg_t* cdfg, cdfg_node_id_t node_id) 
     return false;
 }
 
-/// removes unused nodes and edges. returns whether any nodes or edges were removed.
-static bool remove_unused_nodes_and_edges(cdfg_t* cdfg) {
+static bool optimize_remove_unused_nodes_and_edges(cdfg_t* cdfg) {
     bool removed_anything = false;
     for (size_t i = 0; i < cdfg->nodes_amount; i++) {
         cdfg_node_id_t node_id = {.id = i};
@@ -1859,6 +1878,86 @@ static bool remove_unused_nodes_and_edges(cdfg_t* cdfg) {
             edge->from_node.id = CDFG_ITEM_ID_INVALID;
             edge->to_node.id = CDFG_ITEM_ID_INVALID;
             removed_anything = true;
+        }
+    }
+    return removed_anything;
+}
+
+static bool are_node_inputs_equals(const cdfg_t* cdfg, cdfg_node_id_t a_id, cdfg_node_id_t b_id) {
+    for (size_t i = 0; i < cdfg->edges_amount; i++) {
+        const cdfg_edge_t* a_edge = &cdfg->edge_storage[i];
+        if (a_edge->to_node.id == a_id.id) {
+            cdfg_edge_id_t b_edge =
+                find_edge(cdfg, a_edge->kind, a_edge->from_node, b_id, a_edge->to_node_input_index);
+            if (b_edge.id == CDFG_ITEM_ID_INVALID) {
+                // node b doesn't have this input
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+static bool nodes_equal(const cdfg_t* cdfg, cdfg_node_id_t a_id, cdfg_node_id_t b_id) {
+    const cdfg_node_t* a = &cdfg->node_storage[a_id.id];
+    const cdfg_node_t* b = &cdfg->node_storage[b_id.id];
+    if (a->kind != b->kind) {
+        return false;
+    }
+    switch (a->kind) {
+        case CDFG_NODE_KIND_INVALID:
+            return true;
+        case CDFG_NODE_KIND_VAR:
+            return pis_regions_equal(a->content.var.reg_region, b->content.var.reg_region);
+        case CDFG_NODE_KIND_IMM:
+            return a->content.imm.value == b->content.imm.value;
+        case CDFG_NODE_KIND_CALC:
+            return a->content.calc.calculation == b->content.calc.calculation &&
+                   are_node_inputs_equals(cdfg, a_id, b_id);
+        case CDFG_NODE_KIND_STORE:
+            return are_node_inputs_equals(cdfg, a_id, b_id);
+        case CDFG_NODE_KIND_LOAD:
+            return are_node_inputs_equals(cdfg, a_id, b_id);
+        case CDFG_NODE_KIND_ENTRY:
+            return true;
+        case CDFG_NODE_KIND_FINISH:
+            return are_node_inputs_equals(cdfg, a_id, b_id);
+        case CDFG_NODE_KIND_IF:
+            return are_node_inputs_equals(cdfg, a_id, b_id);
+        case CDFG_NODE_KIND_REGION:
+            return a->content.region.inputs_amount == b->content.region.inputs_amount &&
+                   are_node_inputs_equals(cdfg, a_id, b_id);
+        case CDFG_NODE_KIND_BLOCK_VAR:
+            return pis_regions_equal(a->content.var.reg_region, b->content.var.reg_region);
+        case CDFG_NODE_KIND_BLOCK_ENTRY:
+            return a->content.block_entry.block_id == b->content.block_entry.block_id;
+        case CDFG_NODE_KIND_BLOCK_FINAL_VALUE:
+            return a->content.block_final_value.block_id == b->content.block_final_value.block_id &&
+                   pis_regions_equal(
+                       a->content.block_final_value.reg_region,
+                       b->content.block_final_value.reg_region
+                   ) &&
+                   are_node_inputs_equals(cdfg, a_id, b_id);
+        case CDFG_NODE_KIND_PHI:
+            return a->content.phi.inputs_amount == b->content.phi.inputs_amount &&
+                   are_node_inputs_equals(cdfg, a_id, b_id);
+            break;
+        default:
+            // unreachable
+            return false;
+    }
+}
+
+static bool optimize_remove_duplicate_nodes(cdfg_t* cdfg) {
+    bool removed_anything = false;
+    for (size_t i = 0; i + 1 < cdfg->nodes_amount; i++) {
+        cdfg_node_id_t node_id_a = {.id = i};
+        for (size_t j = i + 1; j < cdfg->nodes_amount; j++) {
+            cdfg_node_id_t node_id_b = {.id = j};
+            if (nodes_equal(cdfg, node_id_a, node_id_b)) {
+                substitute(cdfg, node_id_a, node_id_b);
+                removed_anything = true;
+            }
         }
     }
     return removed_anything;
@@ -2195,7 +2294,8 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
     bool did_anything;
     do {
         did_anything = false;
-        did_anything |= remove_unused_nodes_and_edges(cdfg);
+        did_anything |= optimize_remove_unused_nodes_and_edges(cdfg);
+        did_anything |= optimize_remove_duplicate_nodes(cdfg);
         CHECK_RETHROW(remove_single_input_region_phi_nodes(cdfg, &did_anything));
         CHECK_RETHROW(optimize_sub_equals_zero(cdfg, &did_anything));
         CHECK_RETHROW(optimize_xor_x_x(cdfg, &did_anything));
