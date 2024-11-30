@@ -1427,7 +1427,10 @@ cleanup:
 }
 
 static err_t inherit_predecessor_final_value(
-    cdfg_builder_t* builder, cdfg_node_t* final_value_node, cfg_item_id_t block_id
+    cdfg_builder_t* builder,
+    cdfg_node_t* final_value_node,
+    cfg_item_id_t block_id,
+    bool* did_anything
 ) {
     err_t err = SUCCESS;
 
@@ -1451,12 +1454,17 @@ static err_t inherit_predecessor_final_value(
     // also, mark the new var node as the final value for this register.
     CHECK_RETHROW(mark_block_final_value(&builder->cdfg, block_id, reg_region, block_var_node_id));
 
+    *did_anything = true;
+
 cleanup:
     return err;
 }
 
 static err_t inherit_predecessor_final_values(
-    cdfg_builder_t* builder, cfg_item_id_t block_id, cfg_item_id_t predecessor_block_id
+    cdfg_builder_t* builder,
+    cfg_item_id_t block_id,
+    cfg_item_id_t predecessor_block_id,
+    bool* did_anything
 ) {
     err_t err = SUCCESS;
 
@@ -1465,7 +1473,7 @@ static err_t inherit_predecessor_final_values(
         if (node->kind == CDFG_NODE_KIND_BLOCK_FINAL_VALUE &&
             node->content.block_final_value.block_id == predecessor_block_id) {
             // found a node which represents the final value of a register in the predecessor.
-            CHECK_RETHROW(inherit_predecessor_final_value(builder, node, block_id));
+            CHECK_RETHROW(inherit_predecessor_final_value(builder, node, block_id, did_anything));
         }
     }
 
@@ -2148,9 +2156,8 @@ cleanup:
 err_t cdfg_optimize(cdfg_t* cdfg) {
     err_t err = SUCCESS;
 
-    bool did_anything = true;
-
-    while (did_anything) {
+    bool did_anything;
+    do {
         did_anything = false;
         did_anything |= remove_unused_nodes_and_edges(cdfg);
         CHECK_RETHROW(remove_single_input_region_phi_nodes(cdfg, &did_anything));
@@ -2165,7 +2172,7 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
         CHECK_RETHROW(
             optimize_nop_value(cdfg, CDFG_CALCULATION_ADD, is_node_imm_zero, &did_anything)
         );
-    }
+    } while (did_anything);
 cleanup:
     return err;
 }
@@ -2203,7 +2210,9 @@ cleanup:
     return err;
 }
 
-static err_t cdfg_inherit_all_predecessor_final_values(cdfg_builder_t* builder) {
+static err_t cdfg_inherit_all_predecessor_final_values_one_pass(
+    cdfg_builder_t* builder, bool* did_anything
+) {
     err_t err = SUCCESS;
 
     for (size_t block = 0; block < builder->cfg->blocks_amount; block++) {
@@ -2221,10 +2230,26 @@ static err_t cdfg_inherit_all_predecessor_final_values(cdfg_builder_t* builder) 
                 &is_direct_predecessor
             ));
             if (is_direct_predecessor) {
-                CHECK_RETHROW(inherit_predecessor_final_values(builder, block, predecessor));
+                CHECK_RETHROW(
+                    inherit_predecessor_final_values(builder, block, predecessor, did_anything)
+                );
             }
         }
     }
+
+cleanup:
+    return err;
+}
+
+
+static err_t cdfg_inherit_all_predecessor_final_values(cdfg_builder_t* builder) {
+    err_t err = SUCCESS;
+
+    bool did_anything;
+    do {
+        did_anything = false;
+        CHECK_RETHROW(cdfg_inherit_all_predecessor_final_values_one_pass(builder, &did_anything));
+    } while (did_anything);
 
 cleanup:
     return err;
