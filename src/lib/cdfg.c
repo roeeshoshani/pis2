@@ -1952,11 +1952,31 @@ static bool optimize_remove_duplicate_nodes(cdfg_t* cdfg) {
     bool removed_anything = false;
     for (size_t i = 0; i + 1 < cdfg->nodes_amount; i++) {
         cdfg_node_id_t node_id_a = {.id = i};
+        cdfg_node_t* node_a = &cdfg->node_storage[i];
+
+        if (node_a->kind == CDFG_NODE_KIND_INVALID) {
+            continue;
+        }
+
         for (size_t j = i + 1; j < cdfg->nodes_amount; j++) {
             cdfg_node_id_t node_id_b = {.id = j};
+            cdfg_node_t* node_b = &cdfg->node_storage[j];
+
+            if (node_b->kind == CDFG_NODE_KIND_INVALID) {
+                continue;
+            }
+
             if (nodes_equal(cdfg, node_id_a, node_id_b)) {
+                // replace all usages of node a with node b.
                 substitute(cdfg, node_id_a, node_id_b);
+
+                // invalidate node a.
+                node_a->kind = CDFG_NODE_KIND_INVALID;
+
                 removed_anything = true;
+
+                // we replaced this node, so stop scanning it, and continue to the next one.
+                break;
             }
         }
     }
