@@ -1883,6 +1883,15 @@ static bool optimize_remove_unused_nodes_and_edges(cdfg_t* cdfg) {
     return removed_anything;
 }
 
+static bool optimize_remove_unused_nodes_and_edges_recursively(cdfg_t* cdfg) {
+    bool removed_anything = false;
+    while (optimize_remove_unused_nodes_and_edges(cdfg)) {
+        removed_anything = true;
+    }
+    return removed_anything;
+}
+
+
 static bool are_node_inputs_equals(const cdfg_t* cdfg, cdfg_node_id_t a_id, cdfg_node_id_t b_id) {
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* a_edge = &cdfg->edge_storage[i];
@@ -2314,7 +2323,7 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
     bool did_anything;
     do {
         did_anything = false;
-        did_anything |= optimize_remove_unused_nodes_and_edges(cdfg);
+        did_anything |= optimize_remove_unused_nodes_and_edges_recursively(cdfg);
         did_anything |= optimize_remove_duplicate_nodes(cdfg);
         CHECK_RETHROW(remove_single_input_region_phi_nodes(cdfg, &did_anything));
         CHECK_RETHROW(optimize_sub_equals_zero(cdfg, &did_anything));
