@@ -3372,10 +3372,24 @@ const pis_arch_def_t pis_arch_def_x86_64 = {
     .lifter = pis_lifter_x86_64,
     .endianness = PIS_ENDIANNESS_LITTLE,
     .return_value = &X86_RAX,
+    .args =
+        {
+            &X86_RDI,
+            &X86_RSI,
+            &X86_RDX,
+            &X86_RCX,
+        },
 };
 
 const pis_arch_def_t pis_arch_def_i686 = {
     .lifter = pis_lifter_i686,
     .endianness = PIS_ENDIANNESS_LITTLE,
     .return_value = &X86_EAX,
+    .args =
+        {
+            &X86_EAX,
+            &X86_EDX,
+            &X86_ECX,
+            &X86_EBX,
+        },
 };
