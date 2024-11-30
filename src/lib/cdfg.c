@@ -493,12 +493,9 @@ cleanup:
 }
 
 static err_t mark_block_final_value(
-    cdfg_t* cdfg, cfg_item_id_t block_id, pis_var_t var, cdfg_node_id_t final_value
+    cdfg_t* cdfg, cfg_item_id_t block_id, pis_region_t reg_region, cdfg_node_id_t final_value
 ) {
     err_t err = SUCCESS;
-
-    // only regs are allowed here
-    CHECK(var.space == PIS_VAR_SPACE_REG);
 
     cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(next_node_id(cdfg, &node_id));
@@ -510,7 +507,7 @@ static err_t mark_block_final_value(
                 .block_final_value =
                     {
                         .block_id = block_id,
-                        .reg_region = pis_var_region(var),
+                        .reg_region = reg_region,
                     },
             },
     };
@@ -1374,9 +1371,12 @@ static err_t process_block(cdfg_builder_t* builder, cfg_item_id_t block_id) {
             // only registers are relevant here. tmps are not preserved accross CFG blocks.
             continue;
         }
-        CHECK_RETHROW(
-            mark_block_final_value(&builder->cdfg, block_id, slot->var, slot->value_node_id)
-        );
+        CHECK_RETHROW(mark_block_final_value(
+            &builder->cdfg,
+            block_id,
+            pis_var_region(slot->var),
+            slot->value_node_id
+        ));
     }
 
     // remember the last cf node of this block
@@ -1447,6 +1447,9 @@ static err_t inherit_predecessor_final_value(
     // inherit the value from the predecessors.
 
     CHECK_RETHROW(make_block_var_node(&builder->cdfg, block_id, reg_region, &block_var_node_id));
+
+    // also, mark the new var node as the final value for this register.
+    CHECK_RETHROW(mark_block_final_value(&builder->cdfg, block_id, reg_region, block_var_node_id));
 
 cleanup:
     return err;
