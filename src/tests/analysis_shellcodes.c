@@ -99,7 +99,8 @@ static err_t verify_struct_size_analysis(const cdfg_t* cdfg) {
 
         // we expect one of the inputs of the multiplication node to be an immediate
         cdfg_binop_input_find_res_t mul_node_find_res = {};
-        CHECK_RETHROW(cdfg_find_binop_input(cdfg, node_id, cdfg_node_is_imm, &mul_node_find_res));
+        CHECK_RETHROW(cdfg_find_binop_input(cdfg, mul_node_id, cdfg_node_is_imm, &mul_node_find_res)
+        );
         if (!mul_node_find_res.found) {
             continue;
         }
