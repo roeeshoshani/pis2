@@ -749,7 +749,7 @@ static err_t read_reg_operand(cdfg_builder_t* builder, pis_var_t var, cdfg_node_
     pis_region_t enclosing_region = {};
     bool found_enclosing_region = false;
     CHECK_RETHROW(cdfg_op_map_largest_enclosing(
-        &builder->reg_op_map,
+        &builder->cdfg.reg_op_map,
         region,
         &found_enclosing_region,
         &enclosing_region
@@ -917,7 +917,7 @@ static err_t
     pis_region_t enclosing_region = {};
     bool found_enclosing_region = false;
     CHECK_RETHROW(cdfg_op_map_largest_enclosing(
-        &builder->reg_op_map,
+        &builder->cdfg.reg_op_map,
         region,
         &found_enclosing_region,
         &enclosing_region
@@ -1271,14 +1271,33 @@ static err_t opcode_handler_ret(cdfg_builder_t* builder, const pis_insn_t* insn)
 
     UNUSED(insn);
 
-    cdfg_node_id_t retval_node_id = {.id = CDFG_ITEM_ID_INVALID};
-    pis_op_t return_value = pis_reg_to_op(*builder->cfg->arch->return_value);
-    CHECK_RETHROW(read_operand(builder, &return_value, &retval_node_id));
-
     cdfg_node_id_t finish_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(make_finish_node(&builder->cdfg, &finish_node_id));
 
     CHECK_RETHROW(link_cf_node(builder, finish_node_id));
+
+    // try to find the appropriate region for the return value register
+    bool found_return_value_region = false;
+    pis_region_t return_value_region = {};
+    CHECK_RETHROW(cdfg_op_map_addr_container(
+        &builder->cdfg.reg_op_map,
+        builder->cfg->arch->return_value->region.offset,
+        &found_return_value_region,
+        &return_value_region
+    ));
+
+    if (!found_return_value_region) {
+        // no return value region in the operand map, just use the full register.
+        return_value_region = builder->cfg->arch->return_value->region;
+    }
+
+    cdfg_node_id_t retval_node_id = {.id = CDFG_ITEM_ID_INVALID};
+    pis_var_t return_value_var = {
+        .space = PIS_VAR_SPACE_REG,
+        .offset = return_value_region.offset,
+        .size = return_value_region.size,
+    };
+    CHECK_RETHROW(read_var_operand(builder, return_value_var, &retval_node_id));
 
     CHECK_RETHROW(
         make_edge(&builder->cdfg, CDFG_EDGE_KIND_DATA_FLOW, retval_node_id, finish_node_id, 0)
@@ -2311,7 +2330,9 @@ static err_t cdfg_build_reg_op_map(cdfg_builder_t* builder) {
                     if (op->v.var.addr.space != PIS_VAR_SPACE_REG) {
                         continue;
                     }
-                    CHECK_RETHROW(cdfg_op_map_update(&builder->reg_op_map, pis_op_var_region(op)));
+                    CHECK_RETHROW(
+                        cdfg_op_map_update(&builder->cdfg.reg_op_map, pis_op_var_region(op))
+                    );
                 }
             }
         }
@@ -2398,7 +2419,6 @@ err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg) {
     // initialize the builder
     builder->cfg = cfg;
     cdfg_reset(&builder->cdfg);
-    cdfg_op_map_reset(&builder->reg_op_map);
 
     CHECK_RETHROW(cdfg_build_reg_op_map(builder));
 

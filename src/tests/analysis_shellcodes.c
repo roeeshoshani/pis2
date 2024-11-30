@@ -3,6 +3,7 @@
 #include "../lib/arch/x86/lift.h"
 #include "../lib/arch_def.h"
 #include "../lib/cdfg.h"
+#include "../lib/cdfg/query.h"
 #include "../lib/cfg.h"
 #include "shellcodes.h"
 #include "test_utils.h"
@@ -60,14 +61,18 @@ static err_t verify_struct_size_analysis(const cdfg_t* cdfg) {
     err_t err = SUCCESS;
 
     for (size_t i = 0; i < cdfg->nodes_amount; i++) {
+        cdfg_node_id_t node_id = {.id = i};
         const cdfg_node_t* node = &cdfg->node_storage[i];
+
         if (node->kind != CDFG_NODE_KIND_CALC) {
             continue;
         }
+
         if (node->content.calc.calculation != CDFG_CALCULATION_ADD) {
             continue;
         }
-        cdfg_node_id_t inputs[2] = {};
+
+        // CHECK_RETHROW(cdfg_find_binop_input(cdfg, node_id, ));
     }
 
 cleanup:

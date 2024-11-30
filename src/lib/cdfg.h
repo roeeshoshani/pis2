@@ -190,6 +190,9 @@ typedef struct {
 
     cdfg_edge_t edge_storage[CDFG_MAX_EDGES];
     size_t edges_amount;
+
+    /// the registers operand map.
+    cdfg_op_map_t reg_op_map;
 } cdfg_t;
 
 /// a single slot in the operands state. represents the value of a single operand.
@@ -223,9 +226,6 @@ typedef struct {
 
     /// the CFG that is used to build the CDFG.
     const cfg_t* cfg;
-
-    /// the registers operand map.
-    cdfg_op_map_t reg_op_map;
 
     /// information about each of the blocks of the CFG.
     cdfg_block_info_t block_infos[CFG_MAX_BLOCKS];

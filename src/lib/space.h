@@ -16,6 +16,8 @@ void pis_region_dump(pis_region_t region);
 
 bool pis_region_contains(pis_region_t region, pis_region_t sub_region);
 
+bool pis_region_contains_addr(pis_region_t region, pis_off_t addr);
+
 bool pis_regions_equal(pis_region_t a, pis_region_t b);
 
 bool pis_regions_intersect(pis_region_t a, pis_region_t b);

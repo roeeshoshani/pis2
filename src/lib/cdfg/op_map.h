@@ -41,3 +41,10 @@ err_t cdfg_op_map_largest_enclosing(
     bool* found_container_region,
     pis_region_t* container_region
 );
+
+err_t cdfg_op_map_addr_container(
+    const cdfg_op_map_t* map,
+    pis_off_t addr,
+    bool* found_container_region,
+    pis_region_t* container_region
+);

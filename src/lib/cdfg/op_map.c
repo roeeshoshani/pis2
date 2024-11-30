@@ -249,3 +249,37 @@ err_t cdfg_op_map_largest_enclosing(
 cleanup:
     return err;
 }
+
+err_t cdfg_op_map_addr_container(
+    const cdfg_op_map_t* map,
+    pis_off_t addr,
+    bool* found_container_region,
+    pis_region_t* container_region
+) {
+    err_t err = SUCCESS;
+
+    bool found = false;
+    pis_region_t found_region = {};
+
+    for (size_t i = 0; i < map->used_slots_amount; i++) {
+        const cdfg_op_map_slot_t* slot = &map->slots[i];
+        if (slot->size == CDFG_OP_MAP_SIZE_INVALID) {
+            // slot is vacant.
+            continue;
+        }
+        pis_region_t slot_region = slot_get_region(*slot);
+        if (pis_region_contains_addr(slot_region, addr)) {
+            CHECK(!found);
+            found = true;
+            found_region = slot_region;
+        }
+    }
+
+    *found_container_region = found;
+    if (found) {
+        *container_region = found_region;
+    }
+
+cleanup:
+    return err;
+}

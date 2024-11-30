@@ -15,6 +15,12 @@ bool pis_region_contains(pis_region_t region, pis_region_t sub_region) {
     return sub_region_start >= region_start && sub_region_end <= region_end;
 }
 
+bool pis_region_contains_addr(pis_region_t region, pis_off_t addr) {
+    pis_off_t region_start = region.offset;
+    pis_off_t region_end = region_start + pis_size_to_bytes(region.size);
+    return addr >= region_start && addr < region_end;
+}
+
 bool pis_regions_equal(pis_region_t a, pis_region_t b) {
     return a.offset == b.offset && a.size == b.size;
 }
