@@ -2170,12 +2170,12 @@ cleanup:
     return err;
 }
 
-static err_t cdfg_build_reg_op_map(cdfg_builder_t* builder, const cfg_t* cfg) {
+static err_t cdfg_build_reg_op_map(cdfg_builder_t* builder) {
     err_t err = SUCCESS;
 
     // iterate over all code in the cfg and update the register operand map according to each
     // register access.
-    for (size_t block_idx = 0; block_idx < cfg->blocks_amount; block_idx++) {
+    for (size_t block_idx = 0; block_idx < builder->cfg->blocks_amount; block_idx++) {
         const cfg_block_t* block = &builder->cfg->block_storage[block_idx];
         CHECK(block->units_amount > 0);
 
@@ -2203,28 +2203,10 @@ cleanup:
     return err;
 }
 
-err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg) {
+static err_t cdfg_inherit_all_predecessor_final_values(cdfg_builder_t* builder) {
     err_t err = SUCCESS;
 
-    // initialize the builder
-    builder->cfg = cfg;
-    cdfg_reset(&builder->cdfg);
-    cdfg_op_map_reset(&builder->reg_op_map);
-
-    // build the register operand map
-    CHECK_RETHROW(cdfg_build_reg_op_map(builder, cfg));
-
-    // process all blocks
-    for (size_t i = 0; i < cfg->blocks_amount; i++) {
-        // prepare the initial op state for the block
-        CHECK_RETHROW(prepare_block_initial_op_state(builder, i));
-
-        // process the block
-        CHECK_RETHROW(process_block(builder, i));
-    }
-
-    // inherit final values from predecessors in all blocks
-    for (size_t block = 0; block < cfg->blocks_amount; block++) {
+    for (size_t block = 0; block < builder->cfg->blocks_amount; block++) {
         for (size_t predecessor = 0; predecessor < builder->cfg->blocks_amount; predecessor++) {
             if (block == predecessor) {
                 // skip the block itself
@@ -2244,12 +2226,52 @@ err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg) {
         }
     }
 
-    // now we need to integrate all blocks with each other
-    for (size_t i = 0; i < cfg->blocks_amount; i++) {
+cleanup:
+    return err;
+}
+
+static err_t cdfg_integrate_all_blocks(cdfg_builder_t* builder) {
+    err_t err = SUCCESS;
+
+    for (size_t i = 0; i < builder->cfg->blocks_amount; i++) {
         CHECK_RETHROW(integrate_block(builder, i));
     }
 
-    // finalize the intermediate nodes in our CFG
+cleanup:
+    return err;
+}
+
+static err_t cdfg_process_all_blocks(cdfg_builder_t* builder) {
+    err_t err = SUCCESS;
+
+    for (size_t i = 0; i < builder->cfg->blocks_amount; i++) {
+        // prepare the initial op state for the block
+        CHECK_RETHROW(prepare_block_initial_op_state(builder, i));
+
+        // process the block
+        CHECK_RETHROW(process_block(builder, i));
+    }
+
+cleanup:
+    return err;
+}
+
+err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg) {
+    err_t err = SUCCESS;
+
+    // initialize the builder
+    builder->cfg = cfg;
+    cdfg_reset(&builder->cdfg);
+    cdfg_op_map_reset(&builder->reg_op_map);
+
+    CHECK_RETHROW(cdfg_build_reg_op_map(builder));
+
+    CHECK_RETHROW(cdfg_process_all_blocks(builder));
+
+    CHECK_RETHROW(cdfg_inherit_all_predecessor_final_values(builder));
+
+    CHECK_RETHROW(cdfg_integrate_all_blocks(builder));
+
     CHECK_RETHROW(cdfg_finalize_intermediate_nodes(builder));
 
     CHECK_RETHROW(cdfg_optimize(&builder->cdfg));
