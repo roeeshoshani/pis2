@@ -2093,7 +2093,12 @@ static err_t optimize_recursive_phi_node(cdfg_t* cdfg, bool* did_anything) {
         cdfg_node_id_t last_non_recursive_input_node = {.id = CDFG_ITEM_ID_INVALID};
         for (size_t edge_idx = 0; edge_idx < cdfg->edges_amount; edge_idx++) {
             cdfg_edge_t* edge = &cdfg->edge_storage[edge_idx];
+            if (edge->kind != CDFG_EDGE_KIND_DATA_FLOW) {
+                // we only care about data flow here
+                continue;
+            }
             if (edge->to_node.id != node_idx) {
+                // if this edge is not an input to this phi node, it is not relevant
                 continue;
             }
             if (edge->from_node.id == node_idx) {
