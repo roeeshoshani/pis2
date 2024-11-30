@@ -2020,7 +2020,7 @@ cleanup:
     return err;
 }
 
-static err_t remove_single_input_region_phi_nodes(cdfg_t* cdfg, bool* did_anything) {
+static err_t optimize_remove_single_input_region_phi_nodes(cdfg_t* cdfg, bool* did_anything) {
     err_t err = SUCCESS;
 
     for (size_t i = 0; i < cdfg->nodes_amount; i++) {
@@ -2325,7 +2325,7 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
         did_anything = false;
         did_anything |= optimize_remove_unused_nodes_and_edges_recursively(cdfg);
         did_anything |= optimize_remove_duplicate_nodes(cdfg);
-        CHECK_RETHROW(remove_single_input_region_phi_nodes(cdfg, &did_anything));
+        CHECK_RETHROW(optimize_remove_single_input_region_phi_nodes(cdfg, &did_anything));
         CHECK_RETHROW(optimize_sub_equals_zero(cdfg, &did_anything));
         CHECK_RETHROW(optimize_xor_x_x(cdfg, &did_anything));
         CHECK_RETHROW(
