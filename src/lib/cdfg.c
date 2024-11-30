@@ -2076,6 +2076,66 @@ cleanup:
     return err;
 }
 
+static err_t optimize_recursive_phi_node(cdfg_t* cdfg, bool* did_anything) {
+    err_t err = SUCCESS;
+
+    for (size_t node_idx = 0; node_idx < cdfg->nodes_amount; node_idx++) {
+        cdfg_node_id_t node_id = {.id = node_idx};
+        cdfg_node_t* node = &cdfg->node_storage[node_idx];
+        if (node->kind != CDFG_NODE_KIND_PHI) {
+            continue;
+        }
+
+        size_t inputs_amount = node->content.phi.inputs_amount;
+
+        size_t recursive_inputs_amount = 0;
+        size_t non_recursive_inputs_amount = 0;
+        cdfg_node_id_t last_non_recursive_input_node = {.id = CDFG_ITEM_ID_INVALID};
+        for (size_t edge_idx = 0; edge_idx < cdfg->edges_amount; edge_idx++) {
+            cdfg_edge_t* edge = &cdfg->edge_storage[edge_idx];
+            if (edge->to_node.id != node_idx) {
+                continue;
+            }
+            if (edge->from_node.id == node_idx) {
+                recursive_inputs_amount++;
+            } else {
+                non_recursive_inputs_amount++;
+                last_non_recursive_input_node = edge->from_node;
+            }
+        }
+
+        // sanity. make sure that we found all inputs of this phi node.
+        CHECK(recursive_inputs_amount + non_recursive_inputs_amount == inputs_amount);
+
+        // make sure that at least one input is not recursive, otherwise this phi node doesn't have
+        // an actual value.
+        CHECK(non_recursive_inputs_amount > 0);
+
+        if (non_recursive_inputs_amount > 1) {
+            // if there is more than one non-recursive input, then this phi node can't be optimized
+            // out.
+            continue;
+        }
+
+        // this phi node only has one non-recursive input, so that's the only possible value for
+        // this phi node, so just optimize it out to the underlying value.
+
+        // sanity
+        CHECK(last_non_recursive_input_node.id != CDFG_ITEM_ID_INVALID);
+
+        // replace all usages of the phi/region node with the underlying node.
+        substitute(cdfg, node_id, last_non_recursive_input_node);
+
+        // invalidate the current node. no need to remove the edges since they will be removed by
+        // other optimization passes.
+        node->kind = CDFG_NODE_KIND_INVALID;
+
+        *did_anything = true;
+    }
+cleanup:
+    return err;
+}
+
 static size_t
     node_count_inputs(const cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_edge_kind_t edge_kind) {
     size_t amount = 0;
@@ -2326,6 +2386,7 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
         did_anything |= optimize_remove_unused_nodes_and_edges_recursively(cdfg);
         did_anything |= optimize_remove_duplicate_nodes(cdfg);
         CHECK_RETHROW(optimize_remove_single_input_region_phi_nodes(cdfg, &did_anything));
+        CHECK_RETHROW(optimize_recursive_phi_node(cdfg, &did_anything));
         CHECK_RETHROW(optimize_sub_equals_zero(cdfg, &did_anything));
         CHECK_RETHROW(optimize_xor_x_x(cdfg, &did_anything));
         CHECK_RETHROW(
