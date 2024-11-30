@@ -1406,13 +1406,9 @@ static err_t integrate_predecessor_final_value(
         &block_var_node_id
     ));
 
-    if (block_var_node_id.id == CDFG_ITEM_ID_INVALID) {
-        // if there is no block variable node for this register, it means that the block doesn't use
-        // this register, so ignore it.
-        // TODO: is this really what we want to do here? what if one of the successors of this block
-        // uses this value?
-        SUCCESS_CLEANUP();
-    }
+    // there must be a block variable for this register, as in previous steps we created block
+    // variable nodes for all values that are inherited from predecessors.
+    CHECK(block_var_node_id.id != CDFG_ITEM_ID_INVALID);
 
     CHECK_RETHROW(make_edge(
         &builder->cdfg,
