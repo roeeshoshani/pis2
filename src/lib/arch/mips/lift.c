@@ -839,13 +839,28 @@ static err_t opcode_handler_04(ctx_t* ctx) {
 
     // opcode 0x04 is BEQ
 
-    pis_op_t rs = reg_get_operand(insn_field_rs(ctx->insn), REG_ACCESS_KIND_READ);
-    pis_op_t rt = reg_get_operand(insn_field_rt(ctx->insn), REG_ACCESS_KIND_READ);
+    u8 rs_value = insn_field_rs(ctx->insn);
+    u8 rt_value = insn_field_rt(ctx->insn);
 
-    pis_op_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
-    PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_EQUALS, cond, rs, rt));
+    if (rs_value == rt_value) {
+        // comparing a register to itself always yields true, so this is basically a `B`
+        // instruction.
+        pis_op_t target = calc_pc_rel_branch_target(ctx);
 
-    CHECK_RETHROW(do_branch_cond(ctx, &cond, false));
+        CHECK_RETHROW(lift_delay_slot_insn(ctx));
+
+        PIS_EMIT(&ctx->args->result, PIS_INSN1(PIS_OPCODE_JMP, target));
+    } else {
+        // actual BEQ instruction.
+        pis_op_t rs = reg_get_operand(rs_value, REG_ACCESS_KIND_READ);
+        pis_op_t rt = reg_get_operand(rt_value, REG_ACCESS_KIND_READ);
+
+        pis_op_t cond = TMP_ALLOC(&ctx->tmp_allocator, PIS_SIZE_1);
+        PIS_EMIT(&ctx->args->result, PIS_INSN3(PIS_OPCODE_EQUALS, cond, rs, rt));
+
+        CHECK_RETHROW(do_branch_cond(ctx, &cond, false));
+    }
+
 
 cleanup:
     return err;
