@@ -8,5 +8,5 @@ typedef struct {
     pis_lifter_t lifter;
     pis_endianness_t endianness;
     const pis_reg_t* return_value;
-    const pis_reg_t* params[4];
+    const pis_reg_t* params[3];
 } pis_arch_def_t;

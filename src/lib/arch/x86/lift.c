@@ -3377,7 +3377,6 @@ const pis_arch_def_t pis_arch_def_x86_64 = {
             &X86_RDI,
             &X86_RSI,
             &X86_RDX,
-            &X86_RCX,
         },
 };
 
@@ -3390,6 +3389,5 @@ const pis_arch_def_t pis_arch_def_i686 = {
             &X86_EAX,
             &X86_EDX,
             &X86_ECX,
-            &X86_EBX,
         },
 };

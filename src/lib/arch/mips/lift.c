@@ -1549,7 +1549,6 @@ const pis_arch_def_t pis_arch_def_mipsbe32r1 = {
             &MIPS_REG_A0,
             &MIPS_REG_A1,
             &MIPS_REG_A2,
-            &MIPS_REG_A3,
         },
 };
 
@@ -1562,6 +1561,5 @@ const pis_arch_def_t pis_arch_def_mipsel32r1 = {
             &MIPS_REG_A0,
             &MIPS_REG_A1,
             &MIPS_REG_A2,
-            &MIPS_REG_A3,
         },
 };

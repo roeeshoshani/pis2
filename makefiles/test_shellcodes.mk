@@ -20,7 +20,7 @@ SHELLCODE_LDFLAGS += -Tsrc/test_shellcodes/shellcode.lds
 SHELLCODE_LDFLAGS += -Wl,--build-id=none
 
 CC_i686 := i686-linux-gnu-gcc
-SHELLCODE_CFLAGS_i686 := -mno-sse -mno-avx -mregparm=4
+SHELLCODE_CFLAGS_i686 := -mno-sse -mno-avx -mregparm=3
 
 CC_x86_64 := x86_64-linux-gnu-gcc
 SHELLCODE_CFLAGS_x86_64 := -mno-sse -mno-avx
