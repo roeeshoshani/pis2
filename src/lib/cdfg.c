@@ -1,5 +1,6 @@
 #include "cdfg.h"
 #include "cdfg/op_map.h"
+#include "cdfg/query.h"
 #include "cfg.h"
 #include "errors.h"
 #include "except.h"
@@ -17,37 +18,6 @@ STR_ENUM_IMPL(cdfg_calculation, CDFG_CALCULATION);
 
 void cdfg_reset(cdfg_t* cdfg) {
     memset(cdfg, 0, sizeof(*cdfg));
-}
-
-static err_t find_node_inputs(
-    const cdfg_t* cdfg,
-    cdfg_node_id_t node_id,
-    cdfg_edge_kind_t edge_kind,
-    cdfg_node_id_t* input_node_ids,
-    size_t inputs_amount
-) {
-    err_t err = SUCCESS;
-    size_t cur_inputs_amount = 0;
-    for (size_t i = 0; i < cdfg->edges_amount; i++) {
-        const cdfg_edge_t* edge = &cdfg->edge_storage[i];
-        if (edge->to_node.id != node_id.id || edge->kind != edge_kind) {
-            continue;
-        }
-
-        CHECK(cur_inputs_amount < inputs_amount);
-        input_node_ids[cur_inputs_amount] = edge->from_node;
-        cur_inputs_amount++;
-    }
-
-    CHECK_TRACE(
-        cur_inputs_amount == inputs_amount,
-        "expected inputs amount %lu, instead got %lu",
-        inputs_amount,
-        cur_inputs_amount
-    );
-
-cleanup:
-    return err;
 }
 
 static cdfg_edge_id_t find_edge(
@@ -449,7 +419,7 @@ static err_t find_existing_binop_node(
         }
 
         cdfg_node_id_t inputs[2] = {{.id = CDFG_ITEM_ID_INVALID}, {.id = CDFG_ITEM_ID_INVALID}};
-        CHECK_RETHROW(find_node_inputs(cdfg, cur_node_id, CDFG_EDGE_KIND_DATA_FLOW, inputs, 2));
+        CHECK_RETHROW(cdfg_find_inputs(cdfg, cur_node_id, CDFG_EDGE_KIND_DATA_FLOW, inputs, 2));
 
         if ((inputs[0].id == lhs_node_id.id && inputs[1].id == rhs_node_id.id) ||
             (inputs[1].id == lhs_node_id.id && inputs[0].id == rhs_node_id.id)) {
@@ -1740,7 +1710,7 @@ static err_t cdfg_finalize_block_final_value(
 
     cdfg_node_id_t input_node_id = {.id = CDFG_ITEM_ID_INVALID};
     CHECK_RETHROW(
-        find_node_inputs(&builder->cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW, &input_node_id, 1)
+        cdfg_find_inputs(&builder->cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW, &input_node_id, 1)
     );
 
     substitute(&builder->cdfg, node_id, input_node_id);
@@ -2158,89 +2128,6 @@ static size_t
     return amount;
 }
 
-static err_t find_binop_node_data_inputs(
-    const cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_node_id_t input_node_ids[2]
-) {
-    err_t err = SUCCESS;
-
-    CHECK_RETHROW(find_node_inputs(cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW, input_node_ids, 2));
-
-cleanup:
-    return err;
-}
-
-typedef bool (*node_predicate_t)(const cdfg_t* cdfg, cdfg_node_id_t node_id);
-
-typedef struct {
-    bool found;
-    cdfg_node_id_t matching_input;
-    cdfg_node_id_t other_input;
-} binop_data_input_by_predicate_res_t;
-
-static err_t find_binop_node_data_input_by_predicate(
-    const cdfg_t* cdfg,
-    cdfg_node_id_t node_id,
-    node_predicate_t predicate,
-    binop_data_input_by_predicate_res_t* result
-) {
-    err_t err = SUCCESS;
-
-    cdfg_node_id_t inputs[2] = {};
-    CHECK_RETHROW(find_binop_node_data_inputs(cdfg, node_id, inputs));
-
-    if (predicate(cdfg, inputs[0])) {
-        result->found = true;
-        result->matching_input = inputs[0];
-        result->other_input = inputs[1];
-    } else if (predicate(cdfg, inputs[1])) {
-        result->found = true;
-        result->matching_input = inputs[1];
-        result->other_input = inputs[0];
-    } else {
-        result->found = false;
-        result->matching_input.id = CDFG_ITEM_ID_INVALID;
-        result->other_input.id = CDFG_ITEM_ID_INVALID;
-    }
-
-cleanup:
-    return err;
-}
-
-static cdfg_node_id_t find_node_input_by_predicate(
-    const cdfg_t* cdfg,
-    cdfg_node_id_t node_id,
-    cdfg_edge_kind_t edge_kind,
-    node_predicate_t predicate
-) {
-    cdfg_node_id_t found_node_id = {.id = CDFG_ITEM_ID_INVALID};
-    for (size_t i = 0; i < cdfg->edges_amount; i++) {
-        const cdfg_edge_t* edge = &cdfg->edge_storage[i];
-        // make sure that the edge has the right kind
-        if (edge->kind != edge_kind) {
-            continue;
-        }
-
-        // make sure that the edge points to our node
-        if (edge->to_node.id != node_id.id) {
-            continue;
-        }
-
-        // make sure that the predicate holds for the src node
-        if (!predicate(cdfg, edge->from_node)) {
-            continue;
-        }
-
-        if (found_node_id.id != CDFG_ITEM_ID_INVALID) {
-            // if we found more than one match, return as if there was no match at all
-            found_node_id.id = CDFG_ITEM_ID_INVALID;
-            break;
-        }
-
-        found_node_id = edge->from_node;
-    }
-    return found_node_id;
-}
-
 static bool is_node_imm_zero(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
     const cdfg_node_t* from_node = &cdfg->node_storage[node_id.id];
     return from_node->kind == CDFG_NODE_KIND_IMM && from_node->content.imm.value == 0;
@@ -2273,19 +2160,15 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
         // the current node is an equals node.
 
         // we need one of the inputs to be a zero immediate operand.
-        cdfg_node_id_t zero_imm_node_id = find_node_input_by_predicate(
-            cdfg,
-            cur_node_id,
-            CDFG_EDGE_KIND_DATA_FLOW,
-            is_node_imm_zero
-        );
+        cdfg_node_id_t zero_imm_node_id =
+            cdfg_find_input(cdfg, cur_node_id, CDFG_EDGE_KIND_DATA_FLOW, is_node_imm_zero);
         if (zero_imm_node_id.id == CDFG_ITEM_ID_INVALID) {
             continue;
         }
 
         // we need another one of the inputs to be a sub operation.
         cdfg_node_id_t sub_node_id =
-            find_node_input_by_predicate(cdfg, cur_node_id, CDFG_EDGE_KIND_DATA_FLOW, is_node_sub);
+            cdfg_find_input(cdfg, cur_node_id, CDFG_EDGE_KIND_DATA_FLOW, is_node_sub);
         if (sub_node_id.id == CDFG_ITEM_ID_INVALID) {
             continue;
         }
@@ -2293,7 +2176,7 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
         // doing `x - y == 0` is like doing `x == y`, so we want to create an equals node with the
         // same operands as the sub node.
         cdfg_node_id_t sub_input_node_ids[2] = {};
-        CHECK_RETHROW(find_binop_node_data_inputs(cdfg, sub_node_id, sub_input_node_ids));
+        CHECK_RETHROW(cdfg_find_binop_inputs(cdfg, sub_node_id, sub_input_node_ids));
 
         cdfg_node_id_t optimized_eq_node_id = {.id = CDFG_ITEM_ID_INVALID};
         CHECK_RETHROW(make_binop_node(
@@ -2326,7 +2209,7 @@ static err_t optimize_xor_x_x(cdfg_t* cdfg, bool* did_anything) {
         }
 
         cdfg_node_id_t inputs[2] = {};
-        CHECK_RETHROW(find_binop_node_data_inputs(cdfg, cur_node_id, inputs));
+        CHECK_RETHROW(cdfg_find_binop_inputs(cdfg, cur_node_id, inputs));
         if (inputs[0].id != inputs[1].id) {
             // xoring different values can't be optimized.
             continue;
@@ -2346,7 +2229,7 @@ cleanup:
 static err_t optimize_nop_value(
     cdfg_t* cdfg,
     cdfg_calculation_t calc,
-    node_predicate_t identity_value_predicate,
+    cdfg_node_predicate_t identity_value_predicate,
     bool* did_anything
 ) {
     err_t err = SUCCESS;
@@ -2362,13 +2245,10 @@ static err_t optimize_nop_value(
             continue;
         }
 
-        binop_data_input_by_predicate_res_t match_result = {};
-        CHECK_RETHROW(find_binop_node_data_input_by_predicate(
-            cdfg,
-            cur_node_id,
-            identity_value_predicate,
-            &match_result
-        ));
+        cdfg_binop_input_find_res_t match_result = {};
+        CHECK_RETHROW(
+            cdfg_find_binop_input(cdfg, cur_node_id, identity_value_predicate, &match_result)
+        );
         if (!match_result.found) {
             // no match
             continue;

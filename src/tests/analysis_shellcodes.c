@@ -59,8 +59,16 @@ cleanup:
 static err_t verify_struct_size_analysis(const cdfg_t* cdfg) {
     err_t err = SUCCESS;
 
-    UNUSED(cdfg);
-    goto cleanup;
+    for (size_t i = 0; i < cdfg->nodes_amount; i++) {
+        const cdfg_node_t* node = &cdfg->node_storage[i];
+        if (node->kind != CDFG_NODE_KIND_CALC) {
+            continue;
+        }
+        if (node->content.calc.calculation != CDFG_CALCULATION_ADD) {
+            continue;
+        }
+        cdfg_node_id_t inputs[2] = {};
+    }
 
 cleanup:
     return err;
