@@ -2245,6 +2245,35 @@ cleanup:
     return err;
 }
 
+static err_t optimize_x_x_nop(cdfg_t* cdfg, cdfg_calculation_t calc, bool* did_anything) {
+    err_t err = SUCCESS;
+
+    for (size_t cur_node_index = 0; cur_node_index < cdfg->nodes_amount; cur_node_index++) {
+        cdfg_node_id_t cur_node_id = {.id = cur_node_index};
+        cdfg_node_t* node = &cdfg->node_storage[cur_node_index];
+
+        if (node->kind != CDFG_NODE_KIND_CALC) {
+            continue;
+        }
+
+        if (node->content.calc.calculation != calc) {
+            continue;
+        }
+
+        cdfg_node_id_t inputs[2] = {};
+        CHECK_RETHROW(cdfg_find_binop_inputs(cdfg, cur_node_id, inputs));
+        if (inputs[0].id != inputs[1].id) {
+            // applying the calculation to different values can't be optimized.
+            continue;
+        }
+
+        substitute(cdfg, cur_node_id, inputs[0]);
+
+        *did_anything = true;
+    }
+cleanup:
+    return err;
+}
 static err_t optimize_nop_value(
     cdfg_t* cdfg,
     cdfg_calculation_t calc,
@@ -2293,6 +2322,8 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
         CHECK_RETHROW(optimize_recursive_phi_node(cdfg, &did_anything));
         CHECK_RETHROW(optimize_sub_equals_zero(cdfg, &did_anything));
         CHECK_RETHROW(optimize_xor_x_x(cdfg, &did_anything));
+        CHECK_RETHROW(optimize_x_x_nop(cdfg, CDFG_CALCULATION_OR, &did_anything));
+        CHECK_RETHROW(optimize_x_x_nop(cdfg, CDFG_CALCULATION_AND, &did_anything));
         CHECK_RETHROW(
             optimize_nop_value(cdfg, CDFG_CALCULATION_SIGNED_MUL, is_node_imm_one, &did_anything)
         );
