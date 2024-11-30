@@ -37,3 +37,12 @@ cdfg_node_id_t cdfg_find_input(
     cdfg_edge_kind_t edge_kind,
     cdfg_node_predicate_t predicate
 );
+
+bool cdfg_node_is_param(const cdfg_t* cdfg, cdfg_node_id_t node_id, size_t param_index);
+
+bool cdfg_node_is_first_param(const cdfg_t* cdfg, cdfg_node_id_t node_id);
+bool cdfg_node_is_second_param(const cdfg_t* cdfg, cdfg_node_id_t node_id);
+bool cdfg_node_is_third_param(const cdfg_t* cdfg, cdfg_node_id_t node_id);
+bool cdfg_node_is_fourth_param(const cdfg_t* cdfg, cdfg_node_id_t node_id);
+
+bool cdfg_node_is_imm(const cdfg_t* cdfg, cdfg_node_id_t node_id);

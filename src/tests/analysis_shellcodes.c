@@ -60,6 +60,9 @@ cleanup:
 static err_t verify_struct_size_analysis(const cdfg_t* cdfg) {
     err_t err = SUCCESS;
 
+    bool found_struct_size = false;
+    size_t struct_size = 0;
+
     for (size_t i = 0; i < cdfg->nodes_amount; i++) {
         cdfg_node_id_t node_id = {.id = i};
         const cdfg_node_t* node = &cdfg->node_storage[i];
@@ -72,8 +75,45 @@ static err_t verify_struct_size_analysis(const cdfg_t* cdfg) {
             continue;
         }
 
-        // CHECK_RETHROW(cdfg_find_binop_input(cdfg, node_id, ));
+        // we expect one of the inputs of the add node to be the first parameter of the function.
+        cdfg_binop_input_find_res_t add_node_find_res = {};
+        CHECK_RETHROW(
+            cdfg_find_binop_input(cdfg, node_id, cdfg_node_is_first_param, &add_node_find_res)
+        );
+        if (!add_node_find_res.found) {
+            continue;
+        }
+
+        // we expect the other input of the add node to be a multiplication node.
+        cdfg_node_id_t mul_node_id = add_node_find_res.other_input;
+        const cdfg_node_t* mul_node = &cdfg->node_storage[mul_node_id.id];
+        if (mul_node->kind != CDFG_NODE_KIND_CALC) {
+            continue;
+        }
+        bool is_mul =
+            (mul_node->content.calc.calculation == CDFG_CALCULATION_SIGNED_MUL ||
+             mul_node->content.calc.calculation == CDFG_CALCULATION_UNSIGNED_MUL);
+        if (!is_mul) {
+            continue;
+        }
+
+        // we expect one of the inputs of the multiplication node to be an immediate
+        cdfg_binop_input_find_res_t mul_node_find_res = {};
+        CHECK_RETHROW(cdfg_find_binop_input(cdfg, node_id, cdfg_node_is_imm, &mul_node_find_res));
+        if (!mul_node_find_res.found) {
+            continue;
+        }
+
+        const cdfg_node_t* struct_size_node =
+            &cdfg->node_storage[mul_node_find_res.matching_input.id];
+
+        CHECK(!found_struct_size);
+        struct_size = struct_size_node->content.imm.value;
+        found_struct_size = true;
     }
+
+    CHECK(found_struct_size);
+    CHECK(struct_size == 1337);
 
 cleanup:
     return err;

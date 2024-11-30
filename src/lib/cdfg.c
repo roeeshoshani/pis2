@@ -2419,6 +2419,7 @@ err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg) {
     // initialize the builder
     builder->cfg = cfg;
     cdfg_reset(&builder->cdfg);
+    builder->cdfg.arch = cfg->arch;
 
     CHECK_RETHROW(cdfg_build_reg_op_map(builder));
 

@@ -193,6 +193,8 @@ typedef struct {
 
     /// the registers operand map.
     cdfg_op_map_t reg_op_map;
+
+    const pis_arch_def_t* arch;
 } cdfg_t;
 
 /// a single slot in the operands state. represents the value of a single operand.

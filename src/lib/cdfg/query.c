@@ -110,3 +110,30 @@ cdfg_node_id_t cdfg_find_input(
     }
     return found_node_id;
 }
+
+bool cdfg_node_is_param(const cdfg_t* cdfg, cdfg_node_id_t node_id, size_t param_index) {
+    const cdfg_node_t* node = &cdfg->node_storage[node_id.id];
+    return node->kind == CDFG_NODE_KIND_VAR &&
+           node->content.var.reg_region.offset == cdfg->arch->params[param_index]->region.offset;
+}
+
+bool cdfg_node_is_first_param(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
+    return cdfg_node_is_param(cdfg, node_id, 0);
+}
+
+bool cdfg_node_is_second_param(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
+    return cdfg_node_is_param(cdfg, node_id, 1);
+}
+
+bool cdfg_node_is_third_param(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
+    return cdfg_node_is_param(cdfg, node_id, 2);
+}
+
+bool cdfg_node_is_fourth_param(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
+    return cdfg_node_is_param(cdfg, node_id, 3);
+}
+
+bool cdfg_node_is_imm(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
+    const cdfg_node_t* node = &cdfg->node_storage[node_id.id];
+    return node->kind == CDFG_NODE_KIND_IMM;
+}
