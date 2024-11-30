@@ -534,8 +534,35 @@ static err_t find_block_var_node(
             pis_regions_intersect(node->content.block_var.reg_region, region)) {
             CHECK(pis_regions_equal(node->content.block_var.reg_region, region));
 
-            CHECK(found_node_id.id == CDFG_ITEM_ID_INVALID);
             found_node_id.id = i;
+            break;
+        }
+    }
+
+    *out_node_id = found_node_id;
+
+cleanup:
+    return err;
+}
+
+static err_t find_block_final_value_node(
+    const cdfg_t* cdfg, cfg_item_id_t block_id, pis_region_t region, cdfg_node_id_t* out_node_id
+) {
+    err_t err = SUCCESS;
+
+    cdfg_node_id_t found_node_id = {.id = CDFG_ITEM_ID_INVALID};
+
+    for (size_t i = 0; i < cdfg->nodes_amount; i++) {
+        const cdfg_node_t* node = &cdfg->node_storage[i];
+        if (node->kind != CDFG_NODE_KIND_BLOCK_FINAL_VALUE) {
+            continue;
+        }
+        if (node->content.block_final_value.block_id == block_id &&
+            pis_regions_intersect(node->content.block_final_value.reg_region, region)) {
+            CHECK(pis_regions_equal(node->content.block_final_value.reg_region, region));
+
+            found_node_id.id = i;
+            break;
         }
     }
 
@@ -1451,8 +1478,17 @@ static err_t inherit_predecessor_final_value(
 
     CHECK_RETHROW(make_block_var_node(&builder->cdfg, block_id, reg_region, &block_var_node_id));
 
-    // also, mark the new var node as the final value for this register.
-    CHECK_RETHROW(mark_block_final_value(&builder->cdfg, block_id, reg_region, block_var_node_id));
+    // also, if the block doesn't already have a final value node for this register, mark the new
+    // var node as the final value for this register.
+    cdfg_node_id_t final_value_node_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(
+        find_block_final_value_node(&builder->cdfg, block_id, reg_region, &final_value_node_id)
+    );
+    if (final_value_node_id.id == CDFG_ITEM_ID_INVALID) {
+        CHECK_RETHROW(
+            mark_block_final_value(&builder->cdfg, block_id, reg_region, block_var_node_id)
+        );
+    }
 
     *did_anything = true;
 
