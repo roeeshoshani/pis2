@@ -2156,7 +2156,7 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
 
         // we need one of the inputs to be a zero immediate operand.
         cdfg_node_id_t zero_imm_node_id = {.id = CDFG_ITEM_ID_INVALID};
-        CHECK_RETHROW(cdfg_find_input(
+        CHECK_RETHROW(cdfg_find_one_input(
             cdfg,
             cur_node_id,
             CDFG_EDGE_KIND_DATA_FLOW,
@@ -2170,7 +2170,7 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
 
         // we need another one of the inputs to be a sub operation.
         cdfg_node_id_t sub_node_id = {.id = CDFG_ITEM_ID_INVALID};
-        CHECK_RETHROW(cdfg_find_input(
+        CHECK_RETHROW(cdfg_find_one_input(
             cdfg,
             cur_node_id,
             CDFG_EDGE_KIND_DATA_FLOW,

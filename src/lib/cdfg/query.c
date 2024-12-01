@@ -85,7 +85,7 @@ cleanup:
     return err;
 }
 
-err_t cdfg_find_input(
+err_t cdfg_find_one_input(
     const cdfg_t* cdfg,
     cdfg_node_id_t node_id,
     cdfg_edge_kind_t edge_kind,
@@ -167,7 +167,7 @@ err_t cdfg_detect_phi_loop(
 
     // a loop phi node has one immediate input which represents the initial value
     cdfg_node_id_t initial_value_node_id = {.id = CDFG_ITEM_ID_INVALID};
-    CHECK_RETHROW(cdfg_find_input(
+    CHECK_RETHROW(cdfg_find_one_input(
         cdfg,
         node_id,
         CDFG_EDGE_KIND_DATA_FLOW,
@@ -178,7 +178,7 @@ err_t cdfg_detect_phi_loop(
 
     // a loop phi node also has an input which is an add node to complete the loop
     cdfg_node_id_t add_node_id = {.id = CDFG_ITEM_ID_INVALID};
-    CHECK_RETHROW(cdfg_find_input(
+    CHECK_RETHROW(cdfg_find_one_input(
         cdfg,
         node_id,
         CDFG_EDGE_KIND_DATA_FLOW,
@@ -205,7 +205,7 @@ err_t cdfg_detect_phi_loop(
 
     // the add node's other input should be an imediate
     cdfg_node_id_t increment_value_node_id = {.id = CDFG_ITEM_ID_INVALID};
-    CHECK_RETHROW(cdfg_find_input(
+    CHECK_RETHROW(cdfg_find_one_input(
         cdfg,
         add_node_id,
         CDFG_EDGE_KIND_DATA_FLOW,

@@ -58,7 +58,7 @@ err_t cdfg_find_binop_input(
     cdfg_binop_input_find_res_t* result
 );
 
-err_t cdfg_find_input(
+err_t cdfg_find_one_input(
     const cdfg_t* cdfg,
     cdfg_node_id_t node_id,
     cdfg_edge_kind_t edge_kind,
