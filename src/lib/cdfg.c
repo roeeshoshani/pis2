@@ -20,26 +20,6 @@ void cdfg_reset(cdfg_t* cdfg) {
     memset(cdfg, 0, sizeof(*cdfg));
 }
 
-static cdfg_edge_id_t find_edge(
-    const cdfg_t* cdfg,
-    cdfg_edge_kind_t kind,
-    cdfg_node_id_t from_node_id,
-    cdfg_node_id_t to_node_id,
-    size_t to_node_input_index
-) {
-    cdfg_edge_id_t found_id = {.id = CDFG_ITEM_ID_INVALID};
-    for (size_t i = 0; i < cdfg->edges_amount; i++) {
-        const cdfg_edge_t* edge = &cdfg->edge_storage[i];
-        if (edge->to_node.id == to_node_id.id && edge->from_node.id == from_node_id.id &&
-            edge->kind == kind && edge->to_node_input_index == to_node_input_index) {
-            found_id.id = i;
-            break;
-        }
-    }
-
-    return found_id;
-}
-
 static cdfg_edge_id_t find_node_input_with_index(
     const cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_edge_kind_t edge_kind, size_t input_index
 ) {
@@ -1885,8 +1865,20 @@ static bool are_node_inputs_equals(const cdfg_t* cdfg, cdfg_node_id_t a_id, cdfg
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* a_edge = &cdfg->edge_storage[i];
         if (a_edge->to_node.id == a_id.id) {
-            cdfg_edge_id_t b_edge =
-                find_edge(cdfg, a_edge->kind, a_edge->from_node, b_id, a_edge->to_node_input_index);
+            cdfg_find_first_matching_edge_params_t find_params = {
+                .check_kind = true,
+                .kind = a_edge->kind,
+
+                .check_from_node = true,
+                .from_node = a_edge->from_node,
+
+                .check_to_node = true,
+                .to_node = b_id,
+
+                .check_to_node_input_index = true,
+                .to_node_input_index = a_edge->to_node_input_index
+            };
+            cdfg_edge_id_t b_edge = cdfg_find_first_matching_edge(cdfg, &find_params);
             if (b_edge.id == CDFG_ITEM_ID_INVALID) {
                 // node b doesn't have this input
                 return false;
