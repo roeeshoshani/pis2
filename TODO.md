@@ -15,3 +15,19 @@ notes about stuff that needs to be done.
   don't make it too complicated to keep the code sane.
 - don't use a unified item id type in cfg. use different types like i did in cdfg.
 - make slot allocation re-use invalidated slots in all slot allocation code that i have written.
+- implement a bunch of new optimizations which will make the struct size test actually work.
+
+  both optimizations will require a method to find looping phi nodes which are added a value in each iteration.
+  this is very easy. just find a phi node whose output goes into an add node with an immediate, and the add's output goes into the
+  phi node as an input, and the other phi node's input should be an immediate. this will give us two output value - the initial value
+  and the increment value.
+
+  now that we have the above primitive, implement a function which finds a phi loop node, and checks if its output is only used once,
+  in a multiplication node. if that's the case, multiply the initial value and the increment and remove the multiply node.
+  this is our first optimization.
+
+  the second optimization will find phi nodes that are almot looping phi nodes and convert them to looping phi nodes.
+  it will find phi nodes whose increment value is an immediate, but the initial value is not, and convert them to looping phi nodes
+  with initial value 0, but take their output and add the original initial value to it to get the same value.
+
+  then, the lifting should look the same for x86 and mips.
