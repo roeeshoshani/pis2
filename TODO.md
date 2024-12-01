@@ -31,3 +31,4 @@ notes about stuff that needs to be done.
   with initial value 0, but take their output and add the original initial value to it to get the same value.
 
   then, the lifting should look the same for x86 and mips.
+- handle data flow loops in the unused nodes detection.

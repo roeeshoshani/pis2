@@ -2427,6 +2427,8 @@ static err_t optimize_phi_loop_mul(cdfg_t* cdfg, bool* did_anything) {
         // every usage of the original mul node can be replaced with our new phi node
         substitute(cdfg, cur_node_id, new_phi_node_id);
 
+        node->kind = CDFG_NODE_KIND_INVALID;
+
         *did_anything = true;
     }
 cleanup:
