@@ -10,7 +10,7 @@ typedef struct {
     bool found;
     cdfg_node_id_t matching_input;
     cdfg_node_id_t other_input;
-} cdfg_binop_input_find_res_t;
+} cdfg_find_binop_input_res_t;
 
 typedef struct {
     bool check_kind;
@@ -55,7 +55,7 @@ err_t cdfg_find_binop_input(
     cdfg_node_id_t node_id,
     cdfg_node_predicate_t predicate,
     u64 ctx,
-    cdfg_binop_input_find_res_t* result
+    cdfg_find_binop_input_res_t* result
 );
 
 err_t cdfg_find_one_input(
@@ -69,9 +69,11 @@ err_t cdfg_find_one_input(
 
 err_t cdfg_node_is_param(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching);
 
-err_t cdfg_node_is_imm(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching);
+err_t cdfg_detect_phi_loop(
+    const cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_detect_phi_loop_res_t* result
+);
 
-err_t cdfg_node_is_imm_value(
+err_t cdfg_node_is_imm(
     const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching
 );
 
@@ -79,3 +81,5 @@ err_t cdfg_node_is_calc(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, boo
 
 cdfg_edge_id_t
     cdfg_find_first_matching_edge(const cdfg_t* cdfg, const cdfg_find_first_matching_edge_params_t* params);
+
+err_t cdfg_node_is_of_kind(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching);

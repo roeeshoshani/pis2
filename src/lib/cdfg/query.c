@@ -52,7 +52,7 @@ err_t cdfg_find_binop_input(
     cdfg_node_id_t node_id,
     cdfg_node_predicate_t predicate,
     u64 ctx,
-    cdfg_binop_input_find_res_t* result
+    cdfg_find_binop_input_res_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -143,13 +143,6 @@ err_t cdfg_node_is_param(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bo
     return SUCCESS;
 }
 
-err_t cdfg_node_is_imm(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching) {
-    UNUSED(ctx);
-    const cdfg_node_t* node = &cdfg->node_storage[node_id.id];
-    *is_matching = (node->kind == CDFG_NODE_KIND_IMM);
-    return SUCCESS;
-}
-
 err_t cdfg_detect_phi_loop(
     const cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_detect_phi_loop_res_t* result
 ) {
@@ -171,10 +164,13 @@ err_t cdfg_detect_phi_loop(
         cdfg,
         node_id,
         CDFG_EDGE_KIND_DATA_FLOW,
-        cdfg_node_is_imm,
-        0,
+        cdfg_node_is_of_kind,
+        CDFG_NODE_KIND_IMM,
         &initial_value_node_id
     ));
+    if (initial_value_node_id.id == CDFG_ITEM_ID_INVALID) {
+        SUCCESS_CLEANUP();
+    }
 
     // a loop phi node also has an input which is an add node to complete the loop
     cdfg_node_id_t add_node_id = {.id = CDFG_ITEM_ID_INVALID};
@@ -186,6 +182,9 @@ err_t cdfg_detect_phi_loop(
         CDFG_CALCULATION_ADD,
         &add_node_id
     ));
+    if (add_node_id.id == CDFG_ITEM_ID_INVALID) {
+        SUCCESS_CLEANUP();
+    }
 
     // the add node should have the phi node as one of its inputs
     cdfg_find_first_matching_edge_params_t params = {
@@ -209,10 +208,13 @@ err_t cdfg_detect_phi_loop(
         cdfg,
         add_node_id,
         CDFG_EDGE_KIND_DATA_FLOW,
-        cdfg_node_is_imm,
-        0,
+        cdfg_node_is_of_kind,
+        CDFG_NODE_KIND_IMM,
         &increment_value_node_id
     ));
+    if (increment_value_node_id.id == CDFG_ITEM_ID_INVALID) {
+        SUCCESS_CLEANUP();
+    }
 
     const cdfg_node_t* initial_value_node = &cdfg->node_storage[initial_value_node_id.id];
     const cdfg_node_t* increment_value_node = &cdfg->node_storage[increment_value_node_id.id];
@@ -230,9 +232,7 @@ cleanup:
     return err;
 }
 
-err_t cdfg_node_is_imm_value(
-    const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching
-) {
+err_t cdfg_node_is_imm(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching) {
     u64 desired_imm_value = ctx;
     const cdfg_node_t* node = &cdfg->node_storage[node_id.id];
     *is_matching =
@@ -272,4 +272,11 @@ cdfg_edge_id_t cdfg_find_first_matching_edge(
     }
 
     return found_id;
+}
+
+err_t cdfg_node_is_of_kind(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching) {
+    cdfg_node_kind_t desired_kind = ctx;
+    const cdfg_node_t* node = &cdfg->node_storage[node_id.id];
+    *is_matching = (node->kind == desired_kind);
+    return SUCCESS;
 }

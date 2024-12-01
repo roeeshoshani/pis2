@@ -2160,7 +2160,7 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
             cdfg,
             cur_node_id,
             CDFG_EDGE_KIND_DATA_FLOW,
-            cdfg_node_is_imm_value,
+            cdfg_node_is_imm,
             0,
             &zero_imm_node_id
         ));
@@ -2266,6 +2266,62 @@ static err_t optimize_x_x_nop(cdfg_t* cdfg, cdfg_calculation_t calc, bool* did_a
 cleanup:
     return err;
 }
+
+static err_t optimize_phi_loop_mul(cdfg_t* cdfg, bool* did_anything) {
+    err_t err = SUCCESS;
+
+    for (size_t cur_node_index = 0; cur_node_index < cdfg->nodes_amount; cur_node_index++) {
+        cdfg_node_id_t cur_node_id = {.id = cur_node_index};
+
+        cdfg_node_t* node = &cdfg->node_storage[cur_node_index];
+
+        if (node->kind != CDFG_NODE_KIND_CALC) {
+            continue;
+        }
+
+        bool is_mul =
+            (node->content.calc.calculation == CDFG_CALCULATION_SIGNED_MUL ||
+             node->content.calc.calculation == CDFG_CALCULATION_UNSIGNED_MUL);
+        if (!is_mul) {
+            continue;
+        }
+
+        // the multiplication should be by a constant
+        cdfg_find_binop_input_res_t find_add_imm_res = {};
+        CHECK_RETHROW(cdfg_find_binop_input(
+            cdfg,
+            cur_node_id,
+            cdfg_node_is_of_kind,
+            CDFG_NODE_KIND_IMM,
+            &find_add_imm_res
+        ));
+        if (!find_add_imm_res.found) {
+            continue;
+        }
+
+        cdfg_node_t* mul_factor_node = &cdfg->node_storage[find_add_imm_res.matching_input.id];
+        u64 mul_factor = mul_factor_node->content.imm.value;
+
+        // the other input to the multiplication should be a phi loop node
+        cdfg_detect_phi_loop_res_t detect_phi_loop_res = {};
+        CHECK_RETHROW(cdfg_detect_phi_loop(cdfg, find_add_imm_res.other_input, &detect_phi_loop_res)
+        );
+        if (!detect_phi_loop_res.is_phi_loop) {
+            continue;
+        }
+
+        // TODO: do the simplification
+        TRACE(
+            "found optimization point. initial = %lx, increment = %lx, mul = %lu",
+            detect_phi_loop_res.initial_value,
+            detect_phi_loop_res.increment_value,
+            mul_factor
+        );
+    }
+cleanup:
+    return err;
+}
+
 static err_t optimize_nop_value(
     cdfg_t* cdfg,
     cdfg_calculation_t calc,
@@ -2286,7 +2342,7 @@ static err_t optimize_nop_value(
             continue;
         }
 
-        cdfg_binop_input_find_res_t match_result = {};
+        cdfg_find_binop_input_res_t match_result = {};
         CHECK_RETHROW(cdfg_find_binop_input(
             cdfg,
             cur_node_id,
@@ -2325,20 +2381,22 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
         CHECK_RETHROW(optimize_nop_value(
             cdfg,
             CDFG_CALCULATION_SIGNED_MUL,
-            cdfg_node_is_imm_value,
+            cdfg_node_is_imm,
             1,
             &did_anything
         ));
         CHECK_RETHROW(optimize_nop_value(
             cdfg,
             CDFG_CALCULATION_UNSIGNED_MUL,
-            cdfg_node_is_imm_value,
+            cdfg_node_is_imm,
             1,
             &did_anything
         ));
         CHECK_RETHROW(
-            optimize_nop_value(cdfg, CDFG_CALCULATION_ADD, cdfg_node_is_imm_value, 0, &did_anything)
+            optimize_nop_value(cdfg, CDFG_CALCULATION_ADD, cdfg_node_is_imm, 0, &did_anything)
+
         );
+        CHECK_RETHROW(optimize_phi_loop_mul(cdfg, &did_anything));
     } while (did_anything);
 cleanup:
     return err;
