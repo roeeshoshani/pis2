@@ -144,6 +144,7 @@ err_t cdfg_node_is_param(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bo
 }
 
 err_t cdfg_node_is_imm(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching) {
+    UNUSED(ctx);
     const cdfg_node_t* node = &cdfg->node_storage[node_id.id];
     *is_matching = (node->kind == CDFG_NODE_KIND_IMM);
     return SUCCESS;
@@ -153,6 +154,9 @@ err_t cdfg_node_is_phi_loop(
     const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching
 ) {
     err_t err = SUCCESS;
+
+    UNUSED(ctx);
+
     const cdfg_node_t* node = &cdfg->node_storage[node_id.id];
     if (node->kind != CDFG_NODE_KIND_PHI) {
         *is_matching = false;
