@@ -294,6 +294,29 @@ cleanup:
     return err;
 }
 
+static err_t make_phi_node(cdfg_t* cdfg, size_t inputs_amount, cdfg_node_id_t* out_node_id) {
+    err_t err = SUCCESS;
+
+    cdfg_node_id_t node_id = {.id = CDFG_ITEM_ID_INVALID};
+    CHECK_RETHROW(next_node_id(cdfg, &node_id));
+
+    cdfg->node_storage[node_id.id] = (cdfg_node_t) {
+        .kind = CDFG_NODE_KIND_PHI,
+        .content =
+            {
+                .phi =
+                    {
+                        .inputs_amount = inputs_amount,
+                    },
+            },
+    };
+
+    *out_node_id = node_id;
+
+cleanup:
+    return err;
+}
+
 static err_t do_if(cdfg_builder_t* builder, cdfg_node_id_t cond_node_id) {
     err_t err = SUCCESS;
 
@@ -2286,6 +2309,8 @@ static err_t optimize_phi_loop_mul(cdfg_t* cdfg, bool* did_anything) {
             continue;
         }
 
+        bool is_mul_signed = (node->content.calc.calculation == CDFG_CALCULATION_SIGNED_MUL);
+
         // the multiplication should be by a constant
         cdfg_find_binop_input_res_t find_add_imm_res = {};
         CHECK_RETHROW(cdfg_find_binop_input(
@@ -2303,20 +2328,106 @@ static err_t optimize_phi_loop_mul(cdfg_t* cdfg, bool* did_anything) {
         u64 mul_factor = mul_factor_node->content.imm.value;
 
         // the other input to the multiplication should be a phi loop node
+        cdfg_node_id_t phi_node_id = find_add_imm_res.other_input;
         cdfg_detect_phi_loop_res_t detect_phi_loop_res = {};
-        CHECK_RETHROW(cdfg_detect_phi_loop(cdfg, find_add_imm_res.other_input, &detect_phi_loop_res)
-        );
+        CHECK_RETHROW(cdfg_detect_phi_loop(cdfg, phi_node_id, &detect_phi_loop_res));
         if (!detect_phi_loop_res.is_phi_loop) {
             continue;
         }
 
-        // TODO: do the simplification
-        TRACE(
-            "found optimization point. initial = %lx, increment = %lx, mul = %lu",
-            detect_phi_loop_res.initial_value,
-            detect_phi_loop_res.increment_value,
-            mul_factor
+        // find the input index of the initial value node
+        cdfg_find_first_matching_edge_params_t find_phi_initial_value_edge_params = {
+            .check_kind = true,
+            .kind = CDFG_EDGE_KIND_DATA_FLOW,
+
+            .check_from_node = true,
+            .from_node = detect_phi_loop_res.initial_value_node_id,
+
+            .check_to_node = true,
+            .to_node = phi_node_id,
+        };
+        cdfg_edge_id_t phi_initial_value_edge =
+            cdfg_find_first_matching_edge(cdfg, &find_phi_initial_value_edge_params);
+        CHECK(phi_initial_value_edge.id != CDFG_ITEM_ID_INVALID);
+        size_t phi_initial_value_node_input_index =
+            cdfg->edge_storage[phi_initial_value_edge.id].to_node_input_index;
+
+        // calculate the input index of the add node into the phi node by complementing the input
+        // index of the initial value node.
+        size_t phi_add_node_input_index = !phi_initial_value_node_input_index;
+
+        // calculate the new loop parameters.
+        u64 new_initial_value;
+        u64 new_increment_value;
+        if (is_mul_signed) {
+            // signed multiplication
+            new_initial_value = (u64) ((i64) detect_phi_loop_res.initial_value * (i64) mul_factor);
+            new_increment_value =
+                (u64) ((i64) detect_phi_loop_res.increment_value * (i64) mul_factor);
+        } else {
+            // unsigned multiplication
+            new_initial_value = detect_phi_loop_res.initial_value * mul_factor;
+            new_increment_value = detect_phi_loop_res.increment_value * mul_factor;
+        }
+
+        // create the immediate input nodes
+        cdfg_node_id_t new_initial_value_node = {.id = CDFG_ITEM_ID_INVALID};
+        CHECK_RETHROW(make_imm_node(cdfg, new_initial_value, &new_initial_value_node));
+
+        cdfg_node_id_t new_increment_value_node = {.id = CDFG_ITEM_ID_INVALID};
+        CHECK_RETHROW(make_imm_node(cdfg, new_increment_value, &new_increment_value_node));
+
+        // create a new phi node
+        cdfg_node_id_t new_phi_node_id = {.id = CDFG_ITEM_ID_INVALID};
+        CHECK_RETHROW(make_phi_node(cdfg, 2, &new_phi_node_id));
+
+        // create a new add node
+        cdfg_node_id_t new_add_node_id = {.id = CDFG_ITEM_ID_INVALID};
+        CHECK_RETHROW(make_binop_node(
+            cdfg,
+            CDFG_CALCULATION_ADD,
+            new_phi_node_id,
+            new_increment_value_node,
+            &new_add_node_id
+        ));
+
+        // connect the new add node to the new phi node
+        CHECK_RETHROW(make_edge(
+            cdfg,
+            CDFG_EDGE_KIND_DATA_FLOW,
+            new_add_node_id,
+            new_phi_node_id,
+            phi_add_node_input_index
+        ));
+
+        // connect the new initial value node to the new phi node
+        CHECK_RETHROW(make_edge(
+            cdfg,
+            CDFG_EDGE_KIND_DATA_FLOW,
+            new_initial_value_node,
+            new_phi_node_id,
+            phi_initial_value_node_input_index
+        ));
+
+        // copy the phi control flow edge
+        cdfg_find_first_matching_edge_params_t find_phi_cf_edge_params = {
+            .check_kind = true,
+            .kind = CDFG_EDGE_KIND_CONTROL_FLOW,
+
+            .check_to_node = true,
+            .to_node = phi_node_id,
+        };
+        cdfg_edge_id_t phi_cf_edge_id =
+            cdfg_find_first_matching_edge(cdfg, &find_phi_cf_edge_params);
+        cdfg_node_id_t phi_cf_source = cdfg->edge_storage[phi_cf_edge_id.id].from_node;
+        CHECK_RETHROW(
+            make_edge(cdfg, CDFG_EDGE_KIND_CONTROL_FLOW, phi_cf_source, new_phi_node_id, 0)
         );
+
+        // every usage of the original mul node can be replaced with our new phi node
+        substitute(cdfg, cur_node_id, new_phi_node_id);
+
+        *did_anything = true;
     }
 cleanup:
     return err;
