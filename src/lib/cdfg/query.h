@@ -4,7 +4,7 @@
 #include "../except.h"
 #include "../cdfg.h"
 
-typedef bool (*cdfg_node_predicate_t)(const cdfg_t* cdfg, cdfg_node_id_t node_id);
+typedef err_t (*cdfg_node_predicate_t)(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching);
 
 typedef struct {
     bool found;
@@ -28,21 +28,27 @@ err_t cdfg_find_binop_input(
     const cdfg_t* cdfg,
     cdfg_node_id_t node_id,
     cdfg_node_predicate_t predicate,
+    u64 ctx,
     cdfg_binop_input_find_res_t* result
 );
 
-cdfg_node_id_t cdfg_find_input(
+err_t cdfg_find_input(
     const cdfg_t* cdfg,
     cdfg_node_id_t node_id,
     cdfg_edge_kind_t edge_kind,
-    cdfg_node_predicate_t predicate
+    cdfg_node_predicate_t predicate,
+    u64 ctx,
+    cdfg_node_id_t* out_node_id
 );
 
-bool cdfg_node_is_param(const cdfg_t* cdfg, cdfg_node_id_t node_id, size_t param_index);
+err_t cdfg_node_is_param(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching);
 
-bool cdfg_node_is_first_param(const cdfg_t* cdfg, cdfg_node_id_t node_id);
-bool cdfg_node_is_second_param(const cdfg_t* cdfg, cdfg_node_id_t node_id);
-bool cdfg_node_is_third_param(const cdfg_t* cdfg, cdfg_node_id_t node_id);
-bool cdfg_node_is_fourth_param(const cdfg_t* cdfg, cdfg_node_id_t node_id);
+err_t cdfg_node_is_imm(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching);
 
-bool cdfg_node_is_imm(const cdfg_t* cdfg, cdfg_node_id_t node_id);
+err_t cdfg_node_is_phi_loop(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching);
+
+err_t cdfg_node_is_imm_value(
+    const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching
+);
+
+err_t cdfg_node_is_calc(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching);

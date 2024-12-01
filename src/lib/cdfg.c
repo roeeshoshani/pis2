@@ -2147,22 +2147,6 @@ static size_t
     return amount;
 }
 
-static bool is_node_imm_zero(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
-    const cdfg_node_t* from_node = &cdfg->node_storage[node_id.id];
-    return from_node->kind == CDFG_NODE_KIND_IMM && from_node->content.imm.value == 0;
-}
-
-static bool is_node_imm_one(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
-    const cdfg_node_t* from_node = &cdfg->node_storage[node_id.id];
-    return from_node->kind == CDFG_NODE_KIND_IMM && from_node->content.imm.value == 1;
-}
-
-static bool is_node_sub(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
-    const cdfg_node_t* from_node = &cdfg->node_storage[node_id.id];
-    return from_node->kind == CDFG_NODE_KIND_CALC &&
-           from_node->content.calc.calculation == CDFG_CALCULATION_SUB;
-}
-
 static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
     err_t err = SUCCESS;
 
@@ -2179,15 +2163,29 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
         // the current node is an equals node.
 
         // we need one of the inputs to be a zero immediate operand.
-        cdfg_node_id_t zero_imm_node_id =
-            cdfg_find_input(cdfg, cur_node_id, CDFG_EDGE_KIND_DATA_FLOW, is_node_imm_zero);
+        cdfg_node_id_t zero_imm_node_id = {.id = CDFG_ITEM_ID_INVALID};
+        CHECK_RETHROW(cdfg_find_input(
+            cdfg,
+            cur_node_id,
+            CDFG_EDGE_KIND_DATA_FLOW,
+            cdfg_node_is_imm_value,
+            0,
+            &zero_imm_node_id
+        ));
         if (zero_imm_node_id.id == CDFG_ITEM_ID_INVALID) {
             continue;
         }
 
         // we need another one of the inputs to be a sub operation.
-        cdfg_node_id_t sub_node_id =
-            cdfg_find_input(cdfg, cur_node_id, CDFG_EDGE_KIND_DATA_FLOW, is_node_sub);
+        cdfg_node_id_t sub_node_id = {.id = CDFG_ITEM_ID_INVALID};
+        CHECK_RETHROW(cdfg_find_input(
+            cdfg,
+            cur_node_id,
+            CDFG_EDGE_KIND_DATA_FLOW,
+            cdfg_node_is_calc,
+            CDFG_CALCULATION_SUB,
+            &sub_node_id
+        ));
         if (sub_node_id.id == CDFG_ITEM_ID_INVALID) {
             continue;
         }
@@ -2280,6 +2278,7 @@ static err_t optimize_nop_value(
     cdfg_t* cdfg,
     cdfg_calculation_t calc,
     cdfg_node_predicate_t identity_value_predicate,
+    u64 identity_value_predicate_ctx,
     bool* did_anything
 ) {
     err_t err = SUCCESS;
@@ -2296,9 +2295,13 @@ static err_t optimize_nop_value(
         }
 
         cdfg_binop_input_find_res_t match_result = {};
-        CHECK_RETHROW(
-            cdfg_find_binop_input(cdfg, cur_node_id, identity_value_predicate, &match_result)
-        );
+        CHECK_RETHROW(cdfg_find_binop_input(
+            cdfg,
+            cur_node_id,
+            identity_value_predicate,
+            identity_value_predicate_ctx,
+            &match_result
+        ));
         if (!match_result.found) {
             // no match
             continue;
@@ -2327,14 +2330,22 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
         CHECK_RETHROW(optimize_x_x_zero(cdfg, CDFG_CALCULATION_SUB, &did_anything));
         CHECK_RETHROW(optimize_x_x_nop(cdfg, CDFG_CALCULATION_OR, &did_anything));
         CHECK_RETHROW(optimize_x_x_nop(cdfg, CDFG_CALCULATION_AND, &did_anything));
+        CHECK_RETHROW(optimize_nop_value(
+            cdfg,
+            CDFG_CALCULATION_SIGNED_MUL,
+            cdfg_node_is_imm_value,
+            1,
+            &did_anything
+        ));
+        CHECK_RETHROW(optimize_nop_value(
+            cdfg,
+            CDFG_CALCULATION_UNSIGNED_MUL,
+            cdfg_node_is_imm_value,
+            1,
+            &did_anything
+        ));
         CHECK_RETHROW(
-            optimize_nop_value(cdfg, CDFG_CALCULATION_SIGNED_MUL, is_node_imm_one, &did_anything)
-        );
-        CHECK_RETHROW(
-            optimize_nop_value(cdfg, CDFG_CALCULATION_UNSIGNED_MUL, is_node_imm_one, &did_anything)
-        );
-        CHECK_RETHROW(
-            optimize_nop_value(cdfg, CDFG_CALCULATION_ADD, is_node_imm_zero, &did_anything)
+            optimize_nop_value(cdfg, CDFG_CALCULATION_ADD, cdfg_node_is_imm_value, 0, &did_anything)
         );
     } while (did_anything);
 cleanup:
