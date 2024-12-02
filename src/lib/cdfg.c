@@ -20,7 +20,7 @@ STR_ENUM_IMPL(cdfg_calculation, CDFG_CALCULATION);
 
 void cdfg_reset(cdfg_t* cdfg, const pis_arch_def_t* arch) {
     memset(cdfg, 0, sizeof(*cdfg));
-    bitmap_init(&cdfg->is_node_used, CDFG_MAX_NODES);
+    bitmap_init(&cdfg->nodes_bitmap, CDFG_MAX_NODES);
     cdfg->arch = arch;
 }
 
@@ -1879,28 +1879,9 @@ static bool node_is_root_of_usability(cdfg_t* cdfg, cdfg_node_id_t node_id) {
     }
 }
 
-/// updates the bitmap of used nodes of the cdfg
-static err_t calc_is_node_used_bitmap(cdfg_t* cdfg) {
+static err_t propegate_is_node_used_bitmap(cdfg_t* cdfg) {
     err_t err = SUCCESS;
 
-    bitmap_clear(&cdfg->is_node_used);
-
-    // first, mark all roots of usability as used
-    for (size_t i = 0; i < cdfg->nodes_amount; i++) {
-        cdfg_node_id_t node_id = {.id = i};
-        cdfg_node_t* node = &cdfg->node_storage[i];
-        if (node->kind == CDFG_NODE_KIND_INVALID) {
-            // node is vacant.
-            continue;
-        }
-
-        if (node_is_root_of_usability(cdfg, node_id)) {
-            bitmap_set(&cdfg->is_node_used, i, true);
-        }
-    }
-
-    // now start traversing the graph starting with the roots and mark all other nodes that are
-    // needed by them.
     bool did_anything;
     do {
         did_anything = false;
@@ -1913,14 +1894,14 @@ static err_t calc_is_node_used_bitmap(cdfg_t* cdfg) {
             }
 
             bool is_to_node_used = false;
-            CHECK_RETHROW(bitmap_get(&cdfg->is_node_used, edge->to_node.id, &is_to_node_used));
+            CHECK_RETHROW(bitmap_get(&cdfg->nodes_bitmap, edge->to_node.id, &is_to_node_used));
             if (!is_to_node_used) {
                 continue;
             }
 
             // the dst node of this edge is used, so its source is also used.
             bool is_from_node_used = true;
-            CHECK_RETHROW(bitmap_swap(&cdfg->is_node_used, edge->from_node.id, &is_from_node_used));
+            CHECK_RETHROW(bitmap_swap(&cdfg->nodes_bitmap, edge->from_node.id, &is_from_node_used));
 
             if (!is_from_node_used) {
                 // if the from node was previously unused, and is now used, then we made some
@@ -1929,6 +1910,45 @@ static err_t calc_is_node_used_bitmap(cdfg_t* cdfg) {
             }
         }
     } while (did_anything);
+
+cleanup:
+    return err;
+}
+
+static err_t calc_nodes_used_by(cdfg_t* cdfg, cdfg_node_id_t node_id) {
+    err_t err = SUCCESS;
+
+    bitmap_clear(&cdfg->nodes_bitmap);
+    CHECK_RETHROW(bitmap_set(&cdfg->nodes_bitmap, node_id.id, true));
+
+    CHECK_RETHROW(propegate_is_node_used_bitmap(cdfg));
+
+cleanup:
+    return err;
+}
+
+/// updates the bitmap of used nodes of the cdfg
+static err_t calc_is_node_used_bitmap(cdfg_t* cdfg) {
+    err_t err = SUCCESS;
+
+    bitmap_clear(&cdfg->nodes_bitmap);
+
+    // first, mark all roots of usability as used
+    for (size_t i = 0; i < cdfg->nodes_amount; i++) {
+        cdfg_node_id_t node_id = {.id = i};
+        cdfg_node_t* node = &cdfg->node_storage[i];
+        if (node->kind == CDFG_NODE_KIND_INVALID) {
+            // node is vacant.
+            continue;
+        }
+
+        if (node_is_root_of_usability(cdfg, node_id)) {
+            bitmap_set(&cdfg->nodes_bitmap, i, true);
+        }
+    }
+
+    // now propegate the usability
+    CHECK_RETHROW(propegate_is_node_used_bitmap(cdfg));
 cleanup:
     return err;
 }
@@ -1940,7 +1960,7 @@ static err_t optimize_remove_unused_nodes_and_edges(cdfg_t* cdfg, bool* did_anyt
 
     for (size_t i = 0; i < cdfg->nodes_amount; i++) {
         bool is_used = false;
-        CHECK_RETHROW(bitmap_get(&cdfg->is_node_used, i, &is_used));
+        CHECK_RETHROW(bitmap_get(&cdfg->nodes_bitmap, i, &is_used));
 
         cdfg_node_t* node = &cdfg->node_storage[i];
         if (!is_used && node->kind != CDFG_NODE_KIND_INVALID) {
