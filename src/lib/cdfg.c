@@ -1879,7 +1879,7 @@ static bool node_is_root_of_usability(cdfg_t* cdfg, cdfg_node_id_t node_id) {
     }
 }
 
-static err_t propegate_is_node_used_bitmap(cdfg_t* cdfg) {
+static err_t propegate_is_node_used_bitmap(cdfg_t* cdfg, cdfg_edge_kind_t flow_kind) {
     err_t err = SUCCESS;
 
     bool did_anything;
@@ -1890,6 +1890,10 @@ static err_t propegate_is_node_used_bitmap(cdfg_t* cdfg) {
 
             if (edge->to_node.id == CDFG_ITEM_ID_INVALID) {
                 // this edge is vacant.
+                continue;
+            }
+
+            if (edge->kind != flow_kind) {
                 continue;
             }
 
@@ -1915,13 +1919,13 @@ cleanup:
     return err;
 }
 
-static err_t calc_nodes_used_by(cdfg_t* cdfg, cdfg_node_id_t node_id) {
+static err_t calc_nodes_used_by(cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_edge_kind_t flow_kind) {
     err_t err = SUCCESS;
 
     bitmap_clear(&cdfg->nodes_bitmap);
     CHECK_RETHROW(bitmap_set(&cdfg->nodes_bitmap, node_id.id, true));
 
-    CHECK_RETHROW(propegate_is_node_used_bitmap(cdfg));
+    CHECK_RETHROW(propegate_is_node_used_bitmap(cdfg, flow_kind));
 
 cleanup:
     return err;
@@ -1948,7 +1952,7 @@ static err_t calc_is_node_used_bitmap(cdfg_t* cdfg) {
     }
 
     // now propegate the usability
-    CHECK_RETHROW(propegate_is_node_used_bitmap(cdfg));
+    CHECK_RETHROW(propegate_is_node_used_bitmap(cdfg, CDFG_EDGE_KIND_DATA_FLOW));
 cleanup:
     return err;
 }
@@ -2580,6 +2584,18 @@ static err_t optimize_imm_phi_loop_calc(cdfg_t* cdfg, cdfg_calculation_t calc, b
             continue;
         }
         u64 calc_imm = calc_imm_node->content.imm.value;
+
+        // now make sure that the calculation node that we want to put into the phi is not used as
+        // part of the phi's loop.
+        CHECK_RETHROW(calc_nodes_used_by(cdfg, phi_node_id, CDFG_EDGE_KIND_DATA_FLOW));
+        bool is_calc_used_by_phi = false;
+        CHECK_RETHROW(bitmap_get(&cdfg->nodes_bitmap, cur_node_index, &is_calc_used_by_phi));
+
+        if (is_calc_used_by_phi) {
+            // the calc is used by the phi, but it uses the phi as input. so, this calc is part of
+            // the phi's loop, so we can't optimize it.
+            continue;
+        }
 
         // calculate the new loop parameters.
         u64 new_initial_calc_inputs[] = {detect_phi_res.initial_value, calc_imm};
