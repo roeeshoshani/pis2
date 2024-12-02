@@ -2557,36 +2557,53 @@ static err_t optimize_imm_phi_loop_calc(cdfg_t* cdfg, cdfg_calculation_t calc, b
             continue;
         }
 
-        // one of the inputs of the multiplication should be a phi loop
-        cdfg_find_1_of_2_inputs_res_t find_mul_phi_res = {};
+        // one of the inputs of the calculation should be a phi loop
+        cdfg_find_1_of_2_inputs_res_t find_calc_phi_res = {};
         cdfg_detect_imm_phi_loop_res_t detect_phi_res = {};
         CHECK_RETHROW(cdfg_find_1_of_2_inputs(
             cdfg,
             cur_node_id,
             cdfg_node_is_imm_phi_loop,
             (u64) &detect_phi_res,
-            &find_mul_phi_res
+            &find_calc_phi_res
         ));
-        if (!find_mul_phi_res.found) {
+        if (!find_calc_phi_res.found) {
             continue;
         }
         CHECK(detect_phi_res.is_imm_phi_loop);
-        cdfg_node_id_t phi_node_id = find_mul_phi_res.matching_input.node_id;
+        cdfg_node_id_t phi_node_id = find_calc_phi_res.matching_input.node_id;
 
-        // the other input of the multiplication should be an immediate
-        cdfg_input_t mul_factor_input = find_mul_phi_res.other_input;
-        cdfg_node_t* mul_factor_node = &cdfg->node_storage[mul_factor_input.node_id.id];
-        if (mul_factor_node->kind != CDFG_NODE_KIND_IMM) {
+        // the other input of the calculation should be an immediate
+        cdfg_input_t calc_imm_input = find_calc_phi_res.other_input;
+        cdfg_node_t* calc_imm_node = &cdfg->node_storage[calc_imm_input.node_id.id];
+        if (calc_imm_node->kind != CDFG_NODE_KIND_IMM) {
             continue;
         }
-        u64 mul_factor = mul_factor_node->content.imm.value;
+        u64 calc_imm = calc_imm_node->content.imm.value;
 
         // calculate the new loop parameters.
-        u64 new_initial_value = detect_phi_res.initial_value * mul_factor;
+        u64 new_initial_calc_inputs[] = {detect_phi_res.initial_value, calc_imm};
+        u64 new_initial_value = 0;
+        CHECK_RETHROW(do_calc_imm_binop(
+            calc,
+            new_initial_calc_inputs,
+            ARRAY_SIZE(new_initial_calc_inputs),
+            &new_initial_value
+        ));
+
+        u64 new_increment_calc_inputs[] = {detect_phi_res.increment_value, calc_imm};
+        u64 new_increment_value = 0;
+        CHECK_RETHROW(do_calc_imm_binop(
+            calc,
+            new_increment_calc_inputs,
+            ARRAY_SIZE(new_increment_calc_inputs),
+            &new_increment_value
+        ));
+
+        // create imm nodes for the new loop parameters
         cdfg_node_id_t new_initial_value_node = {.id = CDFG_ITEM_ID_INVALID};
         CHECK_RETHROW(make_imm_node(cdfg, new_initial_value, &new_initial_value_node));
 
-        u64 new_increment_value = detect_phi_res.increment_value * mul_factor;
         cdfg_node_id_t new_increment_value_node = {.id = CDFG_ITEM_ID_INVALID};
         CHECK_RETHROW(make_imm_node(cdfg, new_increment_value, &new_increment_value_node));
 
@@ -2641,7 +2658,7 @@ static err_t optimize_imm_phi_loop_calc(cdfg_t* cdfg, cdfg_calculation_t calc, b
             make_edge(cdfg, CDFG_EDGE_KIND_CONTROL_FLOW, phi_cf_source, new_phi_node_id, 0)
         );
 
-        // every usage of the original mul node can be replaced with our new phi node
+        // every usage of the original calc node can be replaced with our new phi node
         substitute(cdfg, cur_node_id, new_phi_node_id);
 
         node->kind = CDFG_NODE_KIND_INVALID;
