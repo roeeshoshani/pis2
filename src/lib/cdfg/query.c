@@ -223,7 +223,7 @@ err_t cdfg_node_is_phi_loop(
     cdfg_detect_phi_loop_res_t detect_phi_res = {};
     CHECK_RETHROW(cdfg_detect_phi_loop(cdfg, node_id, &detect_phi_res));
 
-    if (res->is_phi_loop) {
+    if (detect_phi_res.is_phi_loop) {
         *is_matching = true;
         *res = detect_phi_res;
     }
