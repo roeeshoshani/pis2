@@ -2358,6 +2358,37 @@ cleanup:
     return err;
 }
 
+static err_t optimize_x_zero_zero(cdfg_t* cdfg, cdfg_calculation_t calc, bool* did_anything) {
+    err_t err = SUCCESS;
+
+    for (size_t cur_node_index = 0; cur_node_index < cdfg->nodes_amount; cur_node_index++) {
+        cdfg_node_id_t cur_node_id = {.id = cur_node_index};
+        cdfg_node_t* node = &cdfg->node_storage[cur_node_index];
+
+        if (node->kind != CDFG_NODE_KIND_CALC) {
+            continue;
+        }
+
+        if (node->content.calc.calculation != calc) {
+            continue;
+        }
+
+        cdfg_find_1_of_2_inputs_res_t find_imm_zero_res = {};
+        CHECK_RETHROW(
+            cdfg_find_1_of_2_inputs(cdfg, cur_node_id, cdfg_node_is_imm, 0, &find_imm_zero_res)
+        );
+        if (!find_imm_zero_res.found) {
+            continue;
+        }
+
+        substitute(cdfg, cur_node_id, find_imm_zero_res.matching_input.node_id);
+
+        *did_anything = true;
+    }
+cleanup:
+    return err;
+}
+
 static err_t optimize_x_x_nop(cdfg_t* cdfg, cdfg_calculation_t calc, bool* did_anything) {
     err_t err = SUCCESS;
 
@@ -2562,6 +2593,9 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
         CHECK_RETHROW(optimize_sub_equals_zero(cdfg, &did_anything));
         CHECK_RETHROW(optimize_x_x_zero(cdfg, CDFG_CALCULATION_XOR, &did_anything));
         CHECK_RETHROW(optimize_x_x_zero(cdfg, CDFG_CALCULATION_SUB, &did_anything));
+        CHECK_RETHROW(optimize_x_zero_zero(cdfg, CDFG_CALCULATION_SIGNED_MUL, &did_anything));
+        CHECK_RETHROW(optimize_x_zero_zero(cdfg, CDFG_CALCULATION_UNSIGNED_MUL, &did_anything));
+        CHECK_RETHROW(optimize_x_zero_zero(cdfg, CDFG_CALCULATION_AND, &did_anything));
         CHECK_RETHROW(optimize_x_x_nop(cdfg, CDFG_CALCULATION_OR, &did_anything));
         CHECK_RETHROW(optimize_x_x_nop(cdfg, CDFG_CALCULATION_AND, &did_anything));
         CHECK_RETHROW(optimize_nop_value(
