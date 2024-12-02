@@ -1869,6 +1869,11 @@ static err_t calc_is_node_used_bitmap(cdfg_t* cdfg) {
         for (size_t i = 0; i < cdfg->edges_amount; i++) {
             cdfg_edge_t* edge = &cdfg->edge_storage[i];
 
+            if (edge->to_node.id == CDFG_ITEM_ID_INVALID) {
+                // this edge is vacant.
+                continue;
+            }
+
             bool is_to_node_used = false;
             CHECK_RETHROW(bitmap_get(&cdfg->is_node_used, edge->to_node.id, &is_to_node_used));
             if (!is_to_node_used) {

@@ -8,7 +8,7 @@ void bitmap_init(bitmap_t* bitmap, size_t bit_size) {
 }
 
 void bitmap_clear(bitmap_t* bitmap) {
-    size_t elems_amount = bitmap->bit_size;
+    size_t elems_amount = BITMAP_ELEMS_AMOUNT(bitmap->bit_size);
     memset(&bitmap->elems, 0, elems_amount * sizeof(bitmap_elem_t));
 }
 
