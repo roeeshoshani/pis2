@@ -1808,15 +1808,6 @@ static bool is_node_used_as_input_of_kind(
     return false;
 }
 
-static bool is_node_used_as_input(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
-    for (size_t i = 0; i < cdfg->edges_amount; i++) {
-        if (cdfg->edge_storage[i].from_node.id == node_id.id) {
-            return true;
-        }
-    }
-    return false;
-}
-
 static bool does_node_have_cf_input(const cdfg_t* cdfg, cdfg_node_id_t node_id) {
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* edge = &cdfg->edge_storage[i];
