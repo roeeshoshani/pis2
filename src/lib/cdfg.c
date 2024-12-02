@@ -1,4 +1,5 @@
 #include "cdfg.h"
+#include "bitmap.h"
 #include "cdfg/op_map.h"
 #include "cdfg/query.h"
 #include "cfg.h"
@@ -18,6 +19,7 @@ STR_ENUM_IMPL(cdfg_calculation, CDFG_CALCULATION);
 
 void cdfg_reset(cdfg_t* cdfg) {
     memset(cdfg, 0, sizeof(*cdfg));
+    bitmap_init(&cdfg->is_node_used, CDFG_MAX_NODES);
 }
 
 static cdfg_edge_id_t find_node_input_with_index(
@@ -1825,8 +1827,34 @@ static bool does_node_have_cf_input(const cdfg_t* cdfg, cdfg_node_id_t node_id) 
     return false;
 }
 
-static bool optimize_remove_unused_nodes_and_edges(cdfg_t* cdfg) {
-    bool removed_anything = false;
+static bool node_is_root_of_usability(cdfg_t* cdfg, cdfg_node_id_t node_id) {
+    cdfg_node_t* node = &cdfg->node_storage[node_id.id];
+    if (node->kind == CDFG_NODE_KIND_FINISH) {
+        // finish nodes are root of usability.
+        return true;
+    } else if (does_node_have_cf_input(cdfg, node_id)) {
+        // the node has CF input
+        if (node->kind == CDFG_NODE_KIND_PHI) {
+            // phi nodes use CF, but they are not roots of usability, they are only needed if their
+            // value is used.
+            return false;
+        } else {
+            // other nodes that use CF are roots of usability.
+            return true;
+        }
+    } else {
+        // all other nodes are not roots of usability.
+        return false;
+    }
+}
+
+/// updates the bitmap of used nodes of the cdfg
+static err_t calc_is_node_used_bitmap(cdfg_t* cdfg) {
+    err_t err = SUCCESS;
+
+    bitmap_clear(&cdfg->is_node_used);
+
+    // first, mark all roots of usability as used
     for (size_t i = 0; i < cdfg->nodes_amount; i++) {
         cdfg_node_id_t node_id = {.id = i};
         cdfg_node_t* node = &cdfg->node_storage[i];
@@ -1835,26 +1863,53 @@ static bool optimize_remove_unused_nodes_and_edges(cdfg_t* cdfg) {
             continue;
         }
 
-        bool is_node_required = false;
-        if (node->kind == CDFG_NODE_KIND_FINISH) {
-            is_node_required = true;
-        } else if (is_node_used_as_input(cdfg, node_id)) {
-            is_node_required = true;
-        } else if (does_node_have_cf_input(cdfg, node_id)) {
-            // the node has CF input
-            if (node->kind == CDFG_NODE_KIND_PHI) {
-                // phi nodes use CF, but if their value is not used they are not required
-            } else {
-                // other nodes that use CF are required.
-                is_node_required = true;
+        if (node_is_root_of_usability(cdfg, node_id)) {
+            bitmap_set(&cdfg->is_node_used, i, true);
+        }
+    }
+
+    // now start traversing the graph starting with the roots and mark all other nodes that are
+    // needed by them.
+    bool did_anything;
+    do {
+        did_anything = false;
+        for (size_t i = 0; i < cdfg->edges_amount; i++) {
+            cdfg_edge_t* edge = &cdfg->edge_storage[i];
+
+            bool is_to_node_used = false;
+            CHECK_RETHROW(bitmap_get(&cdfg->is_node_used, edge->to_node.id, &is_to_node_used));
+            if (!is_to_node_used) {
+                continue;
+            }
+
+            // the dst node of this edge is used, so its source is also used.
+            bool is_from_node_used = true;
+            CHECK_RETHROW(bitmap_swap(&cdfg->is_node_used, edge->from_node.id, &is_from_node_used));
+
+            if (!is_from_node_used) {
+                // if the from node was previously unused, and is now used, then we made some
+                // progress.
+                did_anything = true;
             }
         }
+    } while (did_anything);
+cleanup:
+    return err;
+}
 
-        if (!is_node_required) {
-            // if the node's value is not used anywhere, and it is not a finish node (which by
-            // definition must be kept), remove it.
+static err_t optimize_remove_unused_nodes_and_edges(cdfg_t* cdfg, bool* did_anything) {
+    err_t err = SUCCESS;
+
+    CHECK_RETHROW(calc_is_node_used_bitmap(cdfg));
+
+    for (size_t i = 0; i < cdfg->nodes_amount; i++) {
+        bool is_used = false;
+        CHECK_RETHROW(bitmap_get(&cdfg->is_node_used, i, &is_used));
+
+        if (!is_used) {
+            cdfg_node_t* node = &cdfg->node_storage[i];
             node->kind = CDFG_NODE_KIND_INVALID;
-            removed_anything = true;
+            *did_anything = true;
         }
     }
 
@@ -1869,18 +1924,25 @@ static bool optimize_remove_unused_nodes_and_edges(cdfg_t* cdfg) {
         if (to_node->kind == CDFG_NODE_KIND_INVALID) {
             edge->from_node.id = CDFG_ITEM_ID_INVALID;
             edge->to_node.id = CDFG_ITEM_ID_INVALID;
-            removed_anything = true;
+            *did_anything = true;
         }
     }
-    return removed_anything;
+cleanup:
+    return err;
 }
 
-static bool optimize_remove_unused_nodes_and_edges_recursively(cdfg_t* cdfg) {
-    bool removed_anything = false;
-    while (optimize_remove_unused_nodes_and_edges(cdfg)) {
-        removed_anything = true;
-    }
-    return removed_anything;
+static err_t optimize_remove_unused_nodes_and_edges_recursively(cdfg_t* cdfg, bool* did_anything) {
+    err_t err = SUCCESS;
+    bool removed_anything;
+    do {
+        removed_anything = false;
+        CHECK_RETHROW(optimize_remove_unused_nodes_and_edges(cdfg, &removed_anything));
+        if (removed_anything) {
+            *did_anything = true;
+        }
+    } while (removed_anything);
+cleanup:
+    return err;
 }
 
 
@@ -2482,7 +2544,7 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
     bool did_anything;
     do {
         did_anything = false;
-        did_anything |= optimize_remove_unused_nodes_and_edges_recursively(cdfg);
+        CHECK_RETHROW(optimize_remove_unused_nodes_and_edges_recursively(cdfg, &did_anything));
         did_anything |= optimize_remove_duplicate_nodes(cdfg);
         CHECK_RETHROW(optimize_remove_single_input_region_phi_nodes(cdfg, &did_anything));
         CHECK_RETHROW(optimize_recursive_phi_node(cdfg, &did_anything));

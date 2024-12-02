@@ -1,6 +1,7 @@
 #pragma once
 
 #include "arch_def.h"
+#include "bitmap.h"
 #include "cdfg/op_map.h"
 #include "cfg.h"
 #include "endianness.h"
@@ -190,6 +191,10 @@ typedef struct {
 
     cdfg_edge_t edge_storage[CDFG_MAX_EDGES];
     size_t edges_amount;
+
+    /// a bitmap used to remember whether each node is used or not.
+    /// this is used when optimizing the cdfg to get rid of unused nodes.
+    BITMAP_DECLARE(is_node_used, CDFG_MAX_NODES);
 
     /// the registers operand map.
     cdfg_op_map_t reg_op_map;
