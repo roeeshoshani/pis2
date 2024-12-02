@@ -1904,8 +1904,8 @@ static err_t optimize_remove_unused_nodes_and_edges(cdfg_t* cdfg, bool* did_anyt
         bool is_used = false;
         CHECK_RETHROW(bitmap_get(&cdfg->is_node_used, i, &is_used));
 
-        if (!is_used) {
-            cdfg_node_t* node = &cdfg->node_storage[i];
+        cdfg_node_t* node = &cdfg->node_storage[i];
+        if (!is_used && node->kind != CDFG_NODE_KIND_INVALID) {
             node->kind = CDFG_NODE_KIND_INVALID;
             *did_anything = true;
         }
