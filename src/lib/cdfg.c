@@ -2425,15 +2425,7 @@ static err_t optimize_phi_loop_mul(cdfg_t* cdfg, bool* did_anything) {
         cdfg_node_id_t phi_node_id = find_mul_phi_res.matching_input.node_id;
         cdfg_input_t mul_factor_input = find_mul_phi_res.other_input;
 
-        cdfg_find_1_of_2_inputs_res_t find_phi_mul_res = {};
-        CHECK_RETHROW(cdfg_find_1_of_2_inputs(
-            cdfg,
-            phi_node_id,
-            cdfg_node_is_node_id,
-            cur_node_id.id,
-            &find_phi_mul_res
-        ));
-        cdfg_input_t initial_value_input = find_phi_mul_res.other_input;
+        cdfg_input_t initial_value_input = detect_phi_res.initial_value;
 
         // calculate the new loop parameters.
         cdfg_node_id_t new_initial_value_node = {.id = CDFG_ITEM_ID_INVALID};
@@ -2588,7 +2580,6 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
         ));
         CHECK_RETHROW(
             optimize_nop_value(cdfg, CDFG_CALCULATION_ADD, cdfg_node_is_imm, 0, &did_anything)
-
         );
         CHECK_RETHROW(optimize_phi_loop_mul(cdfg, &did_anything));
     } while (did_anything);
