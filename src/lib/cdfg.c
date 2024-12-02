@@ -439,6 +439,7 @@ static err_t find_existing_binop_node(
         case CDFG_CALCULATION_PARITY:
         case CDFG_CALCULATION_NEG:
         case CDFG_CALCULATION_NOT:
+        default:
             UNREACHABLE();
             break;
     }
