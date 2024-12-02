@@ -244,7 +244,7 @@ typedef struct {
     cfg_item_id_t cur_block_id;
 } cdfg_builder_t;
 
-void cdfg_reset(cdfg_t* cdfg);
+void cdfg_reset(cdfg_t* cdfg, const pis_arch_def_t* arch);
 
 err_t cdfg_optimize(cdfg_t* cdfg);
 

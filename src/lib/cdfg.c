@@ -1,4 +1,5 @@
 #include "cdfg.h"
+#include "arch_def.h"
 #include "bitmap.h"
 #include "cdfg/op_map.h"
 #include "cdfg/query.h"
@@ -17,9 +18,10 @@ typedef err_t (*opcode_handler_t)(cdfg_builder_t* builder, const pis_insn_t* ins
 
 STR_ENUM_IMPL(cdfg_calculation, CDFG_CALCULATION);
 
-void cdfg_reset(cdfg_t* cdfg) {
+void cdfg_reset(cdfg_t* cdfg, const pis_arch_def_t* arch) {
     memset(cdfg, 0, sizeof(*cdfg));
     bitmap_init(&cdfg->is_node_used, CDFG_MAX_NODES);
+    cdfg->arch = arch;
 }
 
 static cdfg_edge_id_t find_node_input_with_index(
@@ -2679,8 +2681,7 @@ err_t cdfg_build(cdfg_builder_t* builder, const cfg_t* cfg) {
 
     // initialize the builder
     builder->cfg = cfg;
-    cdfg_reset(&builder->cdfg);
-    builder->cdfg.arch = cfg->arch;
+    cdfg_reset(&builder->cdfg, cfg->arch);
 
     CHECK_RETHROW(cdfg_build_reg_op_map(builder));
 
