@@ -214,6 +214,45 @@ cleanup:
     return err;
 }
 
+err_t cdfg_detect_imm_phi_loop(
+    const cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_detect_imm_phi_loop_res_t* result
+) {
+    err_t err = SUCCESS;
+
+    result->is_imm_phi_loop = false;
+
+    cdfg_detect_phi_loop_res_t detect_res = {};
+    CHECK_RETHROW(cdfg_detect_phi_loop(cdfg, node_id, &detect_res));
+
+    if (!detect_res.is_phi_loop) {
+        SUCCESS_CLEANUP();
+    }
+
+    const cdfg_node_t* initial_value_node =
+        &cdfg->node_storage[detect_res.initial_value.node_id.id];
+    if (initial_value_node->kind != CDFG_NODE_KIND_IMM) {
+        SUCCESS_CLEANUP();
+    }
+
+    const cdfg_node_t* increment_value_node =
+        &cdfg->node_storage[detect_res.increment_value.node_id.id];
+    if (increment_value_node->kind != CDFG_NODE_KIND_IMM) {
+        SUCCESS_CLEANUP();
+    }
+
+    *result = (cdfg_detect_imm_phi_loop_res_t) {
+        .is_imm_phi_loop = true,
+        .add_node = detect_res.add_node,
+        .initial_value = initial_value_node->content.imm.value,
+        .initial_value_input = detect_res.initial_value,
+        .increment_value = increment_value_node->content.imm.value,
+        .increment_value_input = detect_res.increment_value,
+    };
+
+cleanup:
+    return err;
+}
+
 err_t cdfg_node_is_phi_loop(
     const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching
 ) {
@@ -227,6 +266,25 @@ err_t cdfg_node_is_phi_loop(
     if (detect_phi_res.is_phi_loop) {
         *is_matching = true;
         *res = detect_phi_res;
+    }
+
+cleanup:
+    return err;
+}
+
+err_t cdfg_node_is_imm_phi_loop(
+    const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching
+) {
+    err_t err = SUCCESS;
+
+    cdfg_detect_imm_phi_loop_res_t* res = (cdfg_detect_imm_phi_loop_res_t*) ctx;
+
+    cdfg_detect_imm_phi_loop_res_t detect_imm_phi_res = {};
+    CHECK_RETHROW(cdfg_detect_imm_phi_loop(cdfg, node_id, &detect_imm_phi_res));
+
+    if (detect_imm_phi_res.is_imm_phi_loop) {
+        *is_matching = true;
+        *res = detect_imm_phi_res;
     }
 
 cleanup:

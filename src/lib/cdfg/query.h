@@ -43,6 +43,21 @@ typedef struct {
     cdfg_input_t increment_value;
 } cdfg_detect_phi_loop_res_t;
 
+typedef struct {
+    bool is_imm_phi_loop;
+
+    /// the initial value input to the phi node
+    cdfg_input_t initial_value_input;
+    u64 initial_value;
+
+    /// the add node as an input to the phi node
+    cdfg_input_t add_node;
+
+    /// the increment value input to the add node
+    cdfg_input_t increment_value_input;
+    u64 increment_value;
+} cdfg_detect_imm_phi_loop_res_t;
+
 err_t cdfg_find_inputs(
     const cdfg_t* cdfg,
     cdfg_node_id_t node_id,
@@ -78,7 +93,15 @@ err_t cdfg_detect_phi_loop(
     const cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_detect_phi_loop_res_t* result
 );
 
+err_t cdfg_detect_imm_phi_loop(
+    const cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_detect_imm_phi_loop_res_t* result
+);
+
 err_t cdfg_node_is_phi_loop(
+    const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching
+);
+
+err_t cdfg_node_is_imm_phi_loop(
     const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching
 );
 
