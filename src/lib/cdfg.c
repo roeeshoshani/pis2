@@ -2439,6 +2439,108 @@ cleanup:
     return err;
 }
 
+static err_t
+    do_calc_imm_binop(cdfg_calculation_t calc, const u64* inputs, size_t inputs_amount, u64* res) {
+    err_t err = SUCCESS;
+    switch (calc) {
+        case CDFG_CALCULATION_AND:
+            CHECK(inputs_amount == 2);
+            *res = inputs[0] & inputs[1];
+            break;
+        case CDFG_CALCULATION_ADD:
+            CHECK(inputs_amount == 2);
+            *res = inputs[0] + inputs[1];
+            break;
+        case CDFG_CALCULATION_SUB:
+            CHECK(inputs_amount == 2);
+            *res = inputs[0] - inputs[1];
+            break;
+        case CDFG_CALCULATION_OR:
+            CHECK(inputs_amount == 2);
+            *res = inputs[0] | inputs[1];
+            break;
+        case CDFG_CALCULATION_XOR:
+            CHECK(inputs_amount == 2);
+            *res = inputs[0] ^ inputs[1];
+            break;
+        case CDFG_CALCULATION_SHIFT_RIGHT:
+            CHECK(inputs_amount == 2);
+            *res = inputs[0] >> inputs[1];
+            break;
+        case CDFG_CALCULATION_SHIFT_RIGHT_SIGNED:
+            CHECK(inputs_amount == 2);
+            *res = (i64) inputs[0] >> (i64) inputs[1];
+            break;
+        case CDFG_CALCULATION_SHIFT_LEFT:
+            CHECK(inputs_amount == 2);
+            *res = inputs[0] << inputs[1];
+            break;
+        case CDFG_CALCULATION_UNSIGNED_LESS_THAN:
+            CHECK(inputs_amount == 2);
+            *res = inputs[0] < inputs[1];
+            break;
+        case CDFG_CALCULATION_UNSIGNED_MUL:
+            CHECK(inputs_amount == 2);
+            *res = inputs[0] * inputs[1];
+            break;
+        case CDFG_CALCULATION_SIGNED_MUL:
+            CHECK(inputs_amount == 2);
+            *res = (i64) inputs[0] * (i64) inputs[1];
+            break;
+        case CDFG_CALCULATION_SIGNED_MUL_OVERFLOW:
+        case CDFG_CALCULATION_SIGNED_CARRY:
+        case CDFG_CALCULATION_UNSIGNED_CARRY:
+            // we don't know the size of the immediates so we can't calculate this properly.
+            CHECK_FAIL();
+            break;
+        case CDFG_CALCULATION_SIGNED_LESS_THAN:
+            CHECK(inputs_amount == 2);
+            *res = (i64) inputs[0] < (i64) inputs[1];
+            break;
+        case CDFG_CALCULATION_NEG:
+            CHECK(inputs_amount == 1);
+            *res = -inputs[0];
+            break;
+        case CDFG_CALCULATION_NOT:
+            CHECK(inputs_amount == 1);
+            *res = ~inputs[0];
+            break;
+        case CDFG_CALCULATION_PARITY: {
+            CHECK(inputs_amount == 1);
+
+            u64 value = inputs[0];
+
+            // naive calculation of parity. we don't care about performance here.
+            u32 bits_amount = 0;
+            for (size_t i = 0; i < 64; i++) {
+                if (((value >> i) & 1) != 0) {
+                    bits_amount++;
+                }
+            }
+            bool parity_bit = bits_amount % 2 == 0;
+
+            *res = parity_bit;
+
+            break;
+        }
+        case CDFG_CALCULATION_COND_NEGATE:
+            CHECK(inputs_amount == 1);
+
+            u64 cond = inputs[0];
+
+            CHECK(cond == 0 || cond == 1);
+
+            *res = !cond;
+            break;
+        case CDFG_CALCULATION_EQUALS:
+            CHECK(inputs_amount == 2);
+            *res = inputs[0] == inputs[1];
+            break;
+    }
+cleanup:
+    return err;
+}
+
 static err_t optimize_imm_phi_loop_calc(cdfg_t* cdfg, cdfg_calculation_t calc, bool* did_anything) {
     err_t err = SUCCESS;
 
