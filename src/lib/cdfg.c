@@ -2466,7 +2466,7 @@ static err_t optimize_imm_phi_loop_calc(cdfg_t* cdfg, cdfg_calculation_t calc, b
 
         u64 new_increment_value = detect_phi_res.increment_value * mul_factor;
         cdfg_node_id_t new_increment_value_node = {.id = CDFG_ITEM_ID_INVALID};
-        CHECK_RETHROW(make_imm_node(cdfg, new_increment_value, &new_initial_value_node));
+        CHECK_RETHROW(make_imm_node(cdfg, new_increment_value, &new_increment_value_node));
 
         // create a new phi node
         cdfg_node_id_t new_phi_node_id = {.id = CDFG_ITEM_ID_INVALID};
