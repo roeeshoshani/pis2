@@ -2371,14 +2371,14 @@ static err_t optimize_phi_loop_mul(cdfg_t* cdfg, bool* did_anything) {
 
         bool is_mul_signed = (node->content.calc.calculation == CDFG_CALCULATION_SIGNED_MUL);
 
-        // the multiplication should be by a constant
-        cdfg_find_binop_input_res_t find_add_imm_res = {};
-        CHECK_RETHROW(cdfg_find_binop_input(
+        // one of the inputs of the multiplication should be a phi loop
+        cdfg_find_1_of_2_inputs_res_t find_mul_phi_res = {};
+        cdfg_detect_phi_loop_res_t CHECK_RETHROW(cdfg_find_1_of_2_inputs(
             cdfg,
             cur_node_id,
-            cdfg_node_is_of_kind,
+            cdfg_node_is_phi_loop,
             CDFG_NODE_KIND_IMM,
-            &find_add_imm_res
+            &find_mul_phi_res
         ));
         if (!find_add_imm_res.found) {
             continue;
@@ -2515,7 +2515,7 @@ static err_t optimize_nop_value(
             continue;
         }
 
-        cdfg_find_binop_input_res_t match_result = {};
+        cdfg_find_1_of_2_inputs_res_t match_result = {};
         CHECK_RETHROW(cdfg_find_binop_input(
             cdfg,
             cur_node_id,

@@ -47,12 +47,12 @@ cleanup:
     return err;
 }
 
-err_t cdfg_find_binop_input(
+err_t cdfg_find_1_of_2_inputs(
     const cdfg_t* cdfg,
     cdfg_node_id_t node_id,
     cdfg_node_predicate_t predicate,
     u64 ctx,
-    cdfg_find_binop_input_res_t* result
+    cdfg_find_1_of_2_inputs_res_t* result
 ) {
     err_t err = SUCCESS;
 
@@ -158,75 +158,57 @@ err_t cdfg_detect_phi_loop(
         SUCCESS_CLEANUP();
     }
 
-    // a loop phi node has one immediate input which represents the initial value
-    cdfg_node_id_t initial_value_node_id = {.id = CDFG_ITEM_ID_INVALID};
-    CHECK_RETHROW(cdfg_find_one_input(
+    // a loop phi node has one input which is an add node to make it loop, and another input which
+    // is the initial value.
+    cdfg_find_1_of_2_inputs_res_t find_phi_add_res = {};
+    CHECK_RETHROW(cdfg_find_1_of_2_inputs(
         cdfg,
         node_id,
-        CDFG_EDGE_KIND_DATA_FLOW,
-        cdfg_node_is_of_kind,
-        CDFG_NODE_KIND_IMM,
-        &initial_value_node_id
-    ));
-    if (initial_value_node_id.id == CDFG_ITEM_ID_INVALID) {
-        SUCCESS_CLEANUP();
-    }
-
-    // a loop phi node also has an input which is an add node to complete the loop
-    cdfg_node_id_t add_node_id = {.id = CDFG_ITEM_ID_INVALID};
-    CHECK_RETHROW(cdfg_find_one_input(
-        cdfg,
-        node_id,
-        CDFG_EDGE_KIND_DATA_FLOW,
         cdfg_node_is_calc,
         CDFG_CALCULATION_ADD,
-        &add_node_id
+        &find_phi_add_res
     ));
-    if (add_node_id.id == CDFG_ITEM_ID_INVALID) {
+    if (!find_phi_add_res.found) {
         SUCCESS_CLEANUP();
     }
 
-    // the add node should have the phi node as one of its inputs
-    cdfg_find_first_matching_edge_params_t params = {
-        .check_kind = true,
-        .kind = CDFG_EDGE_KIND_DATA_FLOW,
+    cdfg_node_id_t add_node_id = find_phi_add_res.matching_input;
+    cdfg_node_id_t initial_value_node_id = find_phi_add_res.other_input;
 
-        .check_from_node = true,
-        .from_node = node_id,
+    cdfg_node_id_t add_input_node_ids[2] = {};
+    CHECK_RETHROW(cdfg_find_binop_inputs(cdfg, add_node_id, add_input_node_ids));
 
-        .check_to_node = true,
-        .to_node = add_node_id,
-    };
-    cdfg_edge_id_t phi_to_add_edge_id = cdfg_find_first_matching_edge(cdfg, &params);
-    if (phi_to_add_edge_id.id == CDFG_ITEM_ID_INVALID) {
+    // the add node should have the phi node as one of its inputs, and the other input is the
+    // increment value.
+    cdfg_node_id_t increment_value_node_id;
+    if (add_input_node_ids[0].id == node_id.id) {
+        increment_value_node_id = add_input_node_ids[1];
+    } else if (add_input_node_ids[1].id == node_id.id) {
+        increment_value_node_id = add_input_node_ids[0];
+    } else {
         SUCCESS_CLEANUP();
     }
-
-    // the add node's other input should be an imediate
-    cdfg_node_id_t increment_value_node_id = {.id = CDFG_ITEM_ID_INVALID};
-    CHECK_RETHROW(cdfg_find_one_input(
-        cdfg,
-        add_node_id,
-        CDFG_EDGE_KIND_DATA_FLOW,
-        cdfg_node_is_of_kind,
-        CDFG_NODE_KIND_IMM,
-        &increment_value_node_id
-    ));
-    if (increment_value_node_id.id == CDFG_ITEM_ID_INVALID) {
-        SUCCESS_CLEANUP();
-    }
-
-    const cdfg_node_t* initial_value_node = &cdfg->node_storage[initial_value_node_id.id];
-    const cdfg_node_t* increment_value_node = &cdfg->node_storage[increment_value_node_id.id];
 
     *result = (cdfg_detect_phi_loop_res_t) {
         .is_phi_loop = true,
         .initial_value_node_id = initial_value_node_id,
-        .initial_value = initial_value_node->content.imm.value,
         .increment_value_node_id = increment_value_node_id,
-        .increment_value = increment_value_node->content.imm.value,
         .add_node_id = add_node_id,
     };
+
+cleanup:
+    return err;
+}
+
+err_t cdfg_node_is_phi_loop(
+    const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching
+) {
+    err_t err = SUCCESS;
+
+    cdfg_detect_phi_loop_res_t* res = (cdfg_detect_phi_loop_res_t*) ctx;
+    CHECK_RETHROW(cdfg_detect_phi_loop(cdfg, node_id, res));
+
+    *is_matching = res->is_phi_loop;
 
 cleanup:
     return err;
