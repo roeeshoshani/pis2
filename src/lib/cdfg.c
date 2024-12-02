@@ -413,6 +413,36 @@ static err_t find_existing_binop_node(
 
     cdfg_node_id_t existing_binop_node_id = {.id = CDFG_ITEM_ID_INVALID};
 
+    bool order_matters;
+    switch (calculation) {
+        case CDFG_CALCULATION_ADD:
+        case CDFG_CALCULATION_AND:
+        case CDFG_CALCULATION_OR:
+        case CDFG_CALCULATION_XOR:
+        case CDFG_CALCULATION_EQUALS:
+        case CDFG_CALCULATION_SIGNED_MUL_OVERFLOW:
+        case CDFG_CALCULATION_UNSIGNED_MUL:
+        case CDFG_CALCULATION_SIGNED_MUL:
+            order_matters = false;
+            break;
+        case CDFG_CALCULATION_SUB:
+        case CDFG_CALCULATION_SIGNED_LESS_THAN:
+        case CDFG_CALCULATION_SIGNED_CARRY:
+        case CDFG_CALCULATION_UNSIGNED_CARRY:
+        case CDFG_CALCULATION_UNSIGNED_LESS_THAN:
+        case CDFG_CALCULATION_SHIFT_LEFT:
+        case CDFG_CALCULATION_SHIFT_RIGHT:
+        case CDFG_CALCULATION_SHIFT_RIGHT_SIGNED:
+            order_matters = true;
+            break;
+        case CDFG_CALCULATION_COND_NEGATE:
+        case CDFG_CALCULATION_PARITY:
+        case CDFG_CALCULATION_NEG:
+        case CDFG_CALCULATION_NOT:
+            UNREACHABLE();
+            break;
+    }
+
     for (size_t i = 0; i < cdfg->nodes_amount; i++) {
         cdfg_node_t* cur_node = &cdfg->node_storage[i];
         cdfg_node_id_t cur_node_id = {.id = i};
@@ -425,11 +455,20 @@ static err_t find_existing_binop_node(
             continue;
         }
 
-        cdfg_node_id_t inputs[2] = {{.id = CDFG_ITEM_ID_INVALID}, {.id = CDFG_ITEM_ID_INVALID}};
+        cdfg_input_t inputs[2] = {};
         CHECK_RETHROW(cdfg_find_inputs(cdfg, cur_node_id, CDFG_EDGE_KIND_DATA_FLOW, inputs, 2));
 
-        if ((inputs[0].id == lhs_node_id.id && inputs[1].id == rhs_node_id.id) ||
-            (inputs[1].id == lhs_node_id.id && inputs[0].id == rhs_node_id.id)) {
+        bool matches_correct_order =
+            (inputs[0].node_id.id == lhs_node_id.id && inputs[1].node_id.id == rhs_node_id.id);
+        bool matches_wrong_order =
+            (inputs[1].node_id.id == lhs_node_id.id && inputs[0].node_id.id == rhs_node_id.id);
+
+        bool matches = matches_correct_order;
+        if (!order_matters) {
+            matches |= matches_wrong_order;
+        }
+
+        if (matches) {
             // found an exact match
             existing_binop_node_id.id = i;
             break;
@@ -1734,12 +1773,10 @@ static err_t cdfg_finalize_block_final_value(
     // needed here.
     // so, substitute them with their input, which represents the actual value.
 
-    cdfg_node_id_t input_node_id = {.id = CDFG_ITEM_ID_INVALID};
-    CHECK_RETHROW(
-        cdfg_find_inputs(&builder->cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW, &input_node_id, 1)
-    );
+    cdfg_input_t input = {};
+    CHECK_RETHROW(cdfg_find_inputs(&builder->cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW, &input, 1));
 
-    substitute(&builder->cdfg, node_id, input_node_id);
+    substitute(&builder->cdfg, node_id, input.node_id);
 
     node->kind = CDFG_NODE_KIND_INVALID;
 
@@ -2238,44 +2275,44 @@ static err_t optimize_sub_equals_zero(cdfg_t* cdfg, bool* did_anything) {
         // the current node is an equals node.
 
         // we need one of the inputs to be a zero immediate operand.
-        cdfg_node_id_t zero_imm_node_id = {.id = CDFG_ITEM_ID_INVALID};
+        cdfg_input_t zero_imm_input = {};
         CHECK_RETHROW(cdfg_find_one_input(
             cdfg,
             cur_node_id,
             CDFG_EDGE_KIND_DATA_FLOW,
             cdfg_node_is_imm,
             0,
-            &zero_imm_node_id
+            &zero_imm_input
         ));
-        if (zero_imm_node_id.id == CDFG_ITEM_ID_INVALID) {
+        if (zero_imm_input.node_id.id == CDFG_ITEM_ID_INVALID) {
             continue;
         }
 
         // we need another one of the inputs to be a sub operation.
-        cdfg_node_id_t sub_node_id = {.id = CDFG_ITEM_ID_INVALID};
+        cdfg_input_t sub_node_input = {};
         CHECK_RETHROW(cdfg_find_one_input(
             cdfg,
             cur_node_id,
             CDFG_EDGE_KIND_DATA_FLOW,
             cdfg_node_is_calc,
             CDFG_CALCULATION_SUB,
-            &sub_node_id
+            &sub_node_input
         ));
-        if (sub_node_id.id == CDFG_ITEM_ID_INVALID) {
+        if (sub_node_input.node_id.id == CDFG_ITEM_ID_INVALID) {
             continue;
         }
 
         // doing `x - y == 0` is like doing `x == y`, so we want to create an equals node with the
         // same operands as the sub node.
-        cdfg_node_id_t sub_input_node_ids[2] = {};
-        CHECK_RETHROW(cdfg_find_binop_inputs(cdfg, sub_node_id, sub_input_node_ids));
+        cdfg_input_t sub_inputs[2] = {};
+        CHECK_RETHROW(cdfg_find_2_inputs(cdfg, sub_node_input.node_id, sub_inputs));
 
         cdfg_node_id_t optimized_eq_node_id = {.id = CDFG_ITEM_ID_INVALID};
         CHECK_RETHROW(make_binop_node(
             cdfg,
             CDFG_CALCULATION_EQUALS,
-            sub_input_node_ids[0],
-            sub_input_node_ids[1],
+            sub_inputs[0].node_id,
+            sub_inputs[1].node_id,
             &optimized_eq_node_id
         ));
 
@@ -2302,9 +2339,9 @@ static err_t optimize_x_x_zero(cdfg_t* cdfg, cdfg_calculation_t calc, bool* did_
             continue;
         }
 
-        cdfg_node_id_t inputs[2] = {};
-        CHECK_RETHROW(cdfg_find_binop_inputs(cdfg, cur_node_id, inputs));
-        if (inputs[0].id != inputs[1].id) {
+        cdfg_input_t inputs[2] = {};
+        CHECK_RETHROW(cdfg_find_2_inputs(cdfg, cur_node_id, inputs));
+        if (inputs[0].node_id.id != inputs[1].node_id.id) {
             // applying the calculation to different values can't be optimized.
             continue;
         }
@@ -2335,14 +2372,14 @@ static err_t optimize_x_x_nop(cdfg_t* cdfg, cdfg_calculation_t calc, bool* did_a
             continue;
         }
 
-        cdfg_node_id_t inputs[2] = {};
-        CHECK_RETHROW(cdfg_find_binop_inputs(cdfg, cur_node_id, inputs));
-        if (inputs[0].id != inputs[1].id) {
+        cdfg_input_t inputs[2] = {};
+        CHECK_RETHROW(cdfg_find_2_inputs(cdfg, cur_node_id, inputs));
+        if (inputs[0].node_id.id != inputs[1].node_id.id) {
             // applying the calculation to different values can't be optimized.
             continue;
         }
 
-        substitute(cdfg, cur_node_id, inputs[0]);
+        substitute(cdfg, cur_node_id, inputs[0].node_id);
 
         *did_anything = true;
     }
@@ -2369,73 +2406,52 @@ static err_t optimize_phi_loop_mul(cdfg_t* cdfg, bool* did_anything) {
             continue;
         }
 
-        bool is_mul_signed = (node->content.calc.calculation == CDFG_CALCULATION_SIGNED_MUL);
-
         // one of the inputs of the multiplication should be a phi loop
         cdfg_find_1_of_2_inputs_res_t find_mul_phi_res = {};
-        cdfg_detect_phi_loop_res_t CHECK_RETHROW(cdfg_find_1_of_2_inputs(
+        cdfg_detect_phi_loop_res_t detect_phi_res = {};
+        CHECK_RETHROW(cdfg_find_1_of_2_inputs(
             cdfg,
             cur_node_id,
             cdfg_node_is_phi_loop,
-            CDFG_NODE_KIND_IMM,
+            (u64) &detect_phi_res,
             &find_mul_phi_res
         ));
-        if (!find_add_imm_res.found) {
+        if (!find_mul_phi_res.found) {
             continue;
         }
+        CHECK(detect_phi_res.is_phi_loop);
 
-        cdfg_node_t* mul_factor_node = &cdfg->node_storage[find_add_imm_res.matching_input.id];
-        u64 mul_factor = mul_factor_node->content.imm.value;
+        cdfg_node_id_t phi_node_id = find_mul_phi_res.matching_input.node_id;
+        cdfg_input_t mul_factor_input = find_mul_phi_res.other_input;
 
-        // the other input to the multiplication should be a phi loop node
-        cdfg_node_id_t phi_node_id = find_add_imm_res.other_input;
-        cdfg_detect_phi_loop_res_t detect_phi_loop_res = {};
-        CHECK_RETHROW(cdfg_detect_phi_loop(cdfg, phi_node_id, &detect_phi_loop_res));
-        if (!detect_phi_loop_res.is_phi_loop) {
-            continue;
-        }
-
-        // find the input index of the initial value node
-        cdfg_find_first_matching_edge_params_t find_phi_initial_value_edge_params = {
-            .check_kind = true,
-            .kind = CDFG_EDGE_KIND_DATA_FLOW,
-
-            .check_from_node = true,
-            .from_node = detect_phi_loop_res.initial_value_node_id,
-
-            .check_to_node = true,
-            .to_node = phi_node_id,
-        };
-        cdfg_edge_id_t phi_initial_value_edge =
-            cdfg_find_first_matching_edge(cdfg, &find_phi_initial_value_edge_params);
-        CHECK(phi_initial_value_edge.id != CDFG_ITEM_ID_INVALID);
-        size_t phi_initial_value_node_input_index =
-            cdfg->edge_storage[phi_initial_value_edge.id].to_node_input_index;
-
-        // calculate the input index of the add node into the phi node by complementing the input
-        // index of the initial value node.
-        size_t phi_add_node_input_index = !phi_initial_value_node_input_index;
+        cdfg_find_1_of_2_inputs_res_t find_phi_mul_res = {};
+        CHECK_RETHROW(cdfg_find_1_of_2_inputs(
+            cdfg,
+            phi_node_id,
+            cdfg_node_is_node_id,
+            cur_node_id.id,
+            &find_phi_mul_res
+        ));
+        cdfg_input_t initial_value_input = find_phi_mul_res.other_input;
 
         // calculate the new loop parameters.
-        u64 new_initial_value;
-        u64 new_increment_value;
-        if (is_mul_signed) {
-            // signed multiplication
-            new_initial_value = (u64) ((i64) detect_phi_loop_res.initial_value * (i64) mul_factor);
-            new_increment_value =
-                (u64) ((i64) detect_phi_loop_res.increment_value * (i64) mul_factor);
-        } else {
-            // unsigned multiplication
-            new_initial_value = detect_phi_loop_res.initial_value * mul_factor;
-            new_increment_value = detect_phi_loop_res.increment_value * mul_factor;
-        }
-
-        // create the immediate input nodes
         cdfg_node_id_t new_initial_value_node = {.id = CDFG_ITEM_ID_INVALID};
-        CHECK_RETHROW(make_imm_node(cdfg, new_initial_value, &new_initial_value_node));
+        CHECK_RETHROW(make_binop_node(
+            cdfg,
+            node->content.calc.calculation,
+            initial_value_input.node_id,
+            mul_factor_input.node_id,
+            &new_initial_value_node
+        ));
 
         cdfg_node_id_t new_increment_value_node = {.id = CDFG_ITEM_ID_INVALID};
-        CHECK_RETHROW(make_imm_node(cdfg, new_increment_value, &new_increment_value_node));
+        CHECK_RETHROW(make_binop_node(
+            cdfg,
+            node->content.calc.calculation,
+            detect_phi_res.increment_value.node_id,
+            mul_factor_input.node_id,
+            &new_increment_value_node
+        ));
 
         // create a new phi node
         cdfg_node_id_t new_phi_node_id = {.id = CDFG_ITEM_ID_INVALID};
@@ -2452,6 +2468,8 @@ static err_t optimize_phi_loop_mul(cdfg_t* cdfg, bool* did_anything) {
         ));
 
         // connect the new add node to the new phi node
+        size_t phi_add_node_input_index =
+            cdfg->edge_storage[detect_phi_res.add_node.edge_id.id].to_node_input_index;
         CHECK_RETHROW(make_edge(
             cdfg,
             CDFG_EDGE_KIND_DATA_FLOW,
@@ -2461,6 +2479,8 @@ static err_t optimize_phi_loop_mul(cdfg_t* cdfg, bool* did_anything) {
         ));
 
         // connect the new initial value node to the new phi node
+        size_t phi_initial_value_node_input_index =
+            cdfg->edge_storage[detect_phi_res.initial_value.edge_id.id].to_node_input_index;
         CHECK_RETHROW(make_edge(
             cdfg,
             CDFG_EDGE_KIND_DATA_FLOW,
@@ -2516,7 +2536,7 @@ static err_t optimize_nop_value(
         }
 
         cdfg_find_1_of_2_inputs_res_t match_result = {};
-        CHECK_RETHROW(cdfg_find_binop_input(
+        CHECK_RETHROW(cdfg_find_1_of_2_inputs(
             cdfg,
             cur_node_id,
             identity_value_predicate,
@@ -2528,7 +2548,7 @@ static err_t optimize_nop_value(
             continue;
         }
 
-        substitute(cdfg, cur_node_id, match_result.other_input);
+        substitute(cdfg, cur_node_id, match_result.other_input.node_id);
 
         *did_anything = true;
     }

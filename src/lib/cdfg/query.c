@@ -4,12 +4,17 @@ err_t cdfg_find_inputs(
     const cdfg_t* cdfg,
     cdfg_node_id_t node_id,
     cdfg_edge_kind_t edge_kind,
-    cdfg_node_id_t* input_node_ids,
+    cdfg_input_t* inputs,
     size_t inputs_amount
 ) {
     err_t err = SUCCESS;
 
     size_t cur_inputs_amount = 0;
+
+    for (size_t i = 0; i < inputs_amount; i++) {
+        inputs[i].node_id.id = CDFG_ITEM_ID_INVALID;
+        inputs[i].edge_id.id = CDFG_ITEM_ID_INVALID;
+    }
 
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* edge = &cdfg->edge_storage[i];
@@ -19,8 +24,14 @@ err_t cdfg_find_inputs(
         }
 
         CHECK(cur_inputs_amount < inputs_amount);
+        CHECK(edge->to_node_input_index < inputs_amount);
 
-        input_node_ids[cur_inputs_amount] = edge->from_node;
+        cdfg_input_t* input = &inputs[edge->to_node_input_index];
+
+        CHECK(input->node_id.id == CDFG_ITEM_ID_INVALID);
+
+        input->node_id = edge->from_node;
+        input->edge_id.id = i;
 
         cur_inputs_amount++;
     }
@@ -36,12 +47,10 @@ cleanup:
     return err;
 }
 
-err_t cdfg_find_binop_inputs(
-    const cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_node_id_t input_node_ids[2]
-) {
+err_t cdfg_find_2_inputs(const cdfg_t* cdfg, cdfg_node_id_t node_id, cdfg_input_t inputs[2]) {
     err_t err = SUCCESS;
 
-    CHECK_RETHROW(cdfg_find_inputs(cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW, input_node_ids, 2));
+    CHECK_RETHROW(cdfg_find_inputs(cdfg, node_id, CDFG_EDGE_KIND_DATA_FLOW, inputs, 2));
 
 cleanup:
     return err;
@@ -56,11 +65,11 @@ err_t cdfg_find_1_of_2_inputs(
 ) {
     err_t err = SUCCESS;
 
-    cdfg_node_id_t inputs[2] = {};
-    CHECK_RETHROW(cdfg_find_binop_inputs(cdfg, node_id, inputs));
+    cdfg_input_t inputs[2] = {};
+    CHECK_RETHROW(cdfg_find_2_inputs(cdfg, node_id, inputs));
 
     bool is_first_input_matching = false;
-    CHECK_RETHROW(predicate(cdfg, inputs[0], ctx, &is_first_input_matching));
+    CHECK_RETHROW(predicate(cdfg, inputs[0].node_id, ctx, &is_first_input_matching));
     if (is_first_input_matching) {
         result->found = true;
         result->matching_input = inputs[0];
@@ -69,7 +78,7 @@ err_t cdfg_find_1_of_2_inputs(
     }
 
     bool is_second_input_matching = false;
-    CHECK_RETHROW(predicate(cdfg, inputs[1], ctx, &is_second_input_matching));
+    CHECK_RETHROW(predicate(cdfg, inputs[1].node_id, ctx, &is_second_input_matching));
     if (is_second_input_matching) {
         result->found = true;
         result->matching_input = inputs[1];
@@ -78,8 +87,10 @@ err_t cdfg_find_1_of_2_inputs(
     }
 
     result->found = false;
-    result->matching_input.id = CDFG_ITEM_ID_INVALID;
-    result->other_input.id = CDFG_ITEM_ID_INVALID;
+    result->matching_input.node_id.id = CDFG_ITEM_ID_INVALID;
+    result->matching_input.edge_id.id = CDFG_ITEM_ID_INVALID;
+    result->other_input.node_id.id = CDFG_ITEM_ID_INVALID;
+    result->other_input.edge_id.id = CDFG_ITEM_ID_INVALID;
 
 cleanup:
     return err;
@@ -91,11 +102,12 @@ err_t cdfg_find_one_input(
     cdfg_edge_kind_t edge_kind,
     cdfg_node_predicate_t predicate,
     u64 ctx,
-    cdfg_node_id_t* out_node_id
+    cdfg_input_t* out_found_input
 ) {
     err_t err = SUCCESS;
 
-    cdfg_node_id_t found_node_id = {.id = CDFG_ITEM_ID_INVALID};
+    out_found_input->node_id.id = CDFG_ITEM_ID_INVALID;
+    out_found_input->edge_id.id = CDFG_ITEM_ID_INVALID;
 
     for (size_t i = 0; i < cdfg->edges_amount; i++) {
         const cdfg_edge_t* edge = &cdfg->edge_storage[i];
@@ -116,16 +128,16 @@ err_t cdfg_find_one_input(
             continue;
         }
 
-        if (found_node_id.id != CDFG_ITEM_ID_INVALID) {
+        if (out_found_input->node_id.id != CDFG_ITEM_ID_INVALID) {
             // if we found more than one match, return as if there was no match at all
-            found_node_id.id = CDFG_ITEM_ID_INVALID;
+            out_found_input->node_id.id = CDFG_ITEM_ID_INVALID;
+            out_found_input->edge_id.id = CDFG_ITEM_ID_INVALID;
             break;
         }
 
-        found_node_id = edge->from_node;
+        out_found_input->node_id = edge->from_node;
+        out_found_input->edge_id.id = i;
     }
-
-    *out_node_id = found_node_id;
 
 cleanup:
     return err;
@@ -172,28 +184,29 @@ err_t cdfg_detect_phi_loop(
         SUCCESS_CLEANUP();
     }
 
-    cdfg_node_id_t add_node_id = find_phi_add_res.matching_input;
-    cdfg_node_id_t initial_value_node_id = find_phi_add_res.other_input;
-
-    cdfg_node_id_t add_input_node_ids[2] = {};
-    CHECK_RETHROW(cdfg_find_binop_inputs(cdfg, add_node_id, add_input_node_ids));
+    cdfg_input_t add_node = find_phi_add_res.matching_input;
+    cdfg_input_t initial_value = find_phi_add_res.other_input;
 
     // the add node should have the phi node as one of its inputs, and the other input is the
     // increment value.
-    cdfg_node_id_t increment_value_node_id;
-    if (add_input_node_ids[0].id == node_id.id) {
-        increment_value_node_id = add_input_node_ids[1];
-    } else if (add_input_node_ids[1].id == node_id.id) {
-        increment_value_node_id = add_input_node_ids[0];
-    } else {
+    cdfg_find_1_of_2_inputs_res_t find_add_phi_input_res = {};
+    CHECK_RETHROW(cdfg_find_1_of_2_inputs(
+        cdfg,
+        add_node.node_id,
+        cdfg_node_is_node_id,
+        node_id.id,
+        &find_add_phi_input_res
+    ));
+
+    if (!find_add_phi_input_res.found) {
         SUCCESS_CLEANUP();
     }
 
     *result = (cdfg_detect_phi_loop_res_t) {
         .is_phi_loop = true,
-        .initial_value_node_id = initial_value_node_id,
-        .increment_value_node_id = increment_value_node_id,
-        .add_node_id = add_node_id,
+        .initial_value = initial_value,
+        .increment_value = find_add_phi_input_res.other_input,
+        .add_node = add_node,
     };
 
 cleanup:
@@ -206,9 +219,14 @@ err_t cdfg_node_is_phi_loop(
     err_t err = SUCCESS;
 
     cdfg_detect_phi_loop_res_t* res = (cdfg_detect_phi_loop_res_t*) ctx;
-    CHECK_RETHROW(cdfg_detect_phi_loop(cdfg, node_id, res));
 
-    *is_matching = res->is_phi_loop;
+    cdfg_detect_phi_loop_res_t detect_phi_res = {};
+    CHECK_RETHROW(cdfg_detect_phi_loop(cdfg, node_id, &detect_phi_res));
+
+    if (res->is_phi_loop) {
+        *is_matching = true;
+        *res = detect_phi_res;
+    }
 
 cleanup:
     return err;
@@ -260,5 +278,11 @@ err_t cdfg_node_is_of_kind(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, 
     cdfg_node_kind_t desired_kind = ctx;
     const cdfg_node_t* node = &cdfg->node_storage[node_id.id];
     *is_matching = (node->kind == desired_kind);
+    return SUCCESS;
+}
+
+err_t cdfg_node_is_node_id(const cdfg_t* cdfg, cdfg_node_id_t node_id, u64 ctx, bool* is_matching) {
+    UNUSED(cdfg);
+    *is_matching = (node_id.id == ctx);
     return SUCCESS;
 }
