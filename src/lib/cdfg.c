@@ -2419,7 +2419,7 @@ cleanup:
     return err;
 }
 
-static err_t optimize_phi_loop_mul(cdfg_t* cdfg, bool* did_anything) {
+static err_t optimize_phi_loop_calc(cdfg_t* cdfg, cdfg_calculation_t calc, bool* did_anything) {
     err_t err = SUCCESS;
 
     for (size_t cur_node_index = 0; cur_node_index < cdfg->nodes_amount; cur_node_index++) {
@@ -2431,10 +2431,7 @@ static err_t optimize_phi_loop_mul(cdfg_t* cdfg, bool* did_anything) {
             continue;
         }
 
-        bool is_mul =
-            (node->content.calc.calculation == CDFG_CALCULATION_SIGNED_MUL ||
-             node->content.calc.calculation == CDFG_CALCULATION_UNSIGNED_MUL);
-        if (!is_mul) {
+        if (node->content.calc.calculation != calc) {
             continue;
         }
 
@@ -2462,7 +2459,7 @@ static err_t optimize_phi_loop_mul(cdfg_t* cdfg, bool* did_anything) {
         cdfg_node_id_t new_initial_value_node = {.id = CDFG_ITEM_ID_INVALID};
         CHECK_RETHROW(make_binop_node(
             cdfg,
-            node->content.calc.calculation,
+            calc,
             initial_value_input.node_id,
             mul_factor_input.node_id,
             &new_initial_value_node
@@ -2471,7 +2468,7 @@ static err_t optimize_phi_loop_mul(cdfg_t* cdfg, bool* did_anything) {
         cdfg_node_id_t new_increment_value_node = {.id = CDFG_ITEM_ID_INVALID};
         CHECK_RETHROW(make_binop_node(
             cdfg,
-            node->content.calc.calculation,
+            calc,
             detect_phi_res.increment_value.node_id,
             mul_factor_input.node_id,
             &new_increment_value_node
@@ -2615,7 +2612,10 @@ err_t cdfg_optimize(cdfg_t* cdfg) {
         CHECK_RETHROW(
             optimize_nop_value(cdfg, CDFG_CALCULATION_ADD, cdfg_node_is_imm, 0, &did_anything)
         );
-        CHECK_RETHROW(optimize_phi_loop_mul(cdfg, &did_anything));
+        CHECK_RETHROW(optimize_phi_loop_calc(cdfg, CDFG_CALCULATION_SIGNED_MUL, &did_anything));
+        CHECK_RETHROW(optimize_phi_loop_calc(cdfg, CDFG_CALCULATION_UNSIGNED_MUL, &did_anything));
+        CHECK_RETHROW(optimize_phi_loop_calc(cdfg, CDFG_CALCULATION_ADD, &did_anything));
+        CHECK_RETHROW(optimize_phi_loop_calc(cdfg, CDFG_CALCULATION_SUB, &did_anything));
     } while (did_anything);
 cleanup:
     return err;
