@@ -23,6 +23,8 @@ err_t cdfg_find_inputs(
             continue;
         }
 
+        CHECK(edge->from_node.id != CDFG_ITEM_ID_INVALID);
+
         CHECK(edge->to_node_input_index < inputs_amount);
 
         cdfg_input_t* input = &inputs[edge->to_node_input_index];
